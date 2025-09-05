@@ -265,4 +265,3 @@ class(`Person`) <- c("Person__bundle", "savvy_sedonadb__sealed")
 `print.Person__bundle` <- function(x, ...) {
   cat('Person\n')
 }
-
