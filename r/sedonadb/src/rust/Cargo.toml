@@ -1,0 +1,22 @@
+[package]
+name = "sedonadbr"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib", "lib"]
+
+[dependencies]
+arrow-schema = { workspace = true }
+arrow-array ={ workspace = true }
+datafusion = { workspace = true }
+datafusion-common = { workspace = true }
+savvy = "*"
+savvy-ffi = "*"
+sedona = { path = "../../../../rust/sedona" }
+sedona-adbc = { path = "../../../../rust/sedona-adbc" }
+sedona-expr = { path = "../../../../rust/sedona-expr" }
+sedona-geoparquet = { path = "../../../../rust/sedona-geoparquet" }
+sedona-schema = { path = "../../../../rust/sedona-schema" }
+thiserror = { workspace = true }
+tokio = { workspace = true }
