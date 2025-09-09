@@ -45,6 +45,8 @@
     
       <link rel="stylesheet" href="assets/_mkdocstrings.css">
     
+      <link rel="stylesheet" href="stylesheets/extra.css">
+    
     <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -71,7 +73,7 @@
     
     
     
-    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="deep-orange" data-md-color-accent="green">
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="green">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -88,6 +90,10 @@
     <div data-md-component="announce">
       
     </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
     
     
       
@@ -221,17 +227,18 @@
   
   
   
-    <li class="md-tabs__item">
-      <a href="quickstart-cli/" class="md-tabs__link">
-        
-  
-  
     
+    
+      <li class="md-tabs__item">
+        <a href="quickstart-cli/" class="md-tabs__link">
+          
   
-  CLI Quickstart
+  
+  SedonaDB Guides
 
-      </a>
-    </li>
+        </a>
+      </li>
+    
   
 
       
@@ -240,40 +247,9 @@
   
   
   
-    <li class="md-tabs__item">
-      <a href="quickstart-python/" class="md-tabs__link">
-        
-  
-  
     
-  
-  Python Quickstart
-
-      </a>
-    </li>
-  
-
-      
-        
-  
-  
-  
-  
-    <li class="md-tabs__item">
-      <a href="development/" class="md-tabs__link">
-        
-  
-  
     
-  
-  Development
-
-      </a>
-    </li>
-  
-
       
-        
   
   
   
@@ -285,11 +261,71 @@
           
   
   
-  API Reference
+  SedonaDB Reference
 
         </a>
       </li>
     
+  
+
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="https://sedona.apache.org/latest/blog/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Blog
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="https://sedona.apache.org/latest/asf/asf/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Apache Software Foundation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="https://sedona.apache.org/latest/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Return to Sedona Homepage
+
+      </a>
+    </li>
   
 
       
@@ -310,7 +346,9 @@
           
             
               
-              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+                
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" hidden>
                 <div class="md-sidebar__scrollwrap">
                   <div class="md-sidebar__inner">
                     
@@ -449,6 +487,49 @@
   
   
   
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2">
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    SedonaDB Guides
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            SedonaDB Guides
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
     <li class="md-nav__item">
       <a href="quickstart-cli/" class="md-nav__link">
         
@@ -464,9 +545,10 @@
     </li>
   
 
-    
-      
-      
+              
+            
+              
+                
   
   
   
@@ -486,9 +568,10 @@
     </li>
   
 
-    
-      
-      
+              
+            
+              
+                
   
   
   
@@ -508,6 +591,14 @@
     </li>
   
 
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
     
       
       
@@ -520,6 +611,8 @@
     
     
       
+      
+        
       
     
     
@@ -527,15 +620,15 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5">
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3">
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
             
   
   
   <span class="md-ellipsis">
-    API Reference
+    SedonaDB Reference
     
   </span>
   
@@ -543,10 +636,53 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
-            API Reference
+            SedonaDB Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1">
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Python
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            Python
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -562,30 +698,7 @@
   
   
   <span class="md-ellipsis">
-    Python
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="reference/sql/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    SQL
+    Python Functions
     
   </span>
   
@@ -602,6 +715,200 @@
     </li>
   
 
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2">
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    SQL
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            SQL
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="reference/sql/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    SQL Functions
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="reference/sql-joins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Spatial Joins
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="reference/read-parquet-files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Read Parquet Files
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://sedona.apache.org/latest/blog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Blog
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://sedona.apache.org/latest/asf/asf/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Apache Software Foundation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://sedona.apache.org/latest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Return to Sedona Homepage
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
     
   </ul>
 </nav>
@@ -610,6 +917,8 @@
               </div>
             
             
+              
+                
               
               <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
                 <div class="md-sidebar__scrollwrap">
@@ -678,6 +987,8 @@
               <article class="md-content__inner md-typeset">
                 
                   
+  
+
 
 
   
@@ -708,6 +1019,8 @@
   under the License.
 --><h1 id="sedonadb">SedonaDB<a class="headerlink" href="#sedonadb" title="Permanent link">¶</a></h1>
 <p>SedonaDB is a high-performance, dependency-free geospatial compute engine.</p>
+<p>You can easily run SedonaDB locally or in the cloud.  The first release supports a core set of vector operations, but the full-suite of common vector and raster computations will be supported soon.</p>
+<p>SedonaDB only runs on a single machine, so it’s perfect for processing smaller datasets.  You can use SedonaSpark, SedonaFlink, or SedonaSnow for operations on larger datasets.</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="1:4"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio"><input id="__tabbed_1_2" name="__tabbed_1" type="radio"><input id="__tabbed_1_3" name="__tabbed_1" type="radio"><input id="__tabbed_1_4" name="__tabbed_1" type="radio"><div class="tabbed-labels"><label for="__tabbed_1_1">SQL</label><label for="__tabbed_1_2">Python</label><label for="__tabbed_1_3">Rust</label><label for="__tabbed_1_4">R</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
@@ -742,25 +1055,22 @@
 </div>
 </div>
 <h2 id="key-features">Key features<a class="headerlink" href="#key-features" title="Permanent link">¶</a></h2>
+<p>SedonaDB has several advantages:</p>
 <ul>
-<li><strong>Blazing fast</strong>: SedonaDB runs on a single machine, optimized for geospatial workflows.</li>
-<li>SedonaDB is a <strong>dependency-free</strong>, <strong>small binary</strong> that is only XX KB.</li>
-<li>Supports <strong>various file formats</strong>, including GeoJSON, Shapefile, GeoParquet, CSV, and PostGIS.</li>
-<li>Exposes <strong>several language APIs,</strong> including SQL, Python, Rust, and R.</li>
-<li><strong>Portable</strong>: Easy to run on the command line, locally or in the cloud with AWS Sagemaker, AWS Lambda, Azure Functions, Azure Machine Learning, or Google Colab.</li>
-<li><strong>Extensible</strong>: You can extend SedonaDB to build your own geospatial compute engine custom for your needs.</li>
-<li><strong>Open source</strong>: Apache Sedona is an open-source project managed according to the Apache Software Foundation's guidelines.</li>
+<li><strong>Blazing-Fast Performance:</strong> Built in Rust to process massive geospatial datasets with exceptional speed.</li>
+<li><strong>Unified Geospatial Toolkit:</strong> Access a comprehensive suite of functions for both vector and raster data in a single, powerful library.</li>
+<li><strong>Seamless Ecosystem Integration:</strong> Built on Apache Arrow for smooth interoperability with popular data science libraries like GeoPandas, DuckDB, and Polars.</li>
+<li><strong>Flexible APIs:</strong> Effortlessly switch between Python and SQL interfaces to match your preferred workflow and skillset.</li>
+<li><strong>Guaranteed CRS Propagation:</strong> Automatically manages coordinate reference systems (CRS) to ensure spatial accuracy and prevent common errors.</li>
+<li><strong>Broad File Format Support:</strong> Work with a wide range of both modern and legacy geospatial file formats like geoparquet.</li>
+<li><strong>Highly Extensible:</strong> Easily customize and extend the library's functionality to meet your project's unique requirements.</li>
 </ul>
 <h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">¶</a></h2>
 <p>Here’s how to install SedonaDB with various build tools:</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="2:3"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio"><input id="__tabbed_2_2" name="__tabbed_2" type="radio"><input id="__tabbed_2_3" name="__tabbed_2" type="radio"><div class="tabbed-labels"><label for="__tabbed_2_1">pip</label><label for="__tabbed_2_2">Rust</label><label for="__tabbed_2_3">R</label></div>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio"><input id="__tabbed_2_2" name="__tabbed_2" type="radio"><div class="tabbed-labels"><label for="__tabbed_2_1">pip</label><label for="__tabbed_2_2">R</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"apache-sedona[db]"</span>
-</code></pre></div>
-</div>
-<div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><span class="n">cargo</span><span class="w"> </span><span class="n">add</span><span class="w"> </span><span class="n">sedona</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
@@ -794,7 +1104,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"></path></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-datetime" title="August 29, 2025 19:04:00 UTC">August 29, 2025 19:04:00</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-datetime" title="September 9, 2025 20:06:34 UTC">September 9, 2025 20:06:34</span>
   </span>
 
     
@@ -804,6 +1114,8 @@
   </aside>
 
 
+
+  
 
 
 
@@ -826,6 +1138,8 @@
         <footer class="md-footer">
   
     
+      
+        
       
       <nav class="md-footer__inner md-grid" aria-label="Footer">
         
@@ -877,7 +1191,7 @@
     
     
       
-      <script id="__config" type="application/json">{"base": ".", "features": ["content.code.copy", "content.action.edit", "search.highlight", "search.share", "search.suggest", "navigation.footer", "navigation.instant", "navigation.tabs", "navigation.tabs.sticky", "navigation.top"], "search": "assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"base": ".", "features": ["content.code.copy", "content.action.edit", "search.highlight", "search.share", "search.suggest", "navigation.footer", "navigation.instant", "navigation.top", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky"], "search": "assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
       <script src="assets/javascripts/bundle.92b07e13.min.js"></script>
