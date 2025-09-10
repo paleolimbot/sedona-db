@@ -103,6 +103,39 @@ mod test {
     use super::*;
 
     #[test]
+    fn sedona_types() {
+        let schema = Schema::new(vec![
+            WKB_GEOGRAPHY.to_storage_field("geog", true).unwrap(),
+            WKB_GEOMETRY.to_storage_field("geom", true).unwrap(),
+            Field::new("one", DataType::Int32, true),
+        ]);
+        let df_schema: DFSchema = schema.clone().try_into().unwrap();
+
+        let sedona_types = schema.sedona_types().collect::<Result<Vec<_>>>().unwrap();
+        assert_eq!(
+            sedona_types,
+            vec![
+                WKB_GEOGRAPHY,
+                WKB_GEOMETRY,
+                SedonaType::Arrow(DataType::Int32)
+            ]
+        );
+
+        let sedona_types = df_schema
+            .sedona_types()
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
+        assert_eq!(
+            sedona_types,
+            vec![
+                WKB_GEOGRAPHY,
+                WKB_GEOMETRY,
+                SedonaType::Arrow(DataType::Int32)
+            ]
+        );
+    }
+
+    #[test]
     fn geometry_columns() {
         // No geometry column
         let schema = Schema::new(vec![Field::new("one", DataType::Int32, true)]);
