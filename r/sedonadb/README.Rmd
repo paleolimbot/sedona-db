@@ -82,7 +82,7 @@ sd_sql("SELECT * FROM nc")
 ```
 
 ```{r}
-sd_sql("SELECT ST_Buffer(geometry, 0.1) as geometry FROM nc") |> 
-  st_as_sf() |> 
+sd_sql("SELECT ST_Buffer(geometry, 0.1) as geometry FROM nc") |>
+  st_as_sf() |>
   plot()
 ```
