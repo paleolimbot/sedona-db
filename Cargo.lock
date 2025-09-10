@@ -5082,7 +5082,6 @@ dependencies = [
  "arrow-array",
  "arrow-schema",
  "datafusion-common",
- "datafusion-expr",
  "sedona-common",
  "serde_json",
 ]
