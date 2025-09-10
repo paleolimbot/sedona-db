@@ -14,6 +14,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+
 [package]
 name = "sedonadbr"
 version = "0.1.0"
@@ -24,7 +25,7 @@ crate-type = ["staticlib", "lib"]
 
 [dependencies]
 arrow-schema = { workspace = true }
-arrow-array ={ workspace = true }
+arrow-array = { workspace = true }
 datafusion = { workspace = true }
 datafusion-common = { workspace = true }
 savvy = "*"
