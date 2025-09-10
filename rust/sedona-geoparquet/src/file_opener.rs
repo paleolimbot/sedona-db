@@ -31,8 +31,7 @@ use parquet::file::{
 };
 use sedona_expr::{spatial_filter::SpatialFilter, statistics::GeoStatistics};
 use sedona_geometry::bounding_box::BoundingBox;
-use sedona_schema::datatypes::SedonaType;
-use sedona_schema::matchers::ArgMatcher;
+use sedona_schema::{datatypes::SedonaType, matchers::ArgMatcher};
 
 use crate::metadata::GeoParquetMetadata;
 

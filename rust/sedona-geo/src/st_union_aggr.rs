@@ -27,8 +27,10 @@ use geo::BooleanOps;
 use geo_traits::to_geo::ToGeoGeometry;
 use sedona_expr::aggregate_udf::{SedonaAccumulator, SedonaAccumulatorRef};
 use sedona_functions::executor::WkbExecutor;
-use sedona_schema::datatypes::{SedonaType, WKB_GEOMETRY};
-use sedona_schema::matchers::ArgMatcher;
+use sedona_schema::{
+    datatypes::{SedonaType, WKB_GEOMETRY},
+    matchers::ArgMatcher,
+};
 use wkb::reader::Wkb;
 use wkb::writer::write_geometry;
 use wkb::Endianness;

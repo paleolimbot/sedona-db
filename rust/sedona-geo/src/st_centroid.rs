@@ -24,8 +24,10 @@ use geo_generic_alg::Centroid;
 use sedona_expr::scalar_udf::{ScalarKernelRef, SedonaScalarKernel};
 use sedona_functions::executor::WkbExecutor;
 use sedona_geometry::is_empty::is_geometry_empty;
-use sedona_schema::datatypes::{SedonaType, WKB_GEOMETRY};
-use sedona_schema::matchers::ArgMatcher;
+use sedona_schema::{
+    datatypes::{SedonaType, WKB_GEOMETRY},
+    matchers::ArgMatcher,
+};
 use wkb::reader::Wkb;
 
 use geo_traits::Dimensions;

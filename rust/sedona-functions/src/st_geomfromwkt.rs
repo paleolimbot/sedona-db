@@ -25,8 +25,10 @@ use datafusion_expr::{
 };
 use sedona_expr::scalar_udf::{SedonaScalarKernel, SedonaScalarUDF};
 use sedona_geometry::wkb_factory::WKB_MIN_PROBABLE_BYTES;
-use sedona_schema::datatypes::{SedonaType, WKB_GEOGRAPHY, WKB_GEOMETRY};
-use sedona_schema::matchers::ArgMatcher;
+use sedona_schema::{
+    datatypes::{SedonaType, WKB_GEOGRAPHY, WKB_GEOMETRY},
+    matchers::ArgMatcher,
+};
 use wkb::writer::write_geometry;
 use wkt::Wkt;
 

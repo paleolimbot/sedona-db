@@ -30,8 +30,7 @@ use datafusion_expr::{
     scalar_doc_sections::DOC_SECTION_OTHER, ColumnarValue, Documentation, Volatility,
 };
 use sedona_expr::scalar_udf::{SedonaScalarKernel, SedonaScalarUDF};
-use sedona_schema::datatypes::SedonaType;
-use sedona_schema::matchers::ArgMatcher;
+use sedona_schema::{datatypes::SedonaType, matchers::ArgMatcher};
 
 /// SD_Format() scalar UDF implementation
 ///

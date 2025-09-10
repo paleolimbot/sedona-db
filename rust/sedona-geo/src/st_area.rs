@@ -23,8 +23,7 @@ use datafusion_expr::ColumnarValue;
 use geo_generic_alg::Area;
 use sedona_expr::scalar_udf::{ScalarKernelRef, SedonaScalarKernel};
 use sedona_functions::executor::WkbExecutor;
-use sedona_schema::datatypes::SedonaType;
-use sedona_schema::matchers::ArgMatcher;
+use sedona_schema::{datatypes::SedonaType, matchers::ArgMatcher};
 use wkb::reader::Wkb;
 
 /// ST_Area() implementation using [Area]

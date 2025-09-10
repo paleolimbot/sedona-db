@@ -21,8 +21,10 @@ use datafusion_common::error::Result;
 use datafusion_expr::ColumnarValue;
 use sedona_expr::scalar_udf::{ScalarKernelRef, SedonaScalarKernel};
 use sedona_functions::executor::WkbExecutor;
-use sedona_schema::datatypes::{SedonaType, WKB_GEOGRAPHY, WKB_GEOMETRY};
-use sedona_schema::matchers::ArgMatcher;
+use sedona_schema::{
+    datatypes::{SedonaType, WKB_GEOGRAPHY, WKB_GEOMETRY},
+    matchers::ArgMatcher,
+};
 
 use crate::geoarrow_c::{ArrayReader, ArrayWriter, CError, Visitor};
 

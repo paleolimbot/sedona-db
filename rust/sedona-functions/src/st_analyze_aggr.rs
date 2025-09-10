@@ -36,8 +36,7 @@ use sedona_expr::{aggregate_udf::SedonaAccumulator, statistics::GeoStatistics};
 use sedona_geometry::analyze::GeometryAnalysis;
 use sedona_geometry::interval::IntervalTrait;
 use sedona_geometry::types::GeometryTypeAndDimensions;
-use sedona_schema::datatypes::SedonaType;
-use sedona_schema::matchers::ArgMatcher;
+use sedona_schema::{datatypes::SedonaType, matchers::ArgMatcher};
 use wkb::reader::Wkb;
 
 use crate::executor::WkbExecutor;

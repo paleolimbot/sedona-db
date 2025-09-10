@@ -33,8 +33,10 @@ use sedona_geometry::{
     bounds::geo_traits_update_xy_bounds,
     interval::{Interval, IntervalTrait},
 };
-use sedona_schema::datatypes::{SedonaType, WKB_GEOMETRY};
-use sedona_schema::matchers::ArgMatcher;
+use sedona_schema::{
+    datatypes::{SedonaType, WKB_GEOMETRY},
+    matchers::ArgMatcher,
+};
 
 /// ST_Envelope_Aggr() aggregate UDF implementation
 ///

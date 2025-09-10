@@ -37,8 +37,10 @@ use sedona_geometry::{
         write_wkb_multipoint_header, write_wkb_multipolygon_header,
     },
 };
-use sedona_schema::datatypes::{SedonaType, WKB_GEOMETRY};
-use sedona_schema::matchers::ArgMatcher;
+use sedona_schema::{
+    datatypes::{SedonaType, WKB_GEOMETRY},
+    matchers::ArgMatcher,
+};
 
 /// ST_Collect() aggregate UDF implementation
 ///

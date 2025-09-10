@@ -18,8 +18,10 @@ use std::vec;
 
 use datafusion_expr::{scalar_doc_sections::DOC_SECTION_OTHER, Documentation, Volatility};
 use sedona_expr::scalar_udf::SedonaScalarUDF;
-use sedona_schema::datatypes::{Edges, SedonaType};
-use sedona_schema::matchers::ArgMatcher;
+use sedona_schema::{
+    datatypes::{Edges, SedonaType},
+    matchers::ArgMatcher,
+};
 
 /// St_Transform() UDF implementation
 ///

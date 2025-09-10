@@ -35,8 +35,10 @@ use sedona_geometry::{
     error::SedonaGeometryError,
     wkb_factory::{write_wkb_coord, write_wkb_point_header},
 };
-use sedona_schema::datatypes::{SedonaType, WKB_GEOMETRY};
-use sedona_schema::matchers::ArgMatcher;
+use sedona_schema::{
+    datatypes::{SedonaType, WKB_GEOMETRY},
+    matchers::ArgMatcher,
+};
 
 use crate::executor::WkbExecutor;
 

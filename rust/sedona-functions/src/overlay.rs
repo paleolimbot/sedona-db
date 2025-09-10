@@ -16,8 +16,7 @@
 // under the License.
 use datafusion_expr::{scalar_doc_sections::DOC_SECTION_OTHER, Documentation, Volatility};
 use sedona_expr::scalar_udf::SedonaScalarUDF;
-use sedona_schema::datatypes::WKB_GEOMETRY;
-use sedona_schema::matchers::ArgMatcher;
+use sedona_schema::{datatypes::WKB_GEOMETRY, matchers::ArgMatcher};
 
 /// ST_Intersection() scalar UDF stub
 pub fn st_intersection_udf() -> SedonaScalarUDF {
