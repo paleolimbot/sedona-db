@@ -23,6 +23,9 @@ use datafusion_common::{DFSchema, Result};
 use crate::{datatypes::SedonaType, matchers::ArgMatcher};
 
 pub trait SedonaSchema {
+    /// Iterate over the fields of this schema as parsed [SedonaType]s
+    fn sedona_types(&self) -> impl ExactSizeIterator<Item = Result<SedonaType>>;
+
     /// Return the indices of the columns that are geometry or geography
     fn geometry_column_indices(&self) -> Result<Vec<usize>>;
 
@@ -37,6 +40,10 @@ pub trait SedonaSchema {
 }
 
 impl SedonaSchema for DFSchema {
+    fn sedona_types(&self) -> impl ExactSizeIterator<Item = Result<SedonaType>> {
+        self.as_arrow().sedona_types()
+    }
+
     fn geometry_column_indices(&self) -> Result<Vec<usize>> {
         self.as_arrow().geometry_column_indices()
     }
@@ -47,11 +54,17 @@ impl SedonaSchema for DFSchema {
 }
 
 impl SedonaSchema for Schema {
+    fn sedona_types(&self) -> impl ExactSizeIterator<Item = Result<SedonaType>> {
+        self.fields()
+            .iter()
+            .map(|f| SedonaType::from_storage_field(f))
+    }
+
     fn geometry_column_indices(&self) -> Result<Vec<usize>> {
         let mut indices = Vec::new();
         let matcher = ArgMatcher::is_geometry_or_geography();
-        for (i, field) in self.fields().iter().enumerate() {
-            if matcher.match_type(&SedonaType::from_storage_field(field)?) {
+        for (i, sedona_type) in self.sedona_types().enumerate() {
+            if matcher.match_type(&sedona_type?) {
                 indices.push(i);
             }
         }
