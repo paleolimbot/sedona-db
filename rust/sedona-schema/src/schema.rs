@@ -23,7 +23,16 @@ use datafusion_common::{DFSchema, Result};
 use crate::{datatypes::SedonaType, matchers::ArgMatcher};
 
 pub trait SedonaSchema {
+    /// Return the indices of the columns that are geometry or geography
     fn geometry_column_indices(&self) -> Result<Vec<usize>>;
+
+    /// Return the index of the column that should be considered the "primary" geometry
+    ///
+    /// This applies a heuritic to detect the "primary" geometry column for operations
+    /// that need this information (e.g., creating a GeoPandas GeoDataFrame). The
+    /// heuristic chooses (1) the column named "geometry", (2) the column name
+    /// "geography", (3) the column named "geom", (4) the column named "geog",
+    /// or (5) the first column with a geometry or geography data type.
     fn primary_geometry_column_index(&self) -> Result<Option<usize>>;
 }
 
@@ -69,5 +78,40 @@ impl SedonaSchema for Schema {
         }
 
         Ok(Some(indices[0]))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use arrow_schema::{DataType, Field};
+
+    use crate::datatypes::{WKB_GEOGRAPHY, WKB_GEOMETRY};
+
+    use super::*;
+
+    #[test]
+    fn geometry_columns() {
+        // No geometry column
+        let schema = Schema::new(vec![Field::new("one", DataType::Int32, true)]);
+        let df_schema: DFSchema = schema.clone().try_into().unwrap();
+        assert!(schema.geometry_column_indices().unwrap().is_empty());
+        assert!(schema.primary_geometry_column_index().unwrap().is_none());
+        assert!(df_schema.geometry_column_indices().unwrap().is_empty());
+        assert!(df_schema.primary_geometry_column_index().unwrap().is_none());
+
+        // Should list geometry and geography but pick geom as the primary column
+        let schema = Schema::new(vec![
+            WKB_GEOGRAPHY.to_storage_field("geog", true).unwrap(),
+            WKB_GEOMETRY.to_storage_field("geom", true).unwrap(),
+        ]);
+        assert_eq!(schema.geometry_column_indices().unwrap(), vec![0, 1]);
+        assert_eq!(schema.primary_geometry_column_index().unwrap(), Some(1));
+
+        // ...but should still detect a column without a special name
+        let schema = Schema::new(vec![WKB_GEOMETRY
+            .to_storage_field("name_not_special_cased", true)
+            .unwrap()]);
+        assert_eq!(schema.geometry_column_indices().unwrap(), vec![0]);
+        assert_eq!(schema.primary_geometry_column_index().unwrap(), Some(0));
     }
 }
