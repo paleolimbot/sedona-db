@@ -38,7 +38,7 @@ datafusion = { workspace = true }
 datafusion-common = { workspace = true }
 datafusion-ffi = { workspace = true }
 futures = { workspace = true }
-pyo3 = { version = "0.25.1", features = ["extension-module"] }
+pyo3 = { version = "0.25.1" }
 sedona = { path = "../../rust/sedona" }
 sedona-adbc = { path = "../../rust/sedona-adbc" }
 sedona-geoparquet = { path = "../../rust/sedona-geoparquet" }
