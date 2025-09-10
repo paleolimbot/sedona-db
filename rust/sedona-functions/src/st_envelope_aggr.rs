@@ -29,12 +29,12 @@ use datafusion_expr::{
 };
 use sedona_common::sedona_internal_err;
 use sedona_expr::aggregate_udf::{SedonaAccumulator, SedonaAggregateUDF};
-use sedona_schema::matchers::ArgMatcher;
 use sedona_geometry::{
     bounds::geo_traits_update_xy_bounds,
     interval::{Interval, IntervalTrait},
 };
 use sedona_schema::datatypes::{SedonaType, WKB_GEOMETRY};
+use sedona_schema::matchers::ArgMatcher;
 
 /// ST_Envelope_Aggr() aggregate UDF implementation
 ///

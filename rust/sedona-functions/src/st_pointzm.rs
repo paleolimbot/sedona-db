@@ -31,12 +31,12 @@ use datafusion_expr::{
 };
 use geo_traits::Dimensions;
 use sedona_expr::scalar_udf::{SedonaScalarKernel, SedonaScalarUDF};
-use sedona_schema::matchers::ArgMatcher;
 use sedona_geometry::{
     error::SedonaGeometryError,
     wkb_factory::{write_wkb_coord, write_wkb_point_header},
 };
 use sedona_schema::datatypes::{SedonaType, WKB_GEOMETRY};
+use sedona_schema::matchers::ArgMatcher;
 
 use crate::executor::WkbExecutor;
 

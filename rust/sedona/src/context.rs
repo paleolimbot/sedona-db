@@ -35,16 +35,13 @@ use datafusion_expr::sqlparser::dialect::{dialect_from_str, Dialect};
 use parking_lot::Mutex;
 use sedona_common::option::add_sedona_option_extension;
 use sedona_expr::aggregate_udf::SedonaAccumulatorRef;
-use sedona_expr::{
-    function_set::FunctionSet,
-    scalar_udf::ScalarKernelRef,
-};
-use sedona_schema::matchers::ArgMatcher;
+use sedona_expr::{function_set::FunctionSet, scalar_udf::ScalarKernelRef};
 use sedona_geoparquet::{
     format::GeoParquetFormatFactory,
     provider::{geoparquet_listing_table, GeoParquetReadOptions},
 };
 use sedona_schema::datatypes::SedonaType;
+use sedona_schema::matchers::ArgMatcher;
 
 use crate::exec::create_plan_from_sql;
 use crate::{

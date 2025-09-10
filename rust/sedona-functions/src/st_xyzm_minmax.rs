@@ -26,12 +26,12 @@ use datafusion_expr::{
 use geo_traits::GeometryTrait;
 use sedona_common::sedona_internal_err;
 use sedona_expr::scalar_udf::{SedonaScalarKernel, SedonaScalarUDF};
-use sedona_schema::matchers::ArgMatcher;
 use sedona_geometry::{
     bounds::{geo_traits_bounds_m, geo_traits_bounds_xy, geo_traits_bounds_z},
     interval::{Interval, IntervalTrait},
 };
 use sedona_schema::datatypes::SedonaType;
+use sedona_schema::matchers::ArgMatcher;
 
 pub fn st_xmin_udf() -> SedonaScalarUDF {
     SedonaScalarUDF::new(

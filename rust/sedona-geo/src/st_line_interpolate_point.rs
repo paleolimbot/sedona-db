@@ -25,9 +25,9 @@ use datafusion_expr::ColumnarValue;
 use geo::{algorithm::line_measures::InterpolatableLine, Euclidean};
 use geo_traits::GeometryTrait;
 use sedona_expr::scalar_udf::{ScalarKernelRef, SedonaScalarKernel};
-use sedona_schema::matchers::ArgMatcher;
 use sedona_geometry::wkb_factory::write_wkb_point;
 use sedona_schema::datatypes::{SedonaType, WKB_GEOMETRY};
+use sedona_schema::matchers::ArgMatcher;
 
 use crate::to_geo::GeoTypesExecutor;
 

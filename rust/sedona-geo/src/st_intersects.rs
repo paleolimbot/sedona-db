@@ -22,9 +22,9 @@ use datafusion_common::error::Result;
 use datafusion_expr::ColumnarValue;
 use geo_generic_alg::Intersects;
 use sedona_expr::scalar_udf::{ScalarKernelRef, SedonaScalarKernel};
-use sedona_schema::matchers::ArgMatcher;
 use sedona_functions::executor::WkbExecutor;
 use sedona_schema::datatypes::SedonaType;
+use sedona_schema::matchers::ArgMatcher;
 use wkb::reader::Wkb;
 
 /// ST_Intersects() implementation using [Intersects]

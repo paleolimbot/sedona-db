@@ -16,9 +16,9 @@
 // under the License.
 use arrow_schema::DataType;
 use datafusion_expr::{scalar_doc_sections::DOC_SECTION_OTHER, Documentation, Volatility};
-use sedona_expr::scalar_udf::{SedonaScalarUDF};
-use sedona_schema::matchers::ArgMatcher;
+use sedona_expr::scalar_udf::SedonaScalarUDF;
 use sedona_schema::datatypes::SedonaType;
+use sedona_schema::matchers::ArgMatcher;
 
 /// ST_DWithin() scalar UDF stub
 pub fn st_dwithin_udf() -> SedonaScalarUDF {

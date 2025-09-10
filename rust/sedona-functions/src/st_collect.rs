@@ -30,7 +30,6 @@ use datafusion_expr::{
 use geo_traits::Dimensions;
 use sedona_common::sedona_internal_err;
 use sedona_expr::aggregate_udf::{SedonaAccumulator, SedonaAggregateUDF};
-use sedona_schema::matchers::ArgMatcher;
 use sedona_geometry::{
     types::{GeometryTypeAndDimensions, GeometryTypeId},
     wkb_factory::{
@@ -39,6 +38,7 @@ use sedona_geometry::{
     },
 };
 use sedona_schema::datatypes::{SedonaType, WKB_GEOMETRY};
+use sedona_schema::matchers::ArgMatcher;
 
 /// ST_Collect() aggregate UDF implementation
 ///

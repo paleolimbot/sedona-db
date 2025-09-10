@@ -24,7 +24,6 @@ use datafusion_expr::{
 };
 use geo_traits::GeometryTrait;
 use sedona_expr::scalar_udf::{SedonaScalarKernel, SedonaScalarUDF};
-use sedona_schema::matchers::ArgMatcher;
 use sedona_geometry::{
     bounds::geo_traits_bounds_xy,
     interval::{Interval, IntervalTrait, WraparoundInterval},
@@ -36,6 +35,7 @@ use sedona_geometry::{
     },
 };
 use sedona_schema::datatypes::{SedonaType, WKB_GEOMETRY};
+use sedona_schema::matchers::ArgMatcher;
 use wkb::reader::Wkb;
 
 /// ST_Envelope() scalar UDF implementation
