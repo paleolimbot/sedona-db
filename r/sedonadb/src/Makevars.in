@@ -26,7 +26,7 @@ RUSTFLAGS =
 TARGET_DIR = $(CURDIR)/rust/target
 LIBDIR = $(TARGET_DIR)/$(TARGET)/$(subst dev,debug,$(PROFILE))
 STATLIB = $(LIBDIR)/libsedonadbr.a
-PKG_LIBS = -L$(LIBDIR) -lsedonadbr -L/opt/homebrew/Cellar/geos/3.13.1/lib -lgeos_c
+PKG_LIBS = -L$(LIBDIR) -lsedonadbr @PKG_LIBS@
 
 CARGO_BUILD_ARGS = --lib --profile $(PROFILE) $(FEATURE_FLAGS) --manifest-path=./rust/Cargo.toml --target-dir $(TARGET_DIR)
 

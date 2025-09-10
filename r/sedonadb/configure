@@ -15,6 +15,25 @@
 # specific language governing permissions and limitations
 # under the License.
 
+# We need to link GEOS libs. The cargo build will use pkg-config
+# and then geos-config, in that order, and requires pkg-config to be
+# available (even if it isn't used). Here we just try pkg-config (LIB_DIR
+# can be used to specify the location of -lgeos_c)
+
+pkg-config geos  2>/dev/null
+if [ $? -eq 0 ]; then
+  PKGCONFIG_LIBS=`pkg-config --libs geos`
+fi
+
+if [ "$LIB_DIR" ]; then
+  echo "Found LIB_DIR!"
+  PKG_LIBS="-L$LIB_DIR -lgeos_c $PKG_LIBS"
+elif [ "$PKGCONFIG_CFLAGS" ] || [ "$PKGCONFIG_LIBS" ]; then
+  echo "Found GEOS pkg-config libs!"
+  PKG_LIBS=${PKGCONFIG_LIBS}
+fi
+
+
 # Even when `cargo` is on `PATH`, `rustc` might not in some cases. This adds
 # ~/.cargo/bin to PATH to address such cases. Note that is not always available
 # (e.g. or on Ubuntu with Rust installed via APT).
@@ -68,4 +87,5 @@ sed \
   -e "s/@TARGET@/${TARGET}/" \
   -e "s/@PROFILE@/${PROFILE}/" \
   -e "s/@FEATURE_FLAGS@/${FEATURE_FLAGS}/" \
+  -e "s|@PKG_LIBS@|${PKG_LIBS}|" \
   src/Makevars.in > src/Makevars
