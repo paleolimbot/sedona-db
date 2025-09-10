@@ -17,8 +17,9 @@
 use std::vec;
 
 use datafusion_expr::{scalar_doc_sections::DOC_SECTION_OTHER, Documentation, Volatility};
-use sedona_expr::{aggregate_udf::SedonaAggregateUDF, scalar_udf::ArgMatcher};
+use sedona_expr::aggregate_udf::SedonaAggregateUDF;
 use sedona_schema::datatypes::{Edges, SedonaType};
+use sedona_schema::matchers::ArgMatcher;
 
 /// ST_Union_Aggr() aggregate UDF implementation
 ///

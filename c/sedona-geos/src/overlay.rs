@@ -20,7 +20,8 @@ use arrow_array::builder::BinaryBuilder;
 use datafusion_common::{error::Result, DataFusionError};
 use datafusion_expr::ColumnarValue;
 use geos::Geom;
-use sedona_expr::scalar_udf::{ArgMatcher, ScalarKernelRef, SedonaScalarKernel};
+use sedona_expr::scalar_udf::{ScalarKernelRef, SedonaScalarKernel};
+use sedona_schema::matchers::ArgMatcher;
 use sedona_geometry::wkb_factory::WKB_MIN_PROBABLE_BYTES;
 use sedona_schema::datatypes::{SedonaType, WKB_GEOMETRY};
 

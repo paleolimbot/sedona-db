@@ -25,7 +25,8 @@ use datafusion_expr::{
 };
 use geo_traits::{GeometryCollectionTrait, GeometryTrait, GeometryType};
 use sedona_common::sedona_internal_err;
-use sedona_expr::scalar_udf::{ArgMatcher, SedonaScalarKernel, SedonaScalarUDF};
+use sedona_expr::scalar_udf::{SedonaScalarKernel, SedonaScalarUDF};
+use sedona_schema::matchers::ArgMatcher;
 use sedona_schema::datatypes::SedonaType;
 use wkb::reader::Wkb;
 

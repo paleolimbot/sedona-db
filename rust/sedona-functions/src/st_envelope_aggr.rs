@@ -28,10 +28,8 @@ use datafusion_expr::{
     scalar_doc_sections::DOC_SECTION_OTHER, Accumulator, ColumnarValue, Documentation, Volatility,
 };
 use sedona_common::sedona_internal_err;
-use sedona_expr::{
-    aggregate_udf::{SedonaAccumulator, SedonaAggregateUDF},
-    scalar_udf::ArgMatcher,
-};
+use sedona_expr::aggregate_udf::{SedonaAccumulator, SedonaAggregateUDF};
+use sedona_schema::matchers::ArgMatcher;
 use sedona_geometry::{
     bounds::geo_traits_update_xy_bounds,
     interval::{Interval, IntervalTrait},

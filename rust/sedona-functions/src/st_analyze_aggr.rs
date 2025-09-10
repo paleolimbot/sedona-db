@@ -32,7 +32,7 @@ use datafusion_expr::{scalar_doc_sections::DOC_SECTION_OTHER, Documentation, Vol
 use datafusion_expr::{Accumulator, ColumnarValue};
 use sedona_expr::aggregate_udf::SedonaAccumulatorRef;
 use sedona_expr::aggregate_udf::SedonaAggregateUDF;
-use sedona_expr::scalar_udf::ArgMatcher;
+use sedona_schema::matchers::ArgMatcher;
 use sedona_expr::{aggregate_udf::SedonaAccumulator, statistics::GeoStatistics};
 use sedona_geometry::analyze::GeometryAnalysis;
 use sedona_geometry::interval::IntervalTrait;

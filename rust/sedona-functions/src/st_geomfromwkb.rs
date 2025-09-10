@@ -21,7 +21,8 @@ use datafusion_common::error::Result;
 use datafusion_expr::{
     scalar_doc_sections::DOC_SECTION_OTHER, ColumnarValue, Documentation, Volatility,
 };
-use sedona_expr::scalar_udf::{ArgMatcher, SedonaScalarKernel, SedonaScalarUDF};
+use sedona_expr::scalar_udf::{SedonaScalarKernel, SedonaScalarUDF};
+use sedona_schema::matchers::ArgMatcher;
 use sedona_schema::datatypes::{SedonaType, WKB_GEOMETRY, WKB_VIEW_GEOGRAPHY, WKB_VIEW_GEOMETRY};
 
 use crate::executor::WkbExecutor;

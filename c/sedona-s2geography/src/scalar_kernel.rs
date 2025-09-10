@@ -19,7 +19,8 @@ use std::{iter::zip, sync::Arc};
 use arrow_schema::DataType;
 use datafusion_common::{Result, ScalarValue};
 use datafusion_expr::ColumnarValue;
-use sedona_expr::scalar_udf::{ArgMatcher, ScalarKernelRef, SedonaScalarKernel, TypeMatcher};
+use sedona_expr::scalar_udf::{ScalarKernelRef, SedonaScalarKernel};
+use sedona_schema::matchers::{ArgMatcher, TypeMatcher};
 use sedona_schema::datatypes::{SedonaType, WKB_GEOGRAPHY};
 
 use crate::s2geography::S2ScalarUDF;

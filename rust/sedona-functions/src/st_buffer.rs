@@ -15,7 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 use datafusion_expr::{scalar_doc_sections::DOC_SECTION_OTHER, Documentation, Volatility};
-use sedona_expr::scalar_udf::{ArgMatcher, SedonaScalarUDF};
+use sedona_expr::scalar_udf::{SedonaScalarUDF};
+use sedona_schema::matchers::ArgMatcher;
 use sedona_schema::datatypes::WKB_GEOMETRY;
 
 /// ST_Buffer() scalar UDF stub

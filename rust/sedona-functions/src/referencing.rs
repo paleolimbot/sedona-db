@@ -16,7 +16,8 @@
 // under the License.
 use arrow_schema::DataType;
 use datafusion_expr::{scalar_doc_sections::DOC_SECTION_OTHER, Documentation, Volatility};
-use sedona_expr::scalar_udf::{ArgMatcher, SedonaScalarUDF};
+use sedona_expr::scalar_udf::{SedonaScalarUDF};
+use sedona_schema::matchers::ArgMatcher;
 use sedona_schema::datatypes::{SedonaType, WKB_GEOMETRY};
 
 /// ST_LineLocatePoint() scalar UDF implementation

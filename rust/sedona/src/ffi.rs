@@ -431,7 +431,8 @@ impl SedonaAccumulator for ImportedSedonaAccumulator {
 #[cfg(test)]
 mod test {
     use datafusion_expr::Volatility;
-    use sedona_expr::scalar_udf::{ArgMatcher, SedonaScalarUDF, SimpleSedonaScalarKernel};
+    use sedona_expr::scalar_udf::{SedonaScalarUDF, SimpleSedonaScalarKernel};
+use sedona_schema::matchers::ArgMatcher;
     use sedona_schema::datatypes::WKB_GEOMETRY;
     use sedona_testing::{create::create_array, testers::ScalarUdfTester};
 

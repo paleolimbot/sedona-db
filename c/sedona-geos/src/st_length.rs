@@ -24,7 +24,8 @@ use geos::{
     GResult, Geom,
     GeometryTypes::{GeometryCollection, LineString, MultiLineString},
 };
-use sedona_expr::scalar_udf::{ArgMatcher, ScalarKernelRef, SedonaScalarKernel};
+use sedona_expr::scalar_udf::{ScalarKernelRef, SedonaScalarKernel};
+use sedona_schema::matchers::ArgMatcher;
 use sedona_schema::datatypes::SedonaType;
 
 use crate::executor::GeosExecutor;

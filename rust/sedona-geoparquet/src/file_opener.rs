@@ -29,9 +29,8 @@ use parquet::file::{
     metadata::{ParquetMetaData, RowGroupMetaData},
     statistics::Statistics,
 };
-use sedona_expr::{
-    scalar_udf::ArgMatcher, spatial_filter::SpatialFilter, statistics::GeoStatistics,
-};
+use sedona_expr::{spatial_filter::SpatialFilter, statistics::GeoStatistics};
+use sedona_schema::matchers::ArgMatcher;
 use sedona_geometry::bounding_box::BoundingBox;
 use sedona_schema::datatypes::SedonaType;
 
