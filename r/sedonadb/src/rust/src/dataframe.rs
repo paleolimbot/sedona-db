@@ -26,6 +26,7 @@ use savvy::{savvy, savvy_err, Result};
 use sedona::context::SedonaDataFrame;
 use sedona::reader::SedonaStreamReader;
 use sedona::show::{DisplayMode, DisplayTableOptions};
+use sedona_schema::schema::SedonaSchema;
 use tokio::runtime::Runtime;
 
 use crate::context::InternalContext;
@@ -61,7 +62,7 @@ impl InternalDataFrame {
     }
 
     fn primary_geometry_column_index(&self) -> Result<savvy::Sexp> {
-        if let Some(col) = self.inner.primary_geometry_column_index()? {
+        if let Some(col) = self.inner.schema().primary_geometry_column_index()? {
             Ok(unsafe { savvy::Sexp(savvy_ffi::Rf_ScalarInteger(col.try_into()?)) })
         } else {
             Ok(savvy::NullSexp.into())
@@ -89,9 +90,11 @@ impl InternalDataFrame {
         }
 
         let inner = self.inner.clone();
-        let stream = wait_for_future_captured_r(&self.runtime, async move {
-            inner.execute_stream_sedona().await
-        })??;
+        let stream =
+            wait_for_future_captured_r(
+                &self.runtime,
+                async move { inner.execute_stream().await },
+            )??;
 
         let reader = SedonaStreamReader::new(self.runtime.clone(), stream);
         let reader: Box<dyn RecordBatchReader + Send> = Box::new(reader);
@@ -120,10 +123,7 @@ impl InternalDataFrame {
 
         let inner = self.inner.clone();
         let batches =
-            wait_for_future_captured_r(
-                &self.runtime,
-                async move { inner.collect_sedona().await },
-            )??;
+            wait_for_future_captured_r(&self.runtime, async move { inner.collect().await })??;
 
         let size: usize = batches.iter().map(|batch| batch.num_rows()).sum();
 
