@@ -14,12 +14,11 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
+
 SEXP savvy_init_r_runtime__ffi(DllInfo *c_arg___dll_info);
 SEXP savvy_init_r_runtime_interrupts__ffi(SEXP c_arg__interrupts_call,
                                           SEXP c_arg__pkg_env);
-SEXP savvy_int_times_int__ffi(SEXP c_arg__x, SEXP c_arg__y);
 SEXP savvy_sedonadb_adbc_init_func__ffi(void);
-SEXP savvy_to_upper__ffi(SEXP c_arg__x);
 
 // methods and associated functions for InternalContext
 SEXP savvy_InternalContext_data_frame_from_array_stream__ffi(
@@ -45,9 +44,3 @@ SEXP savvy_InternalDataFrame_to_arrow_stream__ffi(SEXP self__, SEXP c_arg__out);
 SEXP savvy_InternalDataFrame_to_view__ffi(SEXP self__, SEXP c_arg__ctx,
                                           SEXP c_arg__table_ref,
                                           SEXP c_arg__overwrite);
-
-// methods and associated functions for Person
-SEXP savvy_Person_associated_function__ffi(void);
-SEXP savvy_Person_name__ffi(SEXP self__);
-SEXP savvy_Person_new__ffi(void);
-SEXP savvy_Person_set_name__ffi(SEXP self__, SEXP c_arg__name);

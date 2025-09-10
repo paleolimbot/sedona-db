@@ -63,18 +63,8 @@ SEXP savvy_init_r_runtime_interrupts__impl(SEXP c_arg__interrupts_call,
   return handle_result(res);
 }
 
-SEXP savvy_int_times_int__impl(SEXP c_arg__x, SEXP c_arg__y) {
-  SEXP res = savvy_int_times_int__ffi(c_arg__x, c_arg__y);
-  return handle_result(res);
-}
-
 SEXP savvy_sedonadb_adbc_init_func__impl(void) {
   SEXP res = savvy_sedonadb_adbc_init_func__ffi();
-  return handle_result(res);
-}
-
-SEXP savvy_to_upper__impl(SEXP c_arg__x) {
-  SEXP res = savvy_to_upper__ffi(c_arg__x);
   return handle_result(res);
 }
 
@@ -165,33 +155,11 @@ SEXP savvy_InternalDataFrame_to_view__impl(SEXP self__, SEXP c_arg__ctx,
   return handle_result(res);
 }
 
-SEXP savvy_Person_associated_function__impl(void) {
-  SEXP res = savvy_Person_associated_function__ffi();
-  return handle_result(res);
-}
-
-SEXP savvy_Person_name__impl(SEXP self__) {
-  SEXP res = savvy_Person_name__ffi(self__);
-  return handle_result(res);
-}
-
-SEXP savvy_Person_new__impl(void) {
-  SEXP res = savvy_Person_new__ffi();
-  return handle_result(res);
-}
-
-SEXP savvy_Person_set_name__impl(SEXP self__, SEXP c_arg__name) {
-  SEXP res = savvy_Person_set_name__ffi(self__, c_arg__name);
-  return handle_result(res);
-}
-
 static const R_CallMethodDef CallEntries[] = {
     {"savvy_init_r_runtime_interrupts__impl",
      (DL_FUNC)&savvy_init_r_runtime_interrupts__impl, 2},
-    {"savvy_int_times_int__impl", (DL_FUNC)&savvy_int_times_int__impl, 2},
     {"savvy_sedonadb_adbc_init_func__impl",
      (DL_FUNC)&savvy_sedonadb_adbc_init_func__impl, 0},
-    {"savvy_to_upper__impl", (DL_FUNC)&savvy_to_upper__impl, 1},
     {"savvy_InternalContext_data_frame_from_array_stream__impl",
      (DL_FUNC)&savvy_InternalContext_data_frame_from_array_stream__impl, 3},
     {"savvy_InternalContext_deregister_table__impl",
@@ -222,11 +190,6 @@ static const R_CallMethodDef CallEntries[] = {
      (DL_FUNC)&savvy_InternalDataFrame_to_arrow_stream__impl, 2},
     {"savvy_InternalDataFrame_to_view__impl",
      (DL_FUNC)&savvy_InternalDataFrame_to_view__impl, 4},
-    {"savvy_Person_associated_function__impl",
-     (DL_FUNC)&savvy_Person_associated_function__impl, 0},
-    {"savvy_Person_name__impl", (DL_FUNC)&savvy_Person_name__impl, 1},
-    {"savvy_Person_new__impl", (DL_FUNC)&savvy_Person_new__impl, 0},
-    {"savvy_Person_set_name__impl", (DL_FUNC)&savvy_Person_set_name__impl, 2},
     {NULL, NULL, 0}};
 
 void R_init_sedonadb(DllInfo *dll) {

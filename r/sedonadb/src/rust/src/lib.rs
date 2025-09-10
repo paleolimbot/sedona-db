@@ -20,9 +20,6 @@ use std::ffi::c_void;
 
 use savvy::savvy;
 
-use savvy::{IntegerSexp, OwnedIntegerSexp, OwnedStringSexp, StringSexp};
-
-use savvy::NotAvailableValue;
 use savvy_ffi::R_NilValue;
 use sedona_adbc::AdbcSedonadbDriverInit;
 
@@ -43,4 +40,3 @@ fn sedonadb_adbc_init_func() -> savvy::Result<savvy::Sexp> {
         )))
     }
 }
-
