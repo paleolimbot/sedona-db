@@ -571,14 +571,11 @@ mod test {
             ["wkt", "geometry"]
         );
 
-        let sedona_types: Result<Vec<_>> = df
+        let sedona_types = df
             .schema()
-            .as_arrow()
-            .fields()
-            .iter()
-            .map(|f| SedonaType::from_storage_field(f))
-            .collect();
-        let sedona_types = sedona_types.unwrap();
+            .sedona_types()
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
         assert_eq!(sedona_types.len(), 2);
         assert_eq!(sedona_types[0], SedonaType::Arrow(DataType::Utf8View));
         assert_eq!(
@@ -590,13 +587,11 @@ mod test {
         // the correct schema
         let batches = df.collect().await.unwrap();
         assert_eq!(batches.len(), 1);
-        let sedona_types: Result<Vec<_>> = batches[0]
+        let sedona_types = batches[0]
             .schema()
-            .fields()
-            .iter()
-            .map(|f| SedonaType::from_storage_field(f))
-            .collect();
-        let sedona_types = sedona_types.unwrap();
+            .sedona_types()
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
         assert_eq!(sedona_types.len(), 2);
         assert_eq!(sedona_types[0], SedonaType::Arrow(DataType::Utf8View));
         assert_eq!(
@@ -644,14 +639,11 @@ mod test {
             .select(vec![col("wkt")])
             .unwrap();
 
-        let sedona_types: Result<Vec<_>> = df
+        let sedona_types = df
             .schema()
-            .as_arrow()
-            .fields()
-            .iter()
-            .map(|f| SedonaType::from_storage_field(f))
-            .collect();
-        let sedona_types = sedona_types.unwrap();
+            .sedona_types()
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
         assert_eq!(sedona_types.len(), 1);
         assert_eq!(sedona_types[0], SedonaType::Arrow(DataType::Utf8View));
     }
@@ -665,14 +657,11 @@ mod test {
             .await
             .unwrap();
 
-        let sedona_types: Result<Vec<_>> = df
+        let sedona_types = df
             .schema()
-            .as_arrow()
-            .fields()
-            .iter()
-            .map(|f| SedonaType::from_storage_field(f))
-            .collect();
-        let sedona_types = sedona_types.unwrap();
+            .sedona_types()
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
         assert_eq!(sedona_types.len(), 2);
         assert_eq!(sedona_types[0], SedonaType::Arrow(DataType::Utf8View));
         assert_eq!(
