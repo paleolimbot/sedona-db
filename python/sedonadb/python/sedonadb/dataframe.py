@@ -269,8 +269,8 @@ class DataFrame:
         self,
         path: Union[str, Path],
         *,
-        partition_by: Optional[Iterable[str]] = None,
-        sort_by: Optional[Iterable[str]] = None,
+        partition_by: Optional[Union[str, Iterable[str]]] = None,
+        sort_by: Optional[Union[str, Iterable[str]]] = None,
         single_file_output: Optional[bool] = None,
     ):
         path = Path(path)
@@ -278,12 +278,16 @@ class DataFrame:
         if single_file_output is None:
             single_file_output = partition_by is None and str(path).endswith(".parquet")
 
-        if partition_by is not None:
+        if isinstance(partition_by, str):
+            partition_by = [partition_by]
+        elif partition_by is not None:
             partition_by = list(partition_by)
         else:
             partition_by = []
 
-        if sort_by is not None:
+        if isinstance(sort_by, str):
+            sort_by = [sort_by]
+        elif sort_by is not None:
             sort_by = list(sort_by)
         else:
             sort_by = []
