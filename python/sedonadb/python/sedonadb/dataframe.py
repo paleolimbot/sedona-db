@@ -14,7 +14,9 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-from typing import TYPE_CHECKING, Union, Optional, Any
+
+from pathlib import Path
+from typing import TYPE_CHECKING, Union, Optional, Any, Iterable
 
 from sedonadb._options import global_options
 
@@ -262,6 +264,33 @@ class DataFrame:
             return GeoDataFrame.from_arrow(table, geometry=geometry)
         else:
             return table.to_pandas()
+
+    def to_parquet(
+        self,
+        path: Union[str, Path],
+        *,
+        partition_by: Optional[Iterable[str]] = None,
+        sort_by: Optional[Iterable[str]] = None,
+        single_file_output: Optional[bool] = None,
+    ):
+        path = Path(path)
+
+        if single_file_output is None:
+            single_file_output = partition_by is None and str(path).endswith(".parquet")
+
+        if partition_by is not None:
+            partition_by = list(partition_by)
+        else:
+            partition_by = []
+
+        if sort_by is not None:
+            sort_by = list(sort_by)
+        else:
+            sort_by = []
+
+        self._impl.to_parquet(
+            self._ctx, str(path), partition_by, sort_by, single_file_output
+        )
 
     def show(
         self,

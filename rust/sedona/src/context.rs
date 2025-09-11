@@ -348,7 +348,11 @@ impl SedonaDataFrame for DataFrame {
     }
 }
 
-/// A Sedona-specific copy of [DataFrameWriteOptions] with public fields
+/// A Sedona-specific copy of [DataFrameWriteOptions]
+///
+/// This is needed because [DataFrameWriteOptions] has private fields, so we
+/// can't use it in our interfaces. This object can be converted to a
+/// [DataFrameWriteOptions] using `.into()`.
 pub struct SedonaWriteOptions {
     /// Controls how new data should be written to the table, determining whether
     /// to append, overwrite, or replace existing data.
