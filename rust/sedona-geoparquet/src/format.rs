@@ -14,6 +14,7 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
+
 use std::{any::Any, collections::HashMap, sync::Arc};
 
 use arrow_schema::{Schema, SchemaRef};
@@ -23,16 +24,20 @@ use datafusion::{
     datasource::{
         file_format::{
             file_compression_type::FileCompressionType,
-            parquet::{fetch_parquet_metadata, ParquetFormat, ParquetFormatFactory},
+            parquet::{fetch_parquet_metadata, ParquetFormat, ParquetFormatFactory, ParquetSink},
             FileFormat, FileFormatFactory,
         },
         physical_plan::{
             FileOpener, FileScanConfig, FileScanConfigBuilder, FileSinkConfig, FileSource,
         },
+        sink::DataSinkExec,
     },
 };
 use datafusion_catalog::{memory::DataSourceExec, Session};
-use datafusion_common::{not_impl_err, plan_err, GetExt, Result, Statistics};
+use datafusion_common::{
+    exec_datafusion_err, exec_err, not_impl_err, plan_err, GetExt, Result, Statistics,
+};
+use datafusion_expr::dml::InsertOp;
 use datafusion_physical_expr::{LexRequirement, PhysicalExpr};
 use datafusion_physical_plan::{
     filter_pushdown::FilterPushdownPropagation, metrics::ExecutionPlanMetricsSet, ExecutionPlan,
@@ -42,11 +47,16 @@ use object_store::{ObjectMeta, ObjectStore};
 
 use sedona_common::sedona_internal_err;
 
-use sedona_schema::{extension_type::ExtensionType, schema::SedonaSchema};
+use sedona_schema::{
+    crs::lnglat,
+    datatypes::{Edges, SedonaType},
+    extension_type::ExtensionType,
+    schema::SedonaSchema,
+};
 
 use crate::{
     file_opener::{storage_schema_contains_geo, GeoParquetFileOpener},
-    metadata::{GeoParquetColumnEncoding, GeoParquetMetadata},
+    metadata::{GeoParquetColumnEncoding, GeoParquetColumnMetadata, GeoParquetMetadata},
 };
 use datafusion::datasource::physical_plan::ParquetSource;
 use datafusion::datasource::schema_adapter::SchemaAdapterFactory;
@@ -292,6 +302,11 @@ impl FileFormat for GeoParquetFormat {
         conf: FileSinkConfig,
         order_requirements: Option<LexRequirement>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
+        if conf.insert_op != InsertOp::Append {
+            return not_impl_err!("Overwrites are not implemented yet for Parquet");
+        }
+
+        // If there is no geometry, just use the inner implementation
         let output_geometry_column_indices = conf.output_schema().geometry_column_indices()?;
         if output_geometry_column_indices.is_empty() {
             return self
@@ -300,7 +315,78 @@ impl FileFormat for GeoParquetFormat {
                 .await;
         }
 
-        not_impl_err!("Parquet output with geometry columns is not yet implemented")
+        // We have geometry and/or geography! Write GeoParquet 1.0 by adding metadata.
+        // This doesn't allow an opportunity to add a bbox or geometry_types (for which
+        // we'd need to implement our own DataSink like ParquetSink).
+        let field_names = conf
+            .output_schema()
+            .fields()
+            .iter()
+            .map(|f| f.name())
+            .collect::<Vec<_>>();
+
+        let mut metadata = GeoParquetMetadata::default();
+
+        // Apply primary column
+        if let Some(output_geometry_primary) =
+            conf.output_schema().primary_geometry_column_index()?
+        {
+            metadata.primary_column = field_names[output_geometry_primary].clone();
+        }
+
+        // Apply all columns
+        for i in output_geometry_column_indices {
+            let f = conf.output_schema().field(i);
+            let sedona_type = SedonaType::from_storage_field(f)?;
+            let mut column_metadata = GeoParquetColumnMetadata::default();
+
+            let (edge_type, crs) = match sedona_type {
+                SedonaType::Wkb(edge_type, crs) | SedonaType::WkbView(edge_type, crs) => {
+                    (edge_type, crs)
+                }
+                _ => return sedona_internal_err!("Unexpected type: {sedona_type}"),
+            };
+
+            // Assign edge type if needed
+            match edge_type {
+                Edges::Planar => {}
+                Edges::Spherical => {
+                    column_metadata.edges = Some("spherical".to_string());
+                }
+            }
+
+            // Assign crs
+            if crs == lnglat() {
+                // Do nothing, lnglat is the meaning of an omitted CRS
+            } else if let Some(crs) = crs {
+                column_metadata.crs = Some(crs.to_json().parse().map_err(|e| {
+                    exec_datafusion_err!("Failed to parse CRS for column '{}'{e}", f.name())
+                })?);
+            } else {
+                return exec_err!(
+                    "Can't write GeoParquet from null CRS\nUse ST_SetSRID({}, ...) to assign it one",
+                    f.name()
+                );
+            }
+
+            // Add to metadata
+            metadata
+                .columns
+                .insert(f.name().to_string(), column_metadata);
+        }
+
+        // Apply to the Parquet options
+        let mut parquet_options = self.inner.options().clone();
+        parquet_options.key_value_metadata.insert(
+            "geo".to_string(),
+            Some(serde_json::to_string(&metadata).map_err(|e| {
+                exec_datafusion_err!("Failed to serialize GeoParquet metadata: {e}")
+            })?),
+        );
+
+        // Create the sink
+        let sink = Arc::new(ParquetSink::new(conf, parquet_options));
+        Ok(Arc::new(DataSinkExec::new(input, sink, order_requirements)) as _)
     }
 
     fn file_source(&self) -> Arc<dyn FileSource> {
