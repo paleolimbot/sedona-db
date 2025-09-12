@@ -17,5 +17,5 @@
 mod file_opener;
 pub mod format;
 mod metadata;
+pub mod options;
 pub mod provider;
-pub mod writer;

@@ -31,7 +31,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyCapsule;
 use sedona::context::{SedonaDataFrame, SedonaWriteOptions};
 use sedona::show::{DisplayMode, DisplayTableOptions};
-use sedona_geoparquet::writer::TableGeoParquetOptions;
+use sedona_geoparquet::options::TableGeoParquetOptions;
 use sedona_schema::schema::SedonaSchema;
 use tokio::runtime::Runtime;
 

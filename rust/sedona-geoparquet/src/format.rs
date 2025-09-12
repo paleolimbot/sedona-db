@@ -20,7 +20,7 @@ use std::{any::Any, collections::HashMap, sync::Arc};
 use arrow_schema::{Schema, SchemaRef};
 use async_trait::async_trait;
 use datafusion::{
-    config::{ConfigOptions, TableParquetOptions},
+    config::ConfigOptions,
     datasource::{
         file_format::{
             file_compression_type::FileCompressionType,
@@ -57,6 +57,7 @@ use sedona_schema::{
 use crate::{
     file_opener::{storage_schema_contains_geo, GeoParquetFileOpener},
     metadata::{GeoParquetColumnEncoding, GeoParquetColumnMetadata, GeoParquetMetadata},
+    options::{GeoParquetVersion, TableGeoParquetOptions},
 };
 use datafusion::datasource::physical_plan::ParquetSource;
 use datafusion::datasource::schema_adapter::SchemaAdapterFactory;
@@ -65,24 +66,24 @@ use datafusion::datasource::schema_adapter::SchemaAdapterFactory;
 ///
 /// A DataFusion FormatFactory provides a means to allow creating a table
 /// or referencing one from a SQL context like COPY TO.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct GeoParquetFormatFactory {
     inner: ParquetFormatFactory,
+    options: TableGeoParquetOptions,
 }
 
 impl GeoParquetFormatFactory {
     /// Creates an instance of [GeoParquetFormatFactory]
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-        Self {
-            inner: ParquetFormatFactory::new(),
-        }
+        Self::new_with_options(TableGeoParquetOptions::default())
     }
 
     /// Creates an instance of [GeoParquetFormatFactory] with customized default options
-    pub fn new_with_options(options: TableParquetOptions) -> Self {
+    pub fn new_with_options(options: TableGeoParquetOptions) -> Self {
         Self {
-            inner: ParquetFormatFactory::new_with_options(options),
+            inner: ParquetFormatFactory::new_with_options(options.inner.clone()),
+            options,
         }
     }
 }
@@ -93,9 +94,24 @@ impl FileFormatFactory for GeoParquetFormatFactory {
         state: &dyn Session,
         format_options: &HashMap<String, String>,
     ) -> Result<Arc<dyn FileFormat>> {
-        let inner_format = self.inner.create(state, format_options)?;
+        let mut options_mut = self.options.clone();
+        let mut format_options_mut = format_options.clone();
+        options_mut.geoparquet_version =
+            if let Some(version_string) = format_options_mut.remove("geoparquet_version") {
+                match version_string.as_str() {
+                    "1.0.0" => GeoParquetVersion::V1_0,
+                    "1.1.0" => GeoParquetVersion::V1_1,
+                    "2.0.0" => GeoParquetVersion::V2_0,
+                    _ => GeoParquetVersion::Auto,
+                }
+            } else {
+                GeoParquetVersion::Auto
+            };
+
+        let inner_format = self.inner.create(state, &format_options_mut)?;
         if let Some(parquet_format) = inner_format.as_any().downcast_ref::<ParquetFormat>() {
-            Ok(Arc::new(GeoParquetFormat::new(parquet_format)))
+            options_mut.inner = parquet_format.options().clone();
+            Ok(Arc::new(GeoParquetFormat::new(options_mut)))
         } else {
             sedona_internal_err!(
                 "Unexpected format from ParquetFormatFactory: {:?}",
@@ -125,27 +141,23 @@ impl GetExt for GeoParquetFormatFactory {
 /// FileFormat is to be able to be used in a ListingTable (i.e., multi file table).
 /// Here we also use it to implement a basic `TableProvider` that give us most if
 /// not all of the features of the underlying Parquet reader.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct GeoParquetFormat {
     inner: ParquetFormat,
+    options: TableGeoParquetOptions,
 }
 
 impl GeoParquetFormat {
     /// Create a new instance of the file format
-    pub fn new(inner: &ParquetFormat) -> Self {
+    pub fn new(options: TableGeoParquetOptions) -> Self {
         // For GeoParquet we currently inspect metadata at the Arrow level,
         // so we need this to be exposed by the underlying reader. Depending on
         // what exactly we're doing, we might need the underlying metadata or might
         // need it to be omitted.
         Self {
-            inner: ParquetFormat::new().with_options(inner.options().clone()),
+            inner: ParquetFormat::new().with_options(options.inner.clone()),
+            options,
         }
-    }
-}
-
-impl Default for GeoParquetFormat {
-    fn default() -> Self {
-        Self::new(&ParquetFormat::default())
     }
 }
 
@@ -280,7 +292,7 @@ impl FileFormat for GeoParquetFormat {
             metadata_size_hint = Some(metadata);
         }
 
-        let mut source = GeoParquetFileSource::new(self.inner.options().clone());
+        let mut source = GeoParquetFileSource::new(self.options.clone());
 
         if let Some(metadata_size_hint) = metadata_size_hint {
             source = source.with_metadata_size_hint(metadata_size_hint)
@@ -376,7 +388,7 @@ impl FileFormat for GeoParquetFormat {
         }
 
         // Apply to the Parquet options
-        let mut parquet_options = self.inner.options().clone();
+        let mut parquet_options = self.options.inner.clone();
         parquet_options.key_value_metadata.insert(
             "geo".to_string(),
             Some(serde_json::to_string(&metadata).map_err(|e| {
@@ -414,9 +426,9 @@ pub struct GeoParquetFileSource {
 
 impl GeoParquetFileSource {
     /// Create a new file source based on [TableParquetOptions]
-    pub fn new(options: TableParquetOptions) -> Self {
+    pub fn new(options: TableGeoParquetOptions) -> Self {
         Self {
-            inner: ParquetSource::new(options),
+            inner: ParquetSource::new(options.inner.clone()),
             metadata_size_hint: None,
             predicate: None,
         }
@@ -614,6 +626,7 @@ mod test {
 
     use arrow_array::RecordBatch;
     use arrow_schema::DataType;
+    use datafusion::config::TableParquetOptions;
     use datafusion::datasource::file_format::format_as_file_type;
     use datafusion::datasource::physical_plan::ParquetSource;
     use datafusion::datasource::schema_adapter::{SchemaAdapter, SchemaAdapterFactory};
