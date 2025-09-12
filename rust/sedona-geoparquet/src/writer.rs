@@ -217,7 +217,7 @@ mod test {
         let example = test_geoparquet("example", "geometry").unwrap();
         let ctx = setup_context();
 
-        // Completely deselect all geometry columns
+        // Deselect all geometry columns
         let df = ctx
             .table(&example)
             .await

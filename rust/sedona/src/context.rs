@@ -454,6 +454,7 @@ mod tests {
         datatypes::{Edges, SedonaType},
     };
     use sedona_testing::data::test_geoparquet;
+    use tempfile::tempdir;
 
     use super::*;
 
@@ -502,6 +503,23 @@ mod tests {
                 "+-----+"
             ]
         );
+    }
+
+    #[tokio::test]
+    async fn write_geoparquet() {
+        let tmpdir = tempdir().unwrap();
+        let tmp_parquet = tmpdir.path().join("tmp.parquet");
+        let ctx = SedonaContext::new();
+        ctx.sql("SELECT 1 as one")
+            .await
+            .unwrap()
+            .write_parquet(
+                &tmp_parquet.to_string_lossy(),
+                DataFrameWriteOptions::default(),
+                None,
+            )
+            .await
+            .unwrap();
     }
 
     #[tokio::test]

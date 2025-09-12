@@ -4810,6 +4810,7 @@ dependencies = [
  "sedona-tg",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
  "url",
 ]
