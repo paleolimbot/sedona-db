@@ -634,6 +634,7 @@ mod test {
     use sedona_schema::datatypes::{Edges, SedonaType, WKB_GEOMETRY};
     use sedona_testing::create::create_scalar;
     use sedona_testing::data::{geoarrow_data_dir, test_geoparquet};
+    use tempfile::tempdir;
 
     use super::*;
 
@@ -858,6 +859,7 @@ mod test {
 
     #[tokio::test]
     async fn writer_without_spatial() {
+        let tmpdir = tempdir().unwrap();
         let example = test_geoparquet("example", "geometry").unwrap();
         let ctx = setup_context();
 
@@ -876,9 +878,11 @@ mod test {
 
         let df_batches = df.clone().collect().await.unwrap();
 
+        let tmp_parquet = tmpdir.path().join("foofy_spatial.parquet");
+
         let plan = LogicalPlanBuilder::copy_to(
             df.into_unoptimized_plan(),
-            "foofy_not_spatial.parquet".into(),
+            tmp_parquet.to_string_lossy().into(),
             file_type,
             Default::default(),
             vec![],
@@ -890,7 +894,7 @@ mod test {
         DataFrame::new(ctx.state(), plan).collect().await.unwrap();
 
         let df_parquet_batches = ctx
-            .read_parquet("foofy_not_spatial.parquet", ParquetReadOptions::default())
+            .table(tmp_parquet.to_string_lossy().to_string())
             .await
             .unwrap()
             .collect()
@@ -901,6 +905,7 @@ mod test {
 
     #[tokio::test]
     async fn writer_with_spatial() {
+        let tmpdir = tempdir().unwrap();
         let example = test_geoparquet("example", "geometry").unwrap();
         let ctx = setup_context();
 
@@ -910,9 +915,13 @@ mod test {
         let file_type = format_as_file_type(Arc::new(format));
 
         let df = ctx.table(&example).await.unwrap();
+        let df_batches = df.clone().collect().await.unwrap();
+
+        let tmp_parquet = tmpdir.path().join("foofy_spatial.parquet");
+
         let plan = LogicalPlanBuilder::copy_to(
             df.into_unoptimized_plan(),
-            "foofy_spatial.parquet".into(),
+            tmp_parquet.to_string_lossy().into(),
             file_type,
             Default::default(),
             vec![],
@@ -921,14 +930,16 @@ mod test {
         .build()
         .unwrap();
 
-        let err = DataFrame::new(ctx.state(), plan)
+        DataFrame::new(ctx.state(), plan).collect().await.unwrap();
+
+        let df_parquet_batches = ctx
+            .table(tmp_parquet.to_string_lossy().to_string())
+            .await
+            .unwrap()
             .collect()
             .await
-            .unwrap_err();
-        assert_eq!(
-            err.message(),
-            "Parquet output with geometry columns is not yet implemented"
-        );
+            .unwrap();
+        assert_eq!(df_parquet_batches, df_batches);
     }
 
     #[tokio::test]
