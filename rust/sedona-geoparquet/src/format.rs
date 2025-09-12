@@ -534,18 +534,14 @@ mod test {
     use arrow_array::RecordBatch;
     use arrow_schema::DataType;
     use datafusion::config::TableParquetOptions;
-    use datafusion::datasource::file_format::format_as_file_type;
     use datafusion::datasource::physical_plan::ParquetSource;
     use datafusion::datasource::schema_adapter::{SchemaAdapter, SchemaAdapterFactory};
-    use datafusion::prelude::DataFrame;
     use datafusion::{
         execution::SessionStateBuilder,
         prelude::{col, ParquetReadOptions, SessionContext},
     };
     use datafusion_common::ScalarValue;
-    use datafusion_expr::{
-        Expr, LogicalPlanBuilder, Operator, ScalarUDF, Signature, SimpleScalarUDF, Volatility,
-    };
+    use datafusion_expr::{Expr, Operator, ScalarUDF, Signature, SimpleScalarUDF, Volatility};
     use datafusion_physical_expr::expressions::{BinaryExpr, Column, Literal};
     use datafusion_physical_expr::PhysicalExpr;
 
@@ -555,7 +551,6 @@ mod test {
     use sedona_schema::schema::SedonaSchema;
     use sedona_testing::create::create_scalar;
     use sedona_testing::data::{geoarrow_data_dir, test_geoparquet};
-    use tempfile::tempdir;
 
     use super::*;
 
@@ -776,91 +771,6 @@ mod test {
         // because the dummy UDF always returns true.
         let batches_out = df.collect().await.unwrap();
         assert!(!batches_out.is_empty());
-    }
-
-    #[tokio::test]
-    async fn writer_without_spatial() {
-        let tmpdir = tempdir().unwrap();
-        let example = test_geoparquet("example", "geometry").unwrap();
-        let ctx = setup_context();
-
-        // It's a bit verbose to trigger this without helpers (here we're just checking
-        // for this being plugged in)
-        let format = GeoParquetFormatFactory::new();
-        let file_type = format_as_file_type(Arc::new(format));
-
-        // Completely deselect all geometry columns
-        let df = ctx
-            .table(&example)
-            .await
-            .unwrap()
-            .select(vec![col("wkt")])
-            .unwrap();
-
-        let df_batches = df.clone().collect().await.unwrap();
-
-        let tmp_parquet = tmpdir.path().join("foofy_spatial.parquet");
-
-        let plan = LogicalPlanBuilder::copy_to(
-            df.into_unoptimized_plan(),
-            tmp_parquet.to_string_lossy().into(),
-            file_type,
-            Default::default(),
-            vec![],
-        )
-        .unwrap()
-        .build()
-        .unwrap();
-
-        DataFrame::new(ctx.state(), plan).collect().await.unwrap();
-
-        let df_parquet_batches = ctx
-            .table(tmp_parquet.to_string_lossy().to_string())
-            .await
-            .unwrap()
-            .collect()
-            .await
-            .unwrap();
-        assert_eq!(df_parquet_batches, df_batches);
-    }
-
-    #[tokio::test]
-    async fn writer_with_spatial() {
-        let tmpdir = tempdir().unwrap();
-        let example = test_geoparquet("example", "geometry").unwrap();
-        let ctx = setup_context();
-
-        // It's a bit verbose to trigger this without helpers (here we're just checking
-        // for this being plugged in)
-        let format = GeoParquetFormatFactory::new();
-        let file_type = format_as_file_type(Arc::new(format));
-
-        let df = ctx.table(&example).await.unwrap();
-        let df_batches = df.clone().collect().await.unwrap();
-
-        let tmp_parquet = tmpdir.path().join("foofy_spatial.parquet");
-
-        let plan = LogicalPlanBuilder::copy_to(
-            df.into_unoptimized_plan(),
-            tmp_parquet.to_string_lossy().into(),
-            file_type,
-            Default::default(),
-            vec![],
-        )
-        .unwrap()
-        .build()
-        .unwrap();
-
-        DataFrame::new(ctx.state(), plan).collect().await.unwrap();
-
-        let df_parquet_batches = ctx
-            .table(tmp_parquet.to_string_lossy().to_string())
-            .await
-            .unwrap()
-            .collect()
-            .await
-            .unwrap();
-        assert_eq!(df_parquet_batches, df_batches);
     }
 
     #[tokio::test]

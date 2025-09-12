@@ -133,3 +133,116 @@ fn create_inner_writer(
     let sink = Arc::new(ParquetSink::new(conf, options));
     Ok(Arc::new(DataSinkExec::new(input, sink, order_requirements)) as _)
 }
+
+#[cfg(test)]
+mod test {
+    use std::iter::zip;
+
+    use datafusion::datasource::file_format::format_as_file_type;
+    use datafusion::prelude::DataFrame;
+    use datafusion::{
+        execution::SessionStateBuilder,
+        prelude::{col, SessionContext},
+    };
+    use datafusion_expr::LogicalPlanBuilder;
+    use sedona_testing::data::test_geoparquet;
+    use tempfile::tempdir;
+
+    use crate::format::GeoParquetFormatFactory;
+
+    use super::*;
+
+    fn setup_context() -> SessionContext {
+        let mut state = SessionStateBuilder::new().build();
+        state
+            .register_file_format(Arc::new(GeoParquetFormatFactory::new()), true)
+            .unwrap();
+        SessionContext::new_with_state(state).enable_url_table()
+    }
+
+    async fn test_dataframe_roundtrip(ctx: SessionContext, df: DataFrame) {
+        // It's a bit verbose to trigger this without helpers
+        let format = GeoParquetFormatFactory::new();
+        let file_type = format_as_file_type(Arc::new(format));
+        let tmpdir = tempdir().unwrap();
+
+        let df_batches = df.clone().collect().await.unwrap();
+
+        let tmp_parquet = tmpdir.path().join("foofy_spatial.parquet");
+
+        let plan = LogicalPlanBuilder::copy_to(
+            df.into_unoptimized_plan(),
+            tmp_parquet.to_string_lossy().into(),
+            file_type,
+            Default::default(),
+            vec![],
+        )
+        .unwrap()
+        .build()
+        .unwrap();
+
+        DataFrame::new(ctx.state(), plan).collect().await.unwrap();
+
+        let df_parquet_batches = ctx
+            .table(tmp_parquet.to_string_lossy().to_string())
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        assert_eq!(df_parquet_batches.len(), df_batches.len());
+
+        // Check types, since the schema may not compare byte-for-byte equal (CRSes)
+        let df_parquet_sedona_types = df_parquet_batches[0]
+            .schema()
+            .sedona_types()
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
+        let df_sedona_types = df_batches[0]
+            .schema()
+            .sedona_types()
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
+        assert_eq!(df_parquet_sedona_types, df_sedona_types);
+
+        // Check batches without metadata
+        for (df_parquet_batch, df_batch) in zip(df_parquet_batches, df_batches) {
+            assert_eq!(df_parquet_batch.columns(), df_batch.columns())
+        }
+    }
+
+    #[tokio::test]
+    async fn writer_without_spatial() {
+        let example = test_geoparquet("example", "geometry").unwrap();
+        let ctx = setup_context();
+
+        // Completely deselect all geometry columns
+        let df = ctx
+            .table(&example)
+            .await
+            .unwrap()
+            .select(vec![col("wkt")])
+            .unwrap();
+
+        test_dataframe_roundtrip(ctx, df).await;
+    }
+
+    #[tokio::test]
+    async fn writer_with_geometry() {
+        let example = test_geoparquet("example", "geometry").unwrap();
+        let ctx = setup_context();
+        let df = ctx.table(&example).await.unwrap();
+
+        test_dataframe_roundtrip(ctx, df).await;
+    }
+
+    #[tokio::test]
+    async fn writer_with_geography() {
+        let example = test_geoparquet("natural-earth", "countries-geography").unwrap();
+        let ctx = setup_context();
+        let df = ctx.table(&example).await.unwrap();
+
+        test_dataframe_roundtrip(ctx, df).await;
+    }
+}
