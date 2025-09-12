@@ -19,3 +19,4 @@ pub mod format;
 mod metadata;
 pub mod options;
 pub mod provider;
+mod writer;
