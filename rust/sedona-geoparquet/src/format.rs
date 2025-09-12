@@ -105,10 +105,10 @@ impl FileFormatFactory for GeoParquetFormatFactory {
                     "1.0.0" => GeoParquetVersion::V1_0,
                     "1.1.0" => GeoParquetVersion::V1_1,
                     "2.0.0" => GeoParquetVersion::V2_0,
-                    _ => GeoParquetVersion::Auto,
+                    _ => GeoParquetVersion::default(),
                 }
             } else {
-                GeoParquetVersion::Auto
+                GeoParquetVersion::default()
             };
 
         let inner_format = self.inner.create(state, &format_options_mut)?;

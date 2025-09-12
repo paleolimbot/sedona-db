@@ -18,16 +18,13 @@ impl From<TableParquetOptions> for TableGeoParquetOptions {
     }
 }
 
-/// The GeoParquet Version to use
+/// The GeoParquet Version to write for output with spatial columns
 #[derive(Debug, Clone, Copy)]
 pub enum GeoParquetVersion {
-    /// Automatically determine which GeoParquet version to use on write
-    ///
-    /// The heurisitc is currently to include GeoParquet 1.0 if a table contains
-    /// a spatial type, or Omitted otherwise.
-    Auto,
-
     /// Write GeoParquet 1.0 metadata
+    ///
+    /// GeoParquet 1.0 has the widest support among readers and writers; however
+    /// it does not include row-group level statistics.
     V1_0,
 
     /// Write GeoParquet 1.1 metadata and optional bounding box column
@@ -56,6 +53,6 @@ pub enum GeoParquetVersion {
 
 impl Default for GeoParquetVersion {
     fn default() -> Self {
-        Self::Auto
+        Self::V1_0
     }
 }
