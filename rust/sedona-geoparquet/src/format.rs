@@ -69,21 +69,24 @@ use datafusion::datasource::schema_adapter::SchemaAdapterFactory;
 #[derive(Debug, Default)]
 pub struct GeoParquetFormatFactory {
     inner: ParquetFormatFactory,
-    options: TableGeoParquetOptions,
+    options: Option<TableGeoParquetOptions>,
 }
 
 impl GeoParquetFormatFactory {
     /// Creates an instance of [GeoParquetFormatFactory]
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-        Self::new_with_options(TableGeoParquetOptions::default())
+        Self {
+            inner: ParquetFormatFactory::new(),
+            options: None,
+        }
     }
 
     /// Creates an instance of [GeoParquetFormatFactory] with customized default options
     pub fn new_with_options(options: TableGeoParquetOptions) -> Self {
         Self {
             inner: ParquetFormatFactory::new_with_options(options.inner.clone()),
-            options,
+            options: Some(options),
         }
     }
 }
@@ -94,7 +97,7 @@ impl FileFormatFactory for GeoParquetFormatFactory {
         state: &dyn Session,
         format_options: &HashMap<String, String>,
     ) -> Result<Arc<dyn FileFormat>> {
-        let mut options_mut = self.options.clone();
+        let mut options_mut = self.options.clone().unwrap_or_default();
         let mut format_options_mut = format_options.clone();
         options_mut.geoparquet_version =
             if let Some(version_string) = format_options_mut.remove("geoparquet_version") {
@@ -143,21 +146,17 @@ impl GetExt for GeoParquetFormatFactory {
 /// not all of the features of the underlying Parquet reader.
 #[derive(Debug, Default)]
 pub struct GeoParquetFormat {
-    inner: ParquetFormat,
     options: TableGeoParquetOptions,
 }
 
 impl GeoParquetFormat {
     /// Create a new instance of the file format
     pub fn new(options: TableGeoParquetOptions) -> Self {
-        // For GeoParquet we currently inspect metadata at the Arrow level,
-        // so we need this to be exposed by the underlying reader. Depending on
-        // what exactly we're doing, we might need the underlying metadata or might
-        // need it to be omitted.
-        Self {
-            inner: ParquetFormat::new().with_options(options.inner.clone()),
-            options,
-        }
+        Self { options }
+    }
+
+    fn inner(&self) -> ParquetFormat {
+        ParquetFormat::new().with_options(self.options.inner.clone())
     }
 }
 
@@ -168,18 +167,18 @@ impl FileFormat for GeoParquetFormat {
     }
 
     fn get_ext(&self) -> String {
-        self.inner.get_ext()
+        ParquetFormatFactory::new().get_ext()
     }
 
     fn get_ext_with_compression(
         &self,
         file_compression_type: &FileCompressionType,
     ) -> Result<String> {
-        self.inner.get_ext_with_compression(file_compression_type)
+        self.inner().get_ext_with_compression(file_compression_type)
     }
 
     fn compression_type(&self) -> Option<FileCompressionType> {
-        self.inner.compression_type()
+        self.inner().compression_type()
     }
 
     async fn infer_schema(
@@ -191,7 +190,8 @@ impl FileFormat for GeoParquetFormat {
         // First, try the underlying format without schema metadata. This should work
         // for regular Parquet reads and will at least ensure that the underlying schemas
         // are compatible.
-        let inner_schema_without_metadata = self.inner.infer_schema(state, store, objects).await?;
+        let inner_schema_without_metadata =
+            self.inner().infer_schema(state, store, objects).await?;
 
         // Collect metadata separately. We can in theory do our own schema
         // inference too to save an extra server request, but then we have to
@@ -202,7 +202,7 @@ impl FileFormat for GeoParquetFormat {
                 fetch_parquet_metadata(
                     store.as_ref(),
                     object,
-                    self.inner.metadata_size_hint(),
+                    self.inner().metadata_size_hint(),
                     None,
                 )
             })
@@ -274,7 +274,7 @@ impl FileFormat for GeoParquetFormat {
         // We don't do anything special here to insert GeoStatistics because pruning
         // happens elsewhere. These might be useful for a future optimizer or analyzer
         // pass that can insert optimizations based on geometry type.
-        self.inner
+        self.inner()
             .infer_stats(state, store, table_schema, object)
             .await
     }
@@ -288,7 +288,7 @@ impl FileFormat for GeoParquetFormat {
         // DataSourceExec is backed by a GeoParquetFileSource instead of a ParquetFileSource
         let mut metadata_size_hint = None;
 
-        if let Some(metadata) = self.inner.metadata_size_hint() {
+        if let Some(metadata) = self.inner().metadata_size_hint() {
             metadata_size_hint = Some(metadata);
         }
 
@@ -322,7 +322,7 @@ impl FileFormat for GeoParquetFormat {
         let output_geometry_column_indices = conf.output_schema().geometry_column_indices()?;
         if output_geometry_column_indices.is_empty() {
             return self
-                .inner
+                .inner()
                 .create_writer_physical_plan(input, state, conf, order_requirements)
                 .await;
         }
@@ -403,7 +403,7 @@ impl FileFormat for GeoParquetFormat {
 
     fn file_source(&self) -> Arc<dyn FileSource> {
         Arc::new(
-            GeoParquetFileSource::try_from_file_source(self.inner.file_source(), None, None)
+            GeoParquetFileSource::try_from_file_source(self.inner().file_source(), None, None)
                 .unwrap(),
         )
     }
@@ -457,7 +457,6 @@ impl GeoParquetFileSource {
     ) -> Result<Self> {
         if let Some(parquet_source) = inner.as_any().downcast_ref::<ParquetSource>() {
             let mut parquet_source = parquet_source.clone();
-
             // Extract the predicate from the existing source if it exists so we can keep a copy of it
             let new_predicate = match (parquet_source.predicate().cloned(), predicate) {
                 (None, None) => None,
