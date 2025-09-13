@@ -94,9 +94,9 @@ impl FileFormatFactory for GeoParquetFormatFactory {
         options_mut.geoparquet_version =
             if let Some(version_string) = format_options_mut.remove("geoparquet_version") {
                 match version_string.as_str() {
-                    "1.0.0" => GeoParquetVersion::V1_0,
-                    "1.1.0" => GeoParquetVersion::V1_1,
-                    "2.0.0" => GeoParquetVersion::V2_0,
+                    "1.0" => GeoParquetVersion::V1_0,
+                    "1.1" => GeoParquetVersion::V1_1,
+                    "2.0" => GeoParquetVersion::V2_0,
                     _ => GeoParquetVersion::default(),
                 }
             } else {
