@@ -92,7 +92,7 @@ pub fn create_geoparquet_writer_physical_plan(
             // Do nothing, lnglat is the meaning of an omitted CRS
         } else if let Some(crs) = crs {
             column_metadata.crs = Some(crs.to_json().parse().map_err(|e| {
-                exec_datafusion_err!("Failed to parse CRS for column '{}'{e}", f.name())
+                exec_datafusion_err!("Failed to parse CRS for column '{}' {e}", f.name())
             })?);
         } else {
             return exec_err!(
