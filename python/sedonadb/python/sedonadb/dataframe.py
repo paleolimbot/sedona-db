@@ -273,6 +273,35 @@ class DataFrame:
         sort_by: Optional[Union[str, Iterable[str]]] = None,
         single_file_output: Optional[bool] = None,
     ):
+        """Write this DataFrame to one or more (Geo)Parquet files
+
+        For input that contains geometry columns, GeoParquet metadata is written
+        such that suitable readers can recreate Geometry/Geography types when
+        reading the output.
+
+
+        Args:
+            path: A filename or directory to which parquet file(s) should be written.
+            partition_by: A vector of column names to partition by. If non-empty,
+                applies hive-style partitioning to the output.
+            sort_by: A vector of column names to sort by. Currently only ascending
+                sort is supported.
+            single_file_output: Use True or False to force writing a single Parquet
+                file vs. writing one file per partition to a directory. By default,
+                a single file is written if `partition_by` is unspecified and
+                `path` ends with `.parquet`.
+
+        Examples:
+
+            >>> import sedonadb
+            >>> import tempfile
+            >>> con = sedonadb.connect()
+            >>> td = tempfile.TemporaryDirectory()
+            >>> url = "https://github.com/apache/sedona-testing/raw/refs/heads/main/data/parquet/geoparquet-1.1.0.parquet"
+            >>> con.read_parquet(url).to_parquet(f"{td.name}/tmp.parquet")
+
+        """
+
         path = Path(path)
 
         if single_file_output is None:
