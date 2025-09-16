@@ -140,7 +140,7 @@ impl ProjContext {
     /// - PJ_LOG_LEVEL_PJ_LOG_TELL (4): Tell
     pub(crate) fn set_log_level(&self, level: u32) -> Result<(), SedonaProjError> {
         unsafe {
-            call_proj_api!(self.api, proj_log_level, self.inner, level);
+            call_proj_api!(self.api, proj_log_level, self.inner, level as _);
         }
         Ok(())
     }
