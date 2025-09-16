@@ -164,7 +164,7 @@ impl CollectionAccumulator {
                 .map_err(|e| DataFusionError::External(Box::new(e)))?;
         }
 
-        // Write the rest of item into the output and return it
+        // Update the header bytes of the output and return it
         if let Some(mut out) = self.item.take() {
             out[0..WKB_HEADER_SIZE].copy_from_slice(&new_header);
             Ok(Some(out))
