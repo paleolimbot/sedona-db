@@ -169,7 +169,7 @@ impl CollectionAccumulator {
             out[0..WKB_HEADER_SIZE].copy_from_slice(&new_header);
             Ok(Some(out))
         } else {
-            sedona_internal_err!("Unexpect internal state in ST_Collect()")
+            sedona_internal_err!("Unexpected internal state in ST_Collect()")
         }
     }
 }
