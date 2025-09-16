@@ -245,7 +245,10 @@ def configure_proj(
             import warnings
 
             all_errors = "\n".join(errors)
-            warnings.warn(f"Failed to configure PROJ (tried {tried}):\n{all_errors}")
+            warnings.warn(
+                "Failed to configure PROJ. Is pyproj or a system install of PROJ available?"
+                f"\nDetails: tried {tried}\n{all_errors}"
+            )
             return
         else:
             raise ValueError(f"Unknown preset: {preset}")
