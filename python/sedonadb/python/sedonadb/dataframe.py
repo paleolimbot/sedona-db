@@ -19,6 +19,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Union, Optional, Any, Iterable
 
 from sedonadb._options import global_options
+from sedonadb.utility import sedona  # noqa: F401
+
 
 if TYPE_CHECKING:
     import pandas
@@ -44,9 +46,8 @@ class DataFrame:
 
         Examples:
 
-            >>> import sedonadb
-            >>> con = sedonadb.connect()
-            >>> df = con.sql("SELECT 1 as one")
+            >>> sd = sedona.db.connect()
+            >>> df = sd.sql("SELECT 1 as one")
             >>> df.schema
             SedonaSchema with 1 field:
               one: non-nullable Int64
@@ -67,9 +68,8 @@ class DataFrame:
 
         Examples:
 
-            >>> import sedonadb
-            >>> con = sedonadb.connect()
-            >>> df = con.sql("SELECT * FROM (VALUES ('one'), ('two'), ('three')) AS t(val)")
+            >>> sd = sedona.db.connect()
+            >>> df = sd.sql("SELECT * FROM (VALUES ('one'), ('two'), ('three')) AS t(val)")
             >>> df.head(1).show()
             ┌──────┐
             │  val │
@@ -91,9 +91,8 @@ class DataFrame:
 
         Examples:
 
-            >>> import sedonadb
-            >>> con = sedonadb.connect()
-            >>> df = con.sql("SELECT * FROM (VALUES ('one'), ('two'), ('three')) AS t(val)")
+            >>> sd = sedona.db.connect()
+            >>> df = sd.sql("SELECT * FROM (VALUES ('one'), ('two'), ('three')) AS t(val)")
             >>> df.limit(1).show()
             ┌──────┐
             │  val │
@@ -118,9 +117,8 @@ class DataFrame:
 
         Examples:
 
-            >>> import sedonadb
-            >>> con = sedonadb.connect()
-            >>> df = con.sql("SELECT * FROM (VALUES ('one'), ('two'), ('three')) AS t(val)")
+            >>> sd = sedona.db.connect()
+            >>> df = sd.sql("SELECT * FROM (VALUES ('one'), ('two'), ('three')) AS t(val)")
             >>> df.count()
             3
 
@@ -162,10 +160,9 @@ class DataFrame:
 
         Examples:
 
-            >>> import sedonadb
-            >>> con = sedonadb.connect()
-            >>> con.sql("SELECT ST_Point(0, 1) as geom").to_view("foofy")
-            >>> con.view("foofy").show()
+            >>> sd = sedona.db.connect()
+            >>> sd.sql("SELECT ST_Point(0, 1) as geom").to_view("foofy")
+            >>> sd.view("foofy").show()
             ┌────────────┐
             │    geom    │
             │  geometry  │
@@ -187,9 +184,8 @@ class DataFrame:
 
         Examples:
 
-            >>> import sedonadb
-            >>> con = sedonadb.connect()
-            >>> con.sql("SELECT ST_Point(0, 1) as geom").to_memtable().show()
+            >>> sd = sedona.db.connect()
+            >>> sd.sql("SELECT ST_Point(0, 1) as geom").to_memtable().show()
             ┌────────────┐
             │    geom    │
             │  geometry  │
@@ -215,9 +211,8 @@ class DataFrame:
 
         Examples:
 
-            >>> import sedonadb
-            >>> con = sedonadb.connect()
-            >>> con.sql("SELECT ST_Point(0, 1) as geometry").to_arrow_table()
+            >>> sd = sedona.db.connect()
+            >>> sd.sql("SELECT ST_Point(0, 1) as geometry").to_arrow_table()
             pyarrow.Table
             geometry: extension<geoarrow.wkb<WkbType>> not null
             ----
@@ -249,9 +244,8 @@ class DataFrame:
 
         Examples:
 
-            >>> import sedonadb
-            >>> con = sedonadb.connect()
-            >>> con.sql("SELECT ST_Point(0, 1) as geometry").to_pandas()
+            >>> sd = sedona.db.connect()
+            >>> sd.sql("SELECT ST_Point(0, 1) as geometry").to_pandas()
                   geometry
             0  POINT (0 1)
 
@@ -296,12 +290,11 @@ class DataFrame:
 
         Examples:
 
-            >>> import sedonadb
             >>> import tempfile
-            >>> con = sedonadb.connect()
+            >>> sd = sedona.db.connect()
             >>> td = tempfile.TemporaryDirectory()
             >>> url = "https://github.com/apache/sedona-testing/raw/refs/heads/main/data/parquet/geoparquet-1.1.0.parquet"
-            >>> con.read_parquet(url).to_parquet(f"{td.name}/tmp.parquet")
+            >>> sd.read_parquet(url).to_parquet(f"{td.name}/tmp.parquet")
 
         """
 
@@ -347,9 +340,8 @@ class DataFrame:
 
         Examples:
 
-            >>> import sedonadb
-            >>> con = sedonadb.connect()
-            >>> con.sql("SELECT ST_Point(0, 1) as geometry").show()
+            >>> sd = sedona.db.connect()
+            >>> sd.sql("SELECT ST_Point(0, 1) as geometry").show()
             ┌────────────┐
             │  geometry  │
             │  geometry  │

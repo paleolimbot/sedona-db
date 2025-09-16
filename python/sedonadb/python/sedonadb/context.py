@@ -21,6 +21,7 @@ from typing import Any, Dict, Iterable, Literal, Optional, Union
 
 from sedonadb._lib import InternalContext, configure_proj_shared
 from sedonadb.dataframe import DataFrame, _create_data_frame
+from sedonadb.utility import sedona  # noqa: F401
 
 
 class SedonaContext:
@@ -53,9 +54,9 @@ class SedonaContext:
 
         Examples:
 
-            >>> import sedonadb, pandas as pd
-            >>> con = sedonadb.connect()
-            >>> con.create_data_frame(pd.DataFrame({"x": [1, 2]})).head(1).show()
+            >>> import pandas as pd
+            >>> sd = sedona.db.connect()
+            >>> sd.create_data_frame(pd.DataFrame({"x": [1, 2]})).head(1).show()
             ┌───────┐
             │   x   │
             │ int64 │
@@ -75,17 +76,16 @@ class SedonaContext:
 
         Examples:
 
-            >>> import sedonadb
-            >>> con = sedonadb.connect()
-            >>> con.sql("SELECT ST_Point(0, 1) as geom").to_view("foofy")
-            >>> con.view("foofy").show()
+            >>> sd = sedona.db.connect()
+            >>> sd.sql("SELECT ST_Point(0, 1) as geom").to_view("foofy")
+            >>> sd.view("foofy").show()
             ┌────────────┐
             │    geom    │
             │  geometry  │
             ╞════════════╡
             │ POINT(0 1) │
             └────────────┘
-            >>> con.drop_view("foofy")
+            >>> sd.drop_view("foofy")
 
         """
         return DataFrame(self._impl, self._impl.view(name))
@@ -98,10 +98,9 @@ class SedonaContext:
 
         Examples:
 
-            >>> import sedonadb
-            >>> con = sedonadb.connect()
-            >>> con.sql("SELECT ST_Point(0, 1) as geom").to_view("foofy")
-            >>> con.drop_view("foofy")
+            >>> sd = sedona.db.connect()
+            >>> sd.sql("SELECT ST_Point(0, 1) as geom").to_view("foofy")
+            >>> sd.drop_view("foofy")
 
         """
         self._impl.drop_view(name)
@@ -121,9 +120,9 @@ class SedonaContext:
 
         Examples:
 
-            >>> import sedonadb
+            >>> sd = sedona.db.connect()
             >>> url = "https://github.com/apache/sedona-testing/raw/refs/heads/main/data/parquet/geoparquet-1.1.0.parquet"
-            >>> sedonadb.connect().read_parquet(url)
+            >>> sd.read_parquet(url)
             <sedonadb.dataframe.DataFrame object at ...>
 
         """
@@ -149,8 +148,8 @@ class SedonaContext:
 
         Examples:
 
-            >>> import sedonadb
-            >>> sedonadb.connect().sql("SELECT ST_Point(0, 1) as geom")
+            >>> sd = sedona.db.connect()
+            >>> sd.sql("SELECT ST_Point(0, 1) as geom")
             <sedonadb.dataframe.DataFrame object at ...>
 
         """
@@ -207,8 +206,7 @@ def configure_proj(
 
     Examples:
 
-        >>> import sedonadb
-        >>> sedonadb.configure_proj("auto")
+        >>> sedona.db.configure_proj("auto")
     """
     if preset is not None:
         if preset == "pyproj":
