@@ -39,6 +39,7 @@ nav:
    - Sedona Homepage: "https://sedona.apache.org/latest/"
 
 repo_url: https://github.com/apache/sedona-db
+edit_uri: https://github.com/apache/sedona-db/blob/main/docs/
 repo_name: apache/sedona-db
 theme:
   name: material
