@@ -213,6 +213,16 @@ def test_head_limit(con):
     )
 
 
+def test_execute(con):
+    df = con.sql("SELECT * FROM (VALUES ('one'), ('two'), ('three')) AS t(val)")
+    assert df.execute() == 3
+
+    df = con.sql("CREATE OR REPLACE VIEW temp_view AS SELECT 1 as one")
+    assert df.execute() == 0
+    assert con.view("temp_view").count() == 1
+    con.drop_view("temp_view")
+
+
 def test_count(con):
     df = con.sql("SELECT * FROM (VALUES ('one'), ('two'), ('three')) AS t(val)")
     assert df.count() == 3

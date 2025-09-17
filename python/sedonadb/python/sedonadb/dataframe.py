@@ -112,6 +112,32 @@ class DataFrame:
         """
         return DataFrame(self._ctx, self._impl.limit(n, offset))
 
+    def execute(self) -> None:
+        """Execute the plan represented by this DataFrame
+
+        This will execute the query without collecting results into memory,
+        which is useful for executing SQL statements like SET, CREATE VIEW,
+        and CREATE EXTERNAL TABLE.
+
+        Note that this is functionally similar to `.count()` except it does
+        not apply any optimizations (e.g., does not use statistics to avoid
+        reading data to calculate a count).
+
+        Examples:
+
+            >>> sd = sedona.db.connect()
+            >>> sd.sql("CREATE OR REPLACE VIEW temp_view AS SELECT 1 as one").execute()
+            0
+            >>> sd.view("temp_view").show()
+            ┌───────┐
+            │  one  │
+            │ int64 │
+            ╞═══════╡
+            │     1 │
+            └───────┘
+        """
+        return self._impl.execute()
+
     def count(self) -> int:
         """Compute the number of rows in this DataFrame
 

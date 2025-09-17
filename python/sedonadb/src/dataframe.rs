@@ -89,6 +89,17 @@ impl InternalDataFrame {
         Ok(InternalDataFrame::new(inner, self.runtime.clone()))
     }
 
+    fn execute<'py>(&self, py: Python<'py>) -> Result<usize, PySedonaError> {
+        let mut c = 0;
+        let stream = wait_for_future(py, &self.runtime, self.inner.clone().execute_stream())??;
+        let reader = PySedonaStreamReader::new(self.runtime.clone(), stream);
+        for batch in reader {
+            c += batch?.num_rows();
+        }
+
+        Ok(c)
+    }
+
     fn count<'py>(&self, py: Python<'py>) -> Result<usize, PySedonaError> {
         Ok(wait_for_future(
             py,
