@@ -27,6 +27,12 @@ SEDONADB_DIR="$(cd "${SOURCE_DIR}/../.." && pwd)"
 # Avoid a deprecation warning when building the docs
 export JUPYTER_PLATFORM_DIRS=1
 
+# Convert all Jupyter notebooks in docs/ directory to markdown
+for notebook in $(find "${SEDONADB_DIR}/docs" -name "*.ipynb"); do
+  echo "Rendering ${notebook}"
+  jupyter nbconvert --to markdown "${notebook}"
+done
+
 pushd "${SEDONADB_DIR}"
 if mkdocs build --strict ; then
   echo "Success!"
