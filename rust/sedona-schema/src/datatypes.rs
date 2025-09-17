@@ -20,7 +20,7 @@ use sedona_common::sedona_internal_err;
 use serde_json::Value;
 use std::fmt::{Debug, Display};
 
-use crate::crs::{deserialize_crs, CoordinateReferenceSystem, Crs};
+use crate::crs::{deserialize_crs, Crs};
 use crate::extension_type::ExtensionType;
 
 /// Data types supported by Sedona that resolve to a concrete Arrow DataType
@@ -43,38 +43,6 @@ impl Display for SedonaType {
             SedonaType::Arrow(data_type) => Display::fmt(data_type, f),
             SedonaType::Wkb(edges, crs) => display_geometry("wkb", edges, crs, f),
             SedonaType::WkbView(edges, crs) => display_geometry("wkb_view", edges, crs, f),
-        }
-    }
-}
-
-fn display_geometry(
-    name: &str,
-    edges: &Edges,
-    crs: &Crs,
-    f: &mut std::fmt::Formatter<'_>,
-) -> std::fmt::Result {
-    match edges {
-        Edges::Planar => {}
-        Edges::Spherical => write!(f, "spherical ")?,
-    }
-
-    write!(f, "{name}")?;
-
-    if let Some(crs) = crs {
-        write!(f, " <{}>", &crs)?;
-    }
-
-    Ok(())
-}
-
-impl Display for dyn CoordinateReferenceSystem + Send + Sync {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Ok(Some(auth_code)) = self.to_authority_code() {
-            write!(f, "{}", auth_code.to_lowercase())
-        } else {
-            // We can probably try harder to get compact output out of more
-            // types of CRSes
-            write!(f, "{{...}}")
         }
     }
 }
@@ -139,23 +107,6 @@ impl SedonaType {
         }
     }
 
-    /// Returns True if another physical type matches this one for the purposes of dispatch
-    ///
-    /// For Arrow types this matches on type equality; for other type it matches on edges
-    /// but not crs.
-    pub fn match_signature(&self, other: &SedonaType) -> bool {
-        match (self, other) {
-            (SedonaType::Arrow(data_type), SedonaType::Arrow(other_data_type)) => {
-                data_type == other_data_type
-            }
-            (SedonaType::Wkb(edges, _), SedonaType::Wkb(other_edges, _)) => edges == other_edges,
-            (SedonaType::WkbView(edges, _), SedonaType::WkbView(other_edges, _)) => {
-                edges == other_edges
-            }
-            _ => false,
-        }
-    }
-
     /// Construct a [`Field`] as it would appear in an external `RecordBatch`
     pub fn to_storage_field(&self, name: &str, nullable: bool) -> Result<Field> {
         self.extension_type().map_or(
@@ -194,6 +145,85 @@ impl SedonaType {
             _ => None,
         }
     }
+
+    pub fn logical_type_name(&self) -> String {
+        match self {
+            SedonaType::Wkb(Edges::Planar, _) | SedonaType::WkbView(Edges::Planar, _) => {
+                "geometry".to_string()
+            }
+            SedonaType::Wkb(Edges::Spherical, _) | SedonaType::WkbView(Edges::Spherical, _) => {
+                "geography".to_string()
+            }
+            SedonaType::Arrow(data_type) => match data_type {
+                DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => "utf8".to_string(),
+                DataType::Binary
+                | DataType::LargeBinary
+                | DataType::BinaryView
+                | DataType::FixedSizeBinary(_) => "binary".to_string(),
+                DataType::List(_)
+                | DataType::LargeList(_)
+                | DataType::ListView(_)
+                | DataType::LargeListView(_)
+                | DataType::FixedSizeList(_, _) => "list".to_string(),
+                DataType::Dictionary(_, value_type) => {
+                    SedonaType::Arrow(value_type.as_ref().clone()).logical_type_name()
+                }
+                DataType::RunEndEncoded(_, value_field) => {
+                    match SedonaType::from_storage_field(value_field) {
+                        Ok(value_sedona_type) => value_sedona_type.logical_type_name(),
+                        Err(_) => format!("{value_field:?}"),
+                    }
+                }
+                _ => {
+                    let data_type_str = data_type.to_string();
+                    if let Some(params_start) = data_type_str.find('(') {
+                        data_type_str[0..params_start].to_string().to_lowercase()
+                    } else {
+                        data_type_str.to_lowercase()
+                    }
+                }
+            },
+        }
+    }
+
+    /// Returns True if another physical type matches this one for the purposes of dispatch
+    ///
+    /// For Arrow types this matches on type equality; for other type it matches on edges
+    /// but not crs.
+    pub fn match_signature(&self, other: &SedonaType) -> bool {
+        match (self, other) {
+            (SedonaType::Arrow(data_type), SedonaType::Arrow(other_data_type)) => {
+                data_type == other_data_type
+            }
+            (SedonaType::Wkb(edges, _), SedonaType::Wkb(other_edges, _)) => edges == other_edges,
+            (SedonaType::WkbView(edges, _), SedonaType::WkbView(other_edges, _)) => {
+                edges == other_edges
+            }
+            _ => false,
+        }
+    }
+}
+
+// Implementation details for type serialization and display
+
+fn display_geometry(
+    name: &str,
+    edges: &Edges,
+    crs: &Crs,
+    f: &mut std::fmt::Formatter<'_>,
+) -> std::fmt::Result {
+    match edges {
+        Edges::Planar => {}
+        Edges::Spherical => write!(f, "spherical ")?,
+    }
+
+    write!(f, "{name}")?;
+
+    if let Some(crs) = crs {
+        write!(f, " <{}>", &crs)?;
+    }
+
+    Ok(())
 }
 
 // Implementation details for importing/exporting types from/to Arrow + metadata

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 use datafusion_common::{DataFusionError, Result};
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -67,6 +67,18 @@ pub fn lnglat() -> Crs {
 /// to export it to Parquet/Iceberg) and something with which we can check
 /// equality (for binary operators).
 pub type Crs = Option<Arc<dyn CoordinateReferenceSystem + Send + Sync>>;
+
+impl Display for dyn CoordinateReferenceSystem + Send + Sync {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Ok(Some(auth_code)) = self.to_authority_code() {
+            write!(f, "{}", auth_code.to_lowercase())
+        } else {
+            // We can probably try harder to get compact output out of more
+            // types of CRSes
+            write!(f, "{{...}}")
+        }
+    }
+}
 
 impl PartialEq<dyn CoordinateReferenceSystem + Send + Sync>
     for dyn CoordinateReferenceSystem + Send + Sync

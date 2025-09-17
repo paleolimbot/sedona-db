@@ -24,10 +24,7 @@ use datafusion_common::format::DEFAULT_FORMAT_OPTIONS;
 use datafusion_common::{DataFusionError, ScalarValue};
 use datafusion_expr::{ColumnarValue, ReturnFieldArgs, ScalarFunctionArgs, ScalarUDF};
 use sedona_expr::scalar_udf::SedonaScalarUDF;
-use sedona_schema::{
-    datatypes::{Edges, SedonaType},
-    matchers::ArgMatcher,
-};
+use sedona_schema::{datatypes::SedonaType, matchers::ArgMatcher};
 use std::iter::zip;
 use std::sync::Arc;
 
@@ -395,15 +392,7 @@ impl DisplayColumn {
     pub fn header(&self, options: &DisplayTableOptions) -> Cell {
         // Don't print the type ever if it's a continuation column
         let is_continuation = self.name == "…" || self.name == "...";
-        let display_type = match &self.sedona_type {
-            SedonaType::Wkb(Edges::Planar, _) | SedonaType::WkbView(Edges::Planar, _) => {
-                "geometry".to_string()
-            }
-            SedonaType::Wkb(Edges::Spherical, _) | SedonaType::WkbView(Edges::Spherical, _) => {
-                "geography".to_string()
-            }
-            _ => self.sedona_type.to_string().to_lowercase(),
-        };
+        let display_type = self.sedona_type.logical_type_name();
         if options.arrow_options.types_info() && !is_continuation {
             Cell::new(format!("{}\n{}", self.name, display_type)).set_delimiter('\0')
         } else {
