@@ -23,7 +23,7 @@
 
 Create a release branch on the corresponding remote pointing to the official Apache
 repository (i.e., <https://github.com/apache/sedona-db>). This step must be done by
-a commiter.
+a committer.
 
 ```shell
 git pull upstream main
