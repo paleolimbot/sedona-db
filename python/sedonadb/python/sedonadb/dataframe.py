@@ -49,11 +49,11 @@ class DataFrame:
             >>> df = con.sql("SELECT 1 as one")
             >>> df.schema
             SedonaSchema with 1 field:
-              one: non-nullable Int64
+              one: non-nullable int64<Int64>
             >>> df.schema.field(0)
-            SedonaField one: non-nullable Int64
+            SedonaField one: non-nullable int64<Int64>
             >>> df.schema.field(0).name, df.schema.field(0).type
-            ('one', SedonaType Int64)
+            ('one', SedonaType int64<Int64>)
         """
         return self._impl.schema()
 
