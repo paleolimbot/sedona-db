@@ -23,6 +23,8 @@ nav:
    - SedonaDB Guides:
      - Python Quickstart: quickstart-python.md
      - SedonaDB Guide: programming-guide.md
+     - Working with GeoPandas: geopandas-interop.md
+     - Working with Overture: overture-examples.md
      - Development: development.md
    - SedonaDB Reference:
       - Python:

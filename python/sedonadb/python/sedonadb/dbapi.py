@@ -14,13 +14,16 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+
+from typing import Mapping, Any
+
 import adbc_driver_manager.dbapi
 
 import sedonadb.adbc
 from sedonadb.utility import sedona  # noqa: F401
 
 
-def connect(**kwargs) -> "Connection":
+def connect(**kwargs: Mapping[str, Any]) -> "Connection":
     """Connect to Sedona via Python DBAPI
 
     Creates a DBAPI-compatible connection as a thin wrapper around the

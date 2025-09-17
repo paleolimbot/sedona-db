@@ -21,3 +21,7 @@
 ::: sedonadb.context
 
 ::: sedonadb.dataframe
+
+::: sedonadb.testing
+
+::: sedonadb.dbapi
