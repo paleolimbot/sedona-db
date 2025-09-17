@@ -26,6 +26,7 @@ class Sedona:
     user-facing docstrings that use the documented install/import without requiring
     a circular dependency on apache-sedona for testing.
     """
+
     @property
     def db(self):
         import sedonadb
