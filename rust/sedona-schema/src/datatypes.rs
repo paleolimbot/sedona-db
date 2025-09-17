@@ -136,6 +136,12 @@ impl SedonaType {
         }
     }
 
+    /// The logical type name for this type
+    ///
+    /// The logical type name is used in tabular display and schema printing. Notably,
+    /// it renders Wkb and WkbView as "geometry" or "geography" depending on the edge
+    /// type. For Arrow types, this similarly strips the storage details (e.g.,
+    /// both Utf8 and Utf8View types render as "utf8").
     pub fn logical_type_name(&self) -> String {
         match self {
             SedonaType::Wkb(Edges::Planar, _) | SedonaType::WkbView(Edges::Planar, _) => {
