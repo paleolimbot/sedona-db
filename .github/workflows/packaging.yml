@@ -69,6 +69,11 @@ jobs:
             apache-sedona-db-${VERSION} \
             $(git log -n 1 --format=%h)
 
+      - name: Run Release Audit Tool
+        shell: bash
+        run: |
+          dev/release/run-rat.sh apache-sedona-db-${{ env.VERSION }}.tar.gz
+
       - uses: actions/upload-artifact@v4
         with:
           name: source
