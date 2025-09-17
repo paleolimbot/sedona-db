@@ -403,6 +403,74 @@ mod tests {
     }
 
     #[test]
+    fn sedona_logical_type_name() {
+        assert_eq!(WKB_GEOMETRY.logical_type_name(), "geometry");
+        assert_eq!(WKB_GEOGRAPHY.logical_type_name(), "geography");
+
+        assert_eq!(
+            SedonaType::Arrow(DataType::Int32).logical_type_name(),
+            "int32"
+        );
+
+        assert_eq!(
+            SedonaType::Arrow(DataType::Utf8).logical_type_name(),
+            "utf8"
+        );
+        assert_eq!(
+            SedonaType::Arrow(DataType::Utf8View).logical_type_name(),
+            "utf8"
+        );
+
+        assert_eq!(
+            SedonaType::Arrow(DataType::Binary).logical_type_name(),
+            "binary"
+        );
+        assert_eq!(
+            SedonaType::Arrow(DataType::BinaryView).logical_type_name(),
+            "binary"
+        );
+
+        assert_eq!(
+            SedonaType::Arrow(DataType::Duration(arrow_schema::TimeUnit::Microsecond))
+                .logical_type_name(),
+            "duration"
+        );
+
+        assert_eq!(
+            SedonaType::Arrow(DataType::List(
+                Field::new("item", DataType::Int32, true).into()
+            ))
+            .logical_type_name(),
+            "list"
+        );
+        assert_eq!(
+            SedonaType::Arrow(DataType::ListView(
+                Field::new("item", DataType::Int32, true).into()
+            ))
+            .logical_type_name(),
+            "list"
+        );
+
+        assert_eq!(
+            SedonaType::Arrow(DataType::Dictionary(
+                Box::new(DataType::Int32),
+                Box::new(DataType::Binary)
+            ))
+            .logical_type_name(),
+            "binary"
+        );
+
+        assert_eq!(
+            SedonaType::Arrow(DataType::RunEndEncoded(
+                Field::new("ends", DataType::Int32, true).into(),
+                Field::new("values", DataType::Binary, true).into()
+            ))
+            .logical_type_name(),
+            "binary"
+        );
+    }
+
+    #[test]
     fn geoarrow_serialize() {
         assert_eq!(serialize_edges_and_crs(&Edges::Planar, &Crs::None), "{}");
         assert_eq!(
