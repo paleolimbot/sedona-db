@@ -37,16 +37,6 @@ impl From<DataType> for SedonaType {
     }
 }
 
-impl Display for SedonaType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SedonaType::Arrow(data_type) => Display::fmt(data_type, f),
-            SedonaType::Wkb(edges, crs) => display_geometry("wkb", edges, crs, f),
-            SedonaType::WkbView(edges, crs) => display_geometry("wkb_view", edges, crs, f),
-        }
-    }
-}
-
 /// Edge interpolations
 ///
 /// While at the logical level we refer to geometries and geographies, at the execution
@@ -206,21 +196,39 @@ impl SedonaType {
 
 // Implementation details for type serialization and display
 
+impl Display for SedonaType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SedonaType::Arrow(data_type) => Display::fmt(data_type, f),
+            SedonaType::Wkb(edges, crs) => display_geometry("Wkb", edges, crs, f),
+            SedonaType::WkbView(edges, crs) => display_geometry("WkbView", edges, crs, f),
+        }
+    }
+}
+
 fn display_geometry(
     name: &str,
     edges: &Edges,
     crs: &Crs,
     f: &mut std::fmt::Formatter<'_>,
 ) -> std::fmt::Result {
-    match edges {
-        Edges::Planar => {}
-        Edges::Spherical => write!(f, "spherical ")?,
-    }
-
-    write!(f, "{name}")?;
+    let mut params = Vec::new();
 
     if let Some(crs) = crs {
-        write!(f, " <{}>", &crs)?;
+        params.push(crs.to_string());
+    }
+
+    match edges {
+        Edges::Planar => {}
+        Edges::Spherical => {
+            params.push("Spherical".to_string());
+        }
+    }
+
+    match params.len() {
+        0 => write!(f, "{name}")?,
+        1 => write!(f, "{name}({})", params[0])?,
+        _ => write!(f, "{name}({})", params.join(", "))?,
     }
 
     Ok(())
@@ -377,20 +385,20 @@ mod tests {
     #[test]
     fn sedona_type_to_string() {
         assert_eq!(SedonaType::Arrow(DataType::Int32).to_string(), "Int32");
-        assert_eq!(WKB_GEOMETRY.to_string(), "wkb");
-        assert_eq!(WKB_GEOGRAPHY.to_string(), "spherical wkb");
-        assert_eq!(WKB_VIEW_GEOMETRY.to_string(), "wkb_view");
-        assert_eq!(WKB_VIEW_GEOGRAPHY.to_string(), "spherical wkb_view");
+        assert_eq!(WKB_GEOMETRY.to_string(), "Wkb");
+        assert_eq!(WKB_GEOGRAPHY.to_string(), "Wkb(Spherical)");
+        assert_eq!(WKB_VIEW_GEOMETRY.to_string(), "WkbView");
+        assert_eq!(WKB_VIEW_GEOGRAPHY.to_string(), "WkbView(Spherical)");
         assert_eq!(
             SedonaType::Wkb(Edges::Planar, lnglat()).to_string(),
-            "wkb <ogc:crs84>"
+            "Wkb(ogc:crs84)"
         );
 
         let projjson_value: Value = r#"{}"#.parse().unwrap();
         let projjson_crs = deserialize_crs(&projjson_value).unwrap();
         assert_eq!(
             SedonaType::Wkb(Edges::Planar, projjson_crs).to_string(),
-            "wkb <{...}>"
+            "Wkb({...})"
         );
     }
 
