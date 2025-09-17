@@ -53,10 +53,13 @@ jobs:
             # In the case of a tag, the version in Cargo.toml is already correct
             VERSION=${GITHUB_REF_NAME#apache-sedona-db-}
             VERSION=${VERSION%-rc*}
+          elif [[ "${GITHUB_REF##*/}" =~ ^branch-[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            VERSION="${GITHUB_REF##*/branch-}"
           else
             # Set an alpha version and save it to env
             VERSION=$(python ci/scripts/set_dev_version.py)
           fi
+
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
       - name: Create archive
@@ -171,7 +174,7 @@ jobs:
           gh release create "${RELEASE_TAG}" \
             --repo ${{ github.repository }} \
             --prerelease \
-            --title "sedona-db ${RELEASE_TAG}" \
+            --title "SedonaDB ${RELEASE_TAG}" \
             ${UPLOAD}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
