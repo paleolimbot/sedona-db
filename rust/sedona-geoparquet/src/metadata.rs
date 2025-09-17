@@ -14,6 +14,7 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
+
 /// Strongly-typed structs corresponding to the metadata provided by the GeoParquet specification.
 ///
 /// This is a slightly modified version of geoarrow-rs/rust/geoarrow-geoparquet (modified
