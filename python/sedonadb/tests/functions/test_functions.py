@@ -294,7 +294,7 @@ def test_st_envelope(eng, geom, expected):
 @pytest.mark.parametrize(
     ("geom", "expected"),
     [
-        # Failing on None for SedonaDB: with datafusion optimizer exception
+        (None, None),
         ("POINT EMPTY", "POINT (nan nan)"),
         ("POLYGON EMPTY", "POLYGON EMPTY"),
         ("LINESTRING EMPTY", "LINESTRING EMPTY"),
