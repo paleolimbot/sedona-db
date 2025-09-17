@@ -225,4 +225,3 @@ df = sd.read_parquet("DATA_FILE.parquet")
 ```
 
 Once you read the file, you can easily expose it as a view and query it with spatial SQL, as we demonstrated in the example above.
-

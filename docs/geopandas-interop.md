@@ -83,10 +83,10 @@ gdf.info()
     <class 'geopandas.geodataframe.GeoDataFrame'>
     RangeIndex: 3 entries, 0 to 2
     Data columns (total 3 columns):
-     #   Column    Non-Null Count  Dtype   
-    ---  ------    --------------  -----   
-     0   prop0     3 non-null      object  
-     1   prop1     2 non-null      object  
+     #   Column    Non-Null Count  Dtype
+    ---  ------    --------------  -----
+     0   prop0     3 non-null      object
+     1   prop1     2 non-null      object
      2   geometry  3 non-null      geometry
     dtypes: geometry(1), object(2)
     memory usage: 204.0+ bytes
@@ -146,4 +146,3 @@ df.show(3)
     ├╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
     │ Vaduz        ┆ POINT(9.5166695 47.1337238)  │
     └──────────────┴──────────────────────────────┘
-
