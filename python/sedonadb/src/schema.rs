@@ -181,7 +181,7 @@ impl PySedonaType {
     }
 
     pub fn repr(&self) -> String {
-        format!("{}", self.inner)
+        format!("{}<{}>", self.inner.logical_type_name(), self.inner)
     }
 }
 

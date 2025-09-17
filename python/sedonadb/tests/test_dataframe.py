@@ -131,14 +131,14 @@ def test_schema(con):
     # Non-geometry field accessor
     assert df.schema.field(0).name == "one"
     assert df.schema.field("one").name == "one"
-    assert repr(df.schema.field(0).type) == "SedonaType Int64"
+    assert repr(df.schema.field(0).type) == "SedonaType int64<Int64>"
     assert df.schema.field(0).type.edge_type is None
     assert df.schema.field(0).type.crs is None
 
     # Geometry field accessor
     assert df.schema.field(1).name == "geom"
     assert df.schema.field("geom").name == "geom"
-    assert repr(df.schema.field(1).type) == "SedonaType wkb"
+    assert repr(df.schema.field(1).type) == "SedonaType geometry<Wkb>"
     assert df.schema.field(1).type.edge_type == gat.EdgeType.PLANAR
     assert df.schema.field(1).type.crs is None
 
