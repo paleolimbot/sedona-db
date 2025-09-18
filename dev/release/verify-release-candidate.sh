@@ -67,7 +67,7 @@ check_pkg_config_dependencies() {
   local missing_deps=0
   local required_deps=(geos proj openssl absl_base)
   for dep in "${required_deps[@]}"; do
-    if ! command -v pkg-config --modversion $dep &> /dev/null; then
+    if ! pkg-config --modversion $dep &> /dev/null; then
       echo "Error: $dep is not installed or not in PKG_CONFIG_PATH"
       missing_deps=1
     fi
