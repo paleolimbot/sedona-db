@@ -86,7 +86,7 @@ check_pkg_config_dependencies() {
   if [ $missing_deps -ne 0 ]; then
     echo "Please install or update missing dependencies and try again"
     echo "Using Homebrew: brew install geos proj openssl abseil"
-    echo "Using conda: conda install geos proj openssl abseil-cpp"
+    echo "Using conda: conda install geos proj openssl libabseil"
     exit 1
   fi
 }
