@@ -27,11 +27,10 @@ fi
 case $# in
   0) VERSION="HEAD"
      SOURCE_KIND="local"
-     TEST_BINARIES=0
      ;;
-  1) VERSION="$1"
-     SOURCE_KIND="git"
-     TEST_BINARIES=0
+  1) VERSION="TARBALL"
+     SOURCE_KIND="local_tarball"
+     LOCAL_TARBALL="$(realpath $1)"
      ;;
   2) VERSION="$1"
      RC_NUMBER="$2"
@@ -40,12 +39,8 @@ case $# in
   *) echo "Usage:"
      echo "  Verify release candidate:"
      echo "    $0 X.Y.Z RC_NUMBER"
-     echo "  Verify only the source distribution:"
-     echo "    TEST_DEFAULT=0 TEST_SOURCE=1 $0 X.Y.Z RC_NUMBER"
      echo ""
-     echo "  Run the source verification tasks on a remote git revision:"
-     echo "    $0 GIT-REF"
-     echo "  Run the source verification tasks on this nanoarrow checkout:"
+     echo "  Run the source verification tasks on this sedona-db checkout:"
      echo "    $0"
      exit 1
      ;;
@@ -163,20 +158,12 @@ setup_tempdir() {
   echo "Working in sandbox ${NANOARROW_TMPDIR}"
 }
 
-setup_sedona_testing() {
-  show_header "Setting up sedona-testing"
-
-  if [ -z "${NANOARROW_ARROW_TESTING_DIR}" ]; then
-    export NANOARROW_ARROW_TESTING_DIR="${NANOARROW_TMPDIR}/sedona-testing"
-    git clone --depth=1 https://github.com/apache/sedona-testing ${NANOARROW_ARROW_TESTING_DIR}
-  fi
-
-  echo "Using arrow-testing at '${NANOARROW_ARROW_TESTING_DIR}'"
-}
-
 test_rust() {
   show_header "Build and test Rust libraries"
 
+  pushd "${NANOARROW_SOURCE_DIR}"
+  cargo test --workspace --exclude sedona-s2geography
+  popd
 }
 
 activate_or_create_venv() {
@@ -206,9 +193,9 @@ test_python() {
 
   show_info "Installing Python package"
   rm -rf "${NANOARROW_TMPDIR}/python"
-  pip install "sedonadb/[test]"
+  pip install "sedonadb/[test]" -v
 
-  show_info "Testing wheel"
+  show_info "Testing Python package"
   python -m pytest -vv
 
   popd
@@ -225,6 +212,22 @@ ensure_source_directory() {
       export NANOARROW_SOURCE_DIR="${NANOARROW_DIR}"
     fi
     echo "Verifying local nanoarrow checkout at ${NANOARROW_SOURCE_DIR}"
+  elif [ "${SOURCE_KIND}" = "local_tarball" ]; then
+    # Local tarball
+    pushd $NANOARROW_TMPDIR
+    tar xf "$LOCAL_TARBALL"
+    dist_name=$(ls)
+    export NANOARROW_SOURCE_DIR="${NANOARROW_TMPDIR}/${dist_name}"
+
+    # Ensure submodules are where tests expect them to be
+    pushd "$NANOARROW_SOURCE_DIR/submodules"
+    git clone https://github.com/apache/sedona-testing.git
+    git clone https://github.com/geoarrow/geoarrow-data.git
+    popd
+
+    popd
+
+    echo "Verifying local tarball at $LOCAL_TARBALL"
   else
     # Release tarball
     echo "Verifying official nanoarrow release candidate ${VERSION}-rc${RC_NUMBER}"
@@ -233,6 +236,13 @@ ensure_source_directory() {
       pushd $NANOARROW_TMPDIR
       fetch_archive ${dist_name}
       tar xf ${dist_name}.tar.gz
+
+      # Ensure submodules are where tests expect them to be
+      pushd submodules
+      git clone https://github.com/apache/sedona-testing.git
+      git clone https://github.com/geoarrow/geoarrow-data.git
+      popd
+
       popd
     fi
   fi
@@ -264,7 +274,6 @@ test_source_distribution() {
 TEST_SUCCESS=no
 
 setup_tempdir
-setup_sedona_testing
 ensure_source_directory
 test_source_distribution
 
