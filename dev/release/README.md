@@ -19,6 +19,35 @@
 
 # Releasing SedonaDB
 
+## Verifying a release candidate
+
+Release candidates are verified using the script `verify-release-candidate.sh <version> <rc_num>`.
+For example, to verify SedonaDB 0.1.0 RC0, run:
+
+```shell
+# git clone https://github.com/apache/sedona-db.git && cd sedona-db
+# or
+# cd existing/sedona-db && git fetch upstream && git switch main && git pull upstream main
+dev/release/verify-release-candidate.sh 0.1.0 0
+```
+
+Release verification requires a recent Rust toolchain. This toolchain can be installed
+by following instructions from <https://rustup.rs/>.
+
+MacOS users can use [Homebrew](https://brew.sh) to install the required dependencies.
+
+```shell
+brew install geos proj openssl abseil
+```
+
+Linux and MacOS users can use `conda` to install the required dependencies:
+
+```shell
+conda create -y --name verify-sedona-db
+conda activate verify-sedona-db
+conda install -y compilers cmake pkg-config geos proj openssl abseil-cpp
+```
+
 ## Creating a release
 
 Create a release branch on the corresponding remote pointing to the official Apache
