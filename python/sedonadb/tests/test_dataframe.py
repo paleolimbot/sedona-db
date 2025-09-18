@@ -446,7 +446,7 @@ def test_repr(con):
     )
 
     try:
-        sedonadb.options.interactive = True
+        con.options.interactive = True
         repr_interactive = repr(con.sql("SELECT 1 as one"))
         expected = """
 ┌───────┐
@@ -458,4 +458,4 @@ def test_repr(con):
     """.strip()
         assert repr_interactive == expected
     finally:
-        sedonadb.options.interactive = False
+        con.options.interactive = False
