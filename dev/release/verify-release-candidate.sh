@@ -309,7 +309,7 @@ ensure_source_directory() {
       tar xf ${dist_name}.tar.gz
 
       # Ensure submodules are where tests expect them to be
-      pushd submodules
+      pushd "${SEDONADB_SOURCE_DIR}/submodules"
       git clone https://github.com/apache/sedona-testing.git
       git clone https://github.com/geoarrow/geoarrow-data.git
       popd
