@@ -196,9 +196,6 @@ verify_dir_artifact_signatures() {
     # basename of the artifact
     pushd $(dirname $artifact)
     base_artifact=$(basename $artifact)
-    if [ -f $base_artifact.sha256 ]; then
-      ${sha256_verify} $base_artifact.sha256 || exit 1
-    fi
     if [ -f $base_artifact.sha512 ]; then
       ${sha512_verify} $base_artifact.sha512 || exit 1
     fi
