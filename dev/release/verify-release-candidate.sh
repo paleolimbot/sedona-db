@@ -24,6 +24,73 @@ if [ ${VERBOSE:-0} -gt 0 ]; then
   set -x
 fi
 
+# Check that required dependencies are installed
+check_dependencies() {
+  local missing_deps=0
+
+  local required_deps=("curl" "git" "gpg" "cc" "cargo" "cmake")
+  for dep in "${required_deps[@]}"; do
+    if ! command -v $dep &> /dev/null; then
+      echo "Error: $dep is not installed or not in PATH"
+      missing_deps=1
+    fi
+  done
+
+  # pkg-config doesn't work with the above check
+  if ! pkg-config --version &> /dev/null; then
+    echo "Error: pkg-config is not installed or not in PATH"
+    missing_deps=1
+  fi
+
+  # Check for either shasum or sha256sum/sha512sum
+  local has_sha_tools=0
+  if command -v shasum &> /dev/null; then
+    has_sha_tools=1
+  elif command -v sha256sum &> /dev/null && command -v sha512sum &> /dev/null; then
+    has_sha_tools=1
+  else
+    echo "Error: Neither shasum nor sha256sum/sha512sum are installed or in PATH"
+    missing_deps=1
+  fi
+
+  if [ $missing_deps -ne 0 ]; then
+    echo "Please install missing dependencies and try again"
+    exit 1
+  fi
+}
+
+
+# Check that required native dependencies are installed. For the purposes of this
+# script we require geos, proj, absl_base, and openssl via pkg-config, even though
+# technically absl_base and openssl are resolved via CMake for sedona-s2geography.
+check_pkg_config_dependencies() {
+  local missing_deps=0
+  local required_deps=("geos", "proj" "openssl" "absl_base")
+  for dep in "${required_deps[@]}"; do
+    if ! command -v pkg-config --modversion $dep &> /dev/null; then
+      echo "Error: $dep is not installed or not in PKG_CONFIG_PATH"
+      missing_deps=1
+    fi
+  done
+
+  local absl_version=$(pkg-config --modversion absl_base)
+  # Check if Abseil version is sufficient (need at least version 20230802)
+  if [ "$absl_version" -lt "20230802" ]; then
+    echo "Error: Abseil version $absl_version is too old, need at least 20230802"
+    echo "On Linux, this typically requires verification within a conda environment"
+    echo "or by installing Abseil via vcpkg and ensuring PKG_CONFIG_PATH and"
+    echo "CMAKE_TOOLCHAIN_FILE are updated appropriately."
+    missing_deps=1
+  fi
+
+  if [ $missing_deps -ne 0 ]; then
+    echo "Please install or update missing dependencies and try again"
+    echo "Using Homebrew: brew install geos proj openssl abseil"
+    echo "Using conda: conda install geos proj openssl abseil-cpp"
+    exit 1
+  fi
+}
+
 case $# in
   0) VERSION="HEAD"
      SOURCE_KIND="local"
@@ -45,6 +112,10 @@ case $# in
      exit 1
      ;;
 esac
+
+# Check dependencies early
+check_dependencies
+check_pkg_config_dependencies
 
 # Note that these point to the current verify-release-candidate.sh directories
 # which is different from the NANOARROW_SOURCE_DIR set in ensure_source_directory()
