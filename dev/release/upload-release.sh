@@ -48,7 +48,7 @@ main() {
         https://dist.apache.org/repos/dist/release/sedona/${release_id}
 
     echo "Success! The release is available here:"
-    echo "  https://dist.apache.org/repos/dist/release/arrow/${release_id}"
+    echo "  https://dist.apache.org/repos/dist/release/sedona/${release_id}"
 }
 
 main "$@"
