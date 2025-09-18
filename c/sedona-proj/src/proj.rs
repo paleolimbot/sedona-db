@@ -557,7 +557,7 @@ impl ProjApi {
                         *const _,
                         *const _,
                         *mut _,
-                        *const *const i8,
+                        *const _,
                     ) -> _,
             ));
             inner.proj_create = Some(std::mem::transmute(
