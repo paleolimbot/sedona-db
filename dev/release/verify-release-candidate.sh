@@ -65,7 +65,7 @@ check_dependencies() {
 # technically absl_base and openssl are resolved via CMake for sedona-s2geography.
 check_pkg_config_dependencies() {
   local missing_deps=0
-  local required_deps=("geos", "proj" "openssl" "absl_base")
+  local required_deps=(geos proj openssl absl_base)
   for dep in "${required_deps[@]}"; do
     if ! command -v pkg-config --modversion $dep &> /dev/null; then
       echo "Error: $dep is not installed or not in PKG_CONFIG_PATH"
