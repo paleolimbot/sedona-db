@@ -18,7 +18,6 @@
 from pathlib import Path
 from typing import TYPE_CHECKING, Union, Optional, Any, Iterable
 
-from sedonadb._options import global_options
 from sedonadb.utility import sedona  # noqa: F401
 
 
@@ -36,9 +35,10 @@ class DataFrame:
     reading a file, or executing SQL.
     """
 
-    def __init__(self, ctx, impl):
+    def __init__(self, ctx, impl, options):
         self._ctx = ctx
         self._impl = impl
+        self._options = options
 
     @property
     def schema(self):
@@ -110,7 +110,7 @@ class DataFrame:
             └───────┘
 
         """
-        return DataFrame(self._ctx, self._impl.limit(n, offset))
+        return DataFrame(self._ctx, self._impl.limit(n, offset), self._options)
 
     def execute(self) -> None:
         """Execute the plan represented by this DataFrame
@@ -220,7 +220,7 @@ class DataFrame:
             └────────────┘
 
         """
-        return DataFrame(self._ctx, self._impl.to_memtable(self._ctx))
+        return DataFrame(self._ctx, self._impl.to_memtable(self._ctx), self._options)
 
     def __datafusion_table_provider__(self):
         return self._impl.__datafusion_table_provider__()
@@ -376,7 +376,7 @@ class DataFrame:
             └────────────┘
 
         """
-        width = _out_width(width)
+        width = self._out_width(width)
         print(self._impl.show(self._ctx, limit, width, ascii), end="")
 
     def explain(
@@ -420,29 +420,28 @@ class DataFrame:
             │               ┆                                 │
             └───────────────┴─────────────────────────────────┘
         """
-        return DataFrame(self._ctx, self._impl.explain(type, format))
+        return DataFrame(self._ctx, self._impl.explain(type, format), self._options)
 
     def __repr__(self) -> str:
-        if global_options().interactive:
-            width = _out_width()
+        if self._options.interactive:
+            width = self._out_width()
             return self._impl.show(self._ctx, 10, width, ascii=False).strip()
         else:
             return super().__repr__()
 
+    def _out_width(self, width=None) -> int:
+        if width is None:
+            width = self._options.width
 
-def _out_width(width=None) -> int:
-    if width is None:
-        width = global_options().width
+        if width is None:
+            import shutil
 
-    if width is None:
-        import shutil
+            width, _ = shutil.get_terminal_size(fallback=(100, 24))
 
-        width, _ = shutil.get_terminal_size(fallback=(100, 24))
-
-    return width
+        return width
 
 
-def _create_data_frame(ctx_impl, obj, schema) -> DataFrame:
+def _create_data_frame(ctx_impl, obj, schema, options) -> DataFrame:
     """Create a DataFrame (internal)
 
     This is defined here because we need it in future dataframe methods like
@@ -461,27 +460,27 @@ def _create_data_frame(ctx_impl, obj, schema) -> DataFrame:
     # This includes geopandas/pandas DataFrames, pyarrow tables, and Polars tables.
     type_name = _qualified_type_name(obj)
     if type_name in SPECIAL_CASED_SCANS:
-        return SPECIAL_CASED_SCANS[type_name](ctx_impl, obj, schema)
+        return SPECIAL_CASED_SCANS[type_name](ctx_impl, obj, schema, options)
 
     # The default implementation handles objects that implement
     # __datafusion_table_provider__ or __arrow_c_stream__. For objects implementing
     # __arrow_c_stream__, this currently will only work for a single scan (i.e.,
     # the returned data frame can't be previewed before the query is computed).
-    return _scan_default(ctx_impl, obj, schema)
+    return _scan_default(ctx_impl, obj, schema, options)
 
 
-def _scan_default(ctx_impl, obj, schema):
+def _scan_default(ctx_impl, obj, schema, options):
     impl = ctx_impl.create_data_frame(obj, schema)
-    return DataFrame(ctx_impl, impl)
+    return DataFrame(ctx_impl, impl, options)
 
 
-def _scan_collected_default(ctx_impl, obj, schema):
-    return _scan_default(ctx_impl, obj, schema).to_memtable()
+def _scan_collected_default(ctx_impl, obj, schema, options):
+    return _scan_default(ctx_impl, obj, schema, options).to_memtable()
 
 
-def _scan_geopandas(ctx_impl, obj, schema):
+def _scan_geopandas(ctx_impl, obj, schema, options):
     return _scan_collected_default(
-        ctx_impl, obj.to_arrow(geometry_encoding="WKB"), schema
+        ctx_impl, obj.to_arrow(geometry_encoding="WKB"), schema, options
     )
 
 
