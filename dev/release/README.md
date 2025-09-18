@@ -40,12 +40,27 @@ MacOS users can use [Homebrew](https://brew.sh) to install the required dependen
 brew install geos proj openssl abseil
 ```
 
-Linux and MacOS users can use `conda` to install the required dependencies:
+Linux users (e.g., `docker run --rm -it condaforge/mambaforge`) can use `conda` to
+install the required dependencies:
 
 ```shell
 conda create -y --name verify-sedona-db
 conda activate verify-sedona-db
-conda install -y compilers cmake pkg-config geos proj openssl abseil-cpp
+conda install -y curl gnupg geos proj openssl libabseil cmake pkg-config
+export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$CONDA_PREFIX/lib"
+```
+
+Currently system libclang is required to generate C bindings at build time:
+
+```shell
+apt-get update && apt-get install -y libclang-dev
+```
+
+When verifying via Docker or on a smaller machine it may be necessary to limit the
+number of parallel jobs to avoid running out of memory:
+
+```shell
+export CARGO_BUILD_JOBS=4
 ```
 
 ## Creating a release
@@ -71,6 +86,13 @@ being verified. The Python wheels (and the tests that are run as they are create
 are considered a "packaging" step (i.e., the artifacts aren't uploaded to the
 release or voted on), although those CI jobs are important to ensuring
 the release is ready for a vote.
+
+Before creating a tag, download the tarball from the latest packaging run and
+check it locally:
+
+```shell
+dev/release/verify-release-candidate.sh path/to/tarball.tar.gz
+```
 
 When the state of the `branch-x.x.x` branch is clean and checks are complete,
 the release candidate tag can be created:
