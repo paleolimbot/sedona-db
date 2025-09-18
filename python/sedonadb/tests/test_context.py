@@ -20,6 +20,14 @@ import pytest
 import sedonadb
 
 
+def test_options():
+    sd = sedonadb.connect()
+    assert "DataFrame object at" in repr(sd.sql("SELECT 1 as one"))
+
+    sd.options.interactive = True
+    assert "DataFrame object at" not in repr(sd.sql("SELECT 1 as one"))
+
+
 def test_read_parquet(con, geoarrow_data):
     # Check one file
     tab = con.read_parquet(
