@@ -118,9 +118,9 @@ check_dependencies
 check_pkg_config_dependencies
 
 # Note that these point to the current verify-release-candidate.sh directories
-# which is different from the NANOARROW_SOURCE_DIR set in ensure_source_directory()
+# which is different from the SEDONADB_SOURCE_DIR set in ensure_source_directory()
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-NANOARROW_DIR="$(cd "${SOURCE_DIR}/../.." && pwd)"
+SEDONADB_DIR="$(cd "${SOURCE_DIR}/../.." && pwd)"
 
 show_header() {
   if [ -z "$GITHUB_ACTIONS" ]; then
@@ -137,7 +137,7 @@ show_info() {
   echo "└ ${1}"
 }
 
-NANOARROW_DIST_URL='https://dist.apache.org/repos/dist/dev/arrow'
+SEDONADB_DIST_URL='https://dist.apache.org/repos/dist/dev/sedona'
 
 download_dist_file() {
   curl \
@@ -145,11 +145,11 @@ download_dist_file() {
     --show-error \
     --fail \
     --location \
-    --remote-name $NANOARROW_DIST_URL/$1
+    --remote-name $SEDONADB_DIST_URL/$1
 }
 
 download_rc_file() {
-  download_dist_file apache-arrow-nanoarrow-${VERSION}-rc${RC_NUMBER}/$1
+  download_dist_file apache-sedona-db-${VERSION}-rc${RC_NUMBER}/$1
 }
 
 import_gpg_keys() {
@@ -158,7 +158,7 @@ import_gpg_keys() {
   fi
   download_dist_file KEYS
 
-  if [ "${NANOARROW_ACCEPT_IMPORT_GPG_KEYS_ERROR:-0}" -gt 0 ]; then
+  if [ "${SEDONADB_ACCEPT_IMPORT_GPG_KEYS_ERROR:-0}" -gt 0 ]; then
     gpg --import KEYS || true
   else
     gpg --import KEYS
@@ -209,38 +209,38 @@ verify_dir_artifact_signatures() {
 setup_tempdir() {
   cleanup() {
     if [ "${TEST_SUCCESS}" = "yes" ]; then
-      rm -fr "${NANOARROW_TMPDIR}"
+      rm -fr "${SEDONADB_TMPDIR}"
     else
-      echo "Failed to verify release candidate. See ${NANOARROW_TMPDIR} for details."
+      echo "Failed to verify release candidate. See ${SEDONADB_TMPDIR} for details."
     fi
   }
 
   show_header "Creating temporary directory"
 
-  if [ -z "${NANOARROW_TMPDIR}" ]; then
-    # clean up automatically if NANOARROW_TMPDIR is not defined
-    NANOARROW_TMPDIR=$(mktemp -d -t "nanoarrow-${VERSION}.XXXXXX")
+  if [ -z "${SEDONADB_TMPDIR}" ]; then
+    # clean up automatically if SEDONADB_TMPDIR is not defined
+    SEDONADB_TMPDIR=$(mktemp -d -t "sedonadb-${VERSION}.XXXXXX")
     trap cleanup EXIT
   else
     # don't clean up automatically
-    mkdir -p "${NANOARROW_TMPDIR}"
+    mkdir -p "${SEDONADB_TMPDIR}"
   fi
 
-  echo "Working in sandbox ${NANOARROW_TMPDIR}"
+  echo "Working in sandbox ${SEDONADB_TMPDIR}"
 }
 
 test_rust() {
   show_header "Build and test Rust libraries"
 
-  pushd "${NANOARROW_SOURCE_DIR}"
+  pushd "${SEDONADB_SOURCE_DIR}"
   cargo test --workspace --exclude sedona-s2geography
   popd
 }
 
 activate_or_create_venv() {
-  if [ ! -z "${NANOARROW_PYTHON_VENV}" ]; then
-    show_info "Activating virtual environment at ${NANOARROW_PYTHON_VENV}"
-    source "${NANOARROW_PYTHON_VENV}/bin/activate"
+  if [ ! -z "${SEDONADB_PYTHON_VENV}" ]; then
+    show_info "Activating virtual environment at ${SEDONADB_PYTHON_VENV}"
+    source "${SEDONADB_PYTHON_VENV}/bin/activate"
   else
     # Try python3 first, then try regular python (e.g., already in a venv)
     if [ -z "${PYTHON_BIN}" ] && python3 --version >/dev/null; then
@@ -250,8 +250,8 @@ activate_or_create_venv() {
     fi
 
     show_info "Creating temporary virtual environment using ${PYTHON_BIN}..."
-    "${PYTHON_BIN}" -m venv "${NANOARROW_TMPDIR}/venv"
-    source "${NANOARROW_TMPDIR}/venv/bin/activate"
+    "${PYTHON_BIN}" -m venv "${SEDONADB_TMPDIR}/venv"
+    source "${SEDONADB_TMPDIR}/venv/bin/activate"
     python -m pip install --upgrade pip
   fi
 }
@@ -260,10 +260,10 @@ test_python() {
   show_header "Build and test Python package"
   activate_or_create_venv
 
-  pushd "${NANOARROW_SOURCE_DIR}/python"
+  pushd "${SEDONADB_SOURCE_DIR}/python"
 
   show_info "Installing Python package"
-  rm -rf "${NANOARROW_TMPDIR}/python"
+  rm -rf "${SEDONADB_TMPDIR}/python"
   pip install "sedonadb/[test]" -v
 
   show_info "Testing Python package"
@@ -275,23 +275,23 @@ test_python() {
 ensure_source_directory() {
   show_header "Ensuring source directory"
 
-  dist_name="apache-arrow-nanoarrow-${VERSION}"
+  dist_name="apache-sedona-db-${VERSION}"
 
   if [ "${SOURCE_KIND}" = "local" ]; then
-    # Local nanoarrow repository
-    if [ -z "$NANOARROW_SOURCE_DIR" ]; then
-      export NANOARROW_SOURCE_DIR="${NANOARROW_DIR}"
+    # Local repository
+    if [ -z "$SEDONADB_SOURCE_DIR" ]; then
+      export SEDONADB_SOURCE_DIR="${SEDONADB_DIR}"
     fi
-    echo "Verifying local nanoarrow checkout at ${NANOARROW_SOURCE_DIR}"
+    echo "Verifying local sedona-db checkout at ${SEDONADB_SOURCE_DIR}"
   elif [ "${SOURCE_KIND}" = "local_tarball" ]; then
     # Local tarball
-    pushd $NANOARROW_TMPDIR
+    pushd $SEDONADB_TMPDIR
     tar xf "$LOCAL_TARBALL"
     dist_name=$(ls)
-    export NANOARROW_SOURCE_DIR="${NANOARROW_TMPDIR}/${dist_name}"
+    export SEDONADB_SOURCE_DIR="${SEDONADB_TMPDIR}/${dist_name}"
 
     # Ensure submodules are where tests expect them to be
-    pushd "$NANOARROW_SOURCE_DIR/submodules"
+    pushd "$SEDONADB_SOURCE_DIR/submodules"
     git clone https://github.com/apache/sedona-testing.git
     git clone https://github.com/geoarrow/geoarrow-data.git
     popd
@@ -301,10 +301,10 @@ ensure_source_directory() {
     echo "Verifying local tarball at $LOCAL_TARBALL"
   else
     # Release tarball
-    echo "Verifying official nanoarrow release candidate ${VERSION}-rc${RC_NUMBER}"
-    export NANOARROW_SOURCE_DIR="${NANOARROW_TMPDIR}/${dist_name}"
-    if [ ! -d "${NANOARROW_SOURCE_DIR}" ]; then
-      pushd $NANOARROW_TMPDIR
+    echo "Verifying official SedonaDB release candidate ${VERSION}-rc${RC_NUMBER}"
+    export SEDONADB_SOURCE_DIR="${SEDONADB_TMPDIR}/${dist_name}"
+    if [ ! -d "${SEDONADB_SOURCE_DIR}" ]; then
+      pushd $SEDONADB_TMPDIR
       fetch_archive ${dist_name}
       tar xf ${dist_name}.tar.gz
 
@@ -320,7 +320,7 @@ ensure_source_directory() {
 }
 
 test_source_distribution() {
-  pushd $NANOARROW_SOURCE_DIR
+  pushd $SEDONADB_SOURCE_DIR
 
   if [ ${TEST_RUST} -gt 0 ]; then
     test_rust
