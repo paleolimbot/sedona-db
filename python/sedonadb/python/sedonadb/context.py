@@ -31,6 +31,18 @@ class SedonaContext:
     This object keeps track of state such as registered functions,
     registered tables, and available memory. This is similar to a
     Spark SessionContext or a database connection.
+
+    Examples:
+
+        >>> sd = sedona.db.connect()
+        >>> sd.options.interactive = True
+        >>> sd.sql("SELECT 1 as one")
+        ┌───────┐
+        │  one  │
+        │ int64 │
+        ╞═══════╡
+        │     1 │
+        └───────┘
     """
 
     def __init__(self):
