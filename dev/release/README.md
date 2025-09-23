@@ -192,6 +192,10 @@ are currently all derived from `Cargo.toml`, which can be updated to:
 version = "0.2.0"
 ```
 
+The R package must also be updated. R Packages use a different convention for development
+versions such that in preparation for 0.2.0 the development version should be
+`0.1.0.9000`. This is set the DESCRIPTION of the requisite package.
+
 Development versions and the changelog are derived from the presence of a development
 tag on the main branch signifying where development of that version "started". After
 the version bump PR merges, that commit should be tagged with the appropriate
