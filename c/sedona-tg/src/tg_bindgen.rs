@@ -17,9 +17,19 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 
-use std::os::raw::{c_char, c_int, c_void};
+use std::os::raw::{c_char, c_void};
 
+#[cfg(target_env = "msvc")]
+use std::os::raw::c_int;
+
+#[cfg(target_env = "msvc")]
 pub type tg_index = c_int;
+
+#[cfg(not(target_env = "msvc"))]
+use std::os::raw::c_uint;
+
+#[cfg(not(target_env = "msvc"))]
+pub type tg_index = c_uint;
 
 pub const tg_index_TG_NONE: tg_index = 0;
 pub const tg_index_TG_DEFAULT: tg_index = 1;
