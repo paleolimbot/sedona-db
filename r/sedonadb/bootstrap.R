@@ -29,7 +29,6 @@ writeLines(
   cargo_toml
 )
 
-dir.create("src/dep_crates/")
 file.copy(
   c(
     "../../rust",
