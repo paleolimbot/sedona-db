@@ -31,8 +31,8 @@ use std::os::raw::c_uint;
 #[cfg(not(target_env = "msvc"))]
 pub type tg_index = c_uint;
 
-pub const tg_index_TG_NONE: tg_index = 0;
-pub const tg_index_TG_DEFAULT: tg_index = 1;
+pub const tg_index_TG_NONE: tg_index = 1;
+pub const tg_index_TG_DEFAULT: tg_index = 0;
 pub const tg_index_TG_NATURAL: tg_index = 2;
 pub const tg_index_TG_YSTRIPES: tg_index = 3;
 
