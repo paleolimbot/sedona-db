@@ -56,6 +56,7 @@ $(STATLIB):
 	  export PKG_CONFIG_SYSROOT_DIR="$(PKG_CONFIG_SYSROOT_DIR)" && \
 	  export CC="$(CC)" && \
 	  export CFLAGS="$(CFLAGS_TWEAKED)" && \
+	  export CMAKE_OBJECT_PATH_MAX=1024 && \
 	  export AWS_LC_SYS_CMAKE_BUILDER=1 && \
 	  export RUSTFLAGS="$(RUSTFLAGS)" && \
 	  cargo build --target $(TARGET) --lib --profile $(PROFILE) $(FEATURE_FLAGS) --manifest-path ./rust/Cargo.toml --target-dir $(TARGET_DIR)
