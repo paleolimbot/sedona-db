@@ -83,7 +83,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           # Update this key to force a new cache
-          prefix-key: "r-v1"
+          prefix-key: "r-v2"
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
