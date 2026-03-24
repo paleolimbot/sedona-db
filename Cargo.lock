@@ -5173,6 +5173,7 @@ dependencies = [
  "sedona-s2geography",
  "sedona-schema",
  "sedona-spatial-join",
+ "sedona-spatial-join-gpu",
  "sedona-testing",
  "sedona-tg",
  "serde",

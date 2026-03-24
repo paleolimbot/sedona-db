@@ -154,6 +154,14 @@ impl SedonaContext {
             planner = planner.with_spatial_join_factory(Arc::new(DefaultSpatialJoinFactory::new()));
         }
 
+        // Register the GPU join
+        #[cfg(feature = "gpu")]
+        {
+            use sedona_spatial_join_gpu::GpuSpatialJoinFactory;
+
+            planner = planner.with_spatial_join_factory(Arc::new(GpuSpatialJoinFactory::new()));
+        }
+
         state_builder = register_spatial_join_logical_optimizer(state_builder)?;
         state_builder = state_builder.with_query_planner(Arc::new(planner));
 
