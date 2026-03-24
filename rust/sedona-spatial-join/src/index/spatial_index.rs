@@ -37,11 +37,11 @@ pub const DISTANCE_TOLERANCE: f64 = 1e-9;
 /// as well as methods for managing probe statistics and tracking visited build side batches.
 /// The trait is designed to be implemented by various spatial index structures
 #[async_trait]
-pub(crate) trait SpatialIndex {
+pub trait SpatialIndex {
     /// Returns the schema of the indexed data.
     fn schema(&self) -> SchemaRef;
     /// Returns the number of batches that have been indexed.
-    #[cfg(test)] // This is used for tests
+    /// The number of indexed batches
     fn num_indexed_batches(&self) -> usize;
     /// Get the batch at the given index.
     fn get_indexed_batch(&self, batch_idx: usize) -> &RecordBatch;

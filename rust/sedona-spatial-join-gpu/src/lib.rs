@@ -16,5 +16,9 @@
 // under the License.
 
 mod factory;
+mod spatial_index;
+mod spatial_index_builder;
 
 pub use factory::GpuSpatialJoinFactory;
+pub use spatial_index::GpuSpatialIndex;
+pub use spatial_index_builder::GpuSpatialIndexBuilder;

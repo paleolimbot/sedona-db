@@ -21,8 +21,8 @@ pub(crate) mod default_spatial_index_builder;
 mod knn_adapter;
 pub(crate) mod memory_plan;
 pub(crate) mod partitioned_index_provider;
-pub(crate) mod spatial_index;
-pub(crate) mod spatial_index_builder;
+pub mod spatial_index;
+pub mod spatial_index_builder;
 
 pub(crate) use build_side_collector::{
     BuildPartition, BuildSideBatchesCollector, CollectBuildSideMetrics,
@@ -42,7 +42,7 @@ pub(crate) struct IndexQueryResult<'a, 'b> {
 
 /// The metrics for a spatial index query
 #[derive(Debug)]
-pub(crate) struct QueryResultMetrics {
+pub struct QueryResultMetrics {
     pub count: usize,
     pub candidate_count: usize,
 }

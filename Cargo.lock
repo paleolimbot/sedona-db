@@ -5714,11 +5714,20 @@ dependencies = [
 name = "sedona-spatial-join-gpu"
 version = "0.4.0"
 dependencies = [
+ "arrow",
+ "arrow-array",
+ "arrow-schema",
+ "async-trait",
  "datafusion",
  "datafusion-common",
  "datafusion-physical-plan",
+ "geo-types",
+ "parking_lot",
  "sedona-common",
+ "sedona-expr",
  "sedona-query-planner",
+ "sedona-spatial-join",
+ "wkb",
 ]
 
 [[package]]

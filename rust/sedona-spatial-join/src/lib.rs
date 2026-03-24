@@ -18,7 +18,7 @@
 pub mod evaluated_batch;
 pub mod exec;
 pub mod factory;
-mod index;
+pub mod index;
 pub mod operand_evaluator;
 pub mod partitioning;
 mod prepare;
