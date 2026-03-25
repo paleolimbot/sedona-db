@@ -40,7 +40,7 @@ use crate::{
 
 /// Operand evaluator is for evaluating the operands of a spatial predicate. It can be a distance
 /// operand evaluator or a relation operand evaluator.
-pub(crate) trait OperandEvaluator: fmt::Debug + Send + Sync {
+pub trait OperandEvaluator: fmt::Debug + Send + Sync {
     /// Evaluate the spatial predicate operand on the build side.
     fn evaluate_build(&self, batch: &RecordBatch) -> Result<EvaluatedGeometryArray> {
         let geom_expr = self.build_side_expr()?;
@@ -71,7 +71,7 @@ pub(crate) trait OperandEvaluator: fmt::Debug + Send + Sync {
 }
 
 /// Create a spatial predicate evaluator for the spatial predicate.
-pub(crate) fn create_operand_evaluator(
+pub fn create_operand_evaluator(
     predicate: &SpatialPredicate,
     options: SpatialJoinOptions,
 ) -> Arc<dyn OperandEvaluator> {
@@ -103,7 +103,7 @@ pub struct EvaluatedGeometryArray {
     /// but we'll only allow accessing Wkb<'a> where 'a is the lifetime of the GeometryBatchResult to make
     /// the interfaces safe. The buffers in `geometry_array` are allocated on the heap and won't be moved when
     /// the GeometryBatchResult is moved, so we don't need to worry about pinning.
-    wkbs: Vec<Option<Wkb<'static>>>,
+    pub wkbs: Vec<Option<Wkb<'static>>>,
 }
 
 impl EvaluatedGeometryArray {

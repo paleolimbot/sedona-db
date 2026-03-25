@@ -47,7 +47,7 @@ use crate::{
     utils::bbox_sampler::{BoundingBoxSampler, BoundingBoxSamples},
 };
 
-pub(crate) struct BuildPartition {
+pub struct BuildPartition {
     pub num_rows: usize,
     pub build_side_batch_stream: SendableEvaluatedBatchStream,
     pub geo_statistics: GeoStatistics,
@@ -78,7 +78,7 @@ pub(crate) struct BuildPartition {
 /// could then be fed into the spatial index builder to build an in-memory or external
 /// spatial index, depending on the statistics collected by the collector.
 #[derive(Clone)]
-pub(crate) struct BuildSideBatchesCollector {
+pub struct BuildSideBatchesCollector {
     spatial_predicate: SpatialPredicate,
     spatial_join_options: SpatialJoinOptions,
     evaluator: Arc<dyn OperandEvaluator>,
@@ -88,20 +88,20 @@ pub(crate) struct BuildSideBatchesCollector {
 }
 
 #[derive(Clone)]
-pub(crate) struct CollectBuildSideMetrics {
+pub struct CollectBuildSideMetrics {
     /// Number of batches collected
-    num_batches: metrics::Count,
+    pub num_batches: metrics::Count,
     /// Number of rows collected
-    num_rows: metrics::Count,
+    pub num_rows: metrics::Count,
     /// Total in-memory size of batches collected. If the batches were spilled, this size is the
     /// in-memory size if we load all batches into memory. This does not represent the in-memory size
     /// of the resulting BuildPartition.
-    total_size_bytes: metrics::Gauge,
+    pub total_size_bytes: metrics::Gauge,
     /// Total time taken to collect and process the build side batches. This does not include the time awaiting
     /// for batches from the input stream.
-    time_taken: metrics::Time,
+    pub time_taken: metrics::Time,
     /// Spill metrics of build partitions collecting phase
-    spill_metrics: SpillMetrics,
+    pub spill_metrics: SpillMetrics,
 }
 
 impl CollectBuildSideMetrics {

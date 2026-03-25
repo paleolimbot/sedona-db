@@ -38,6 +38,6 @@ pub trait EvaluatedBatchStream: Stream<Item = Result<EvaluatedBatch>> {
 
 pub type SendableEvaluatedBatchStream = Pin<Box<dyn EvaluatedBatchStream + Send>>;
 
-pub(crate) mod evaluate;
+pub mod evaluate;
 pub mod external;
 pub mod in_mem;

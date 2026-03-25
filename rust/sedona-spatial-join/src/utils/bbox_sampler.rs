@@ -67,7 +67,7 @@ use sedona_geometry::bounding_box::BoundingBox;
 /// This multi-stage approach ensures uniform sampling across all stages while satisfying all
 /// the goals above.
 #[derive(Debug)]
-pub(crate) struct BoundingBoxSampler {
+pub struct BoundingBoxSampler {
     /// Minimum number of samples to collect
     min_samples: usize,
 
@@ -93,7 +93,7 @@ pub(crate) struct BoundingBoxSampler {
 
 /// Samples collected by [`BoundingBoxSampler`].
 #[derive(Debug, PartialEq, Clone, Default)]
-pub(crate) struct BoundingBoxSamples {
+pub struct BoundingBoxSamples {
     /// The collected samples
     samples: Vec<BoundingBox>,
 

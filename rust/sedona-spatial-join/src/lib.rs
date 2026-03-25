@@ -22,10 +22,10 @@ pub mod index;
 pub mod operand_evaluator;
 pub mod partitioning;
 mod prepare;
-mod probe;
+pub mod probe;
 pub mod refine;
 pub use sedona_query_planner::spatial_predicate;
-mod stream;
+pub mod stream;
 pub mod utils;
 
 pub use exec::SpatialJoinExec;

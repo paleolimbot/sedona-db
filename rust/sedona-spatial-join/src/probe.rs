@@ -20,7 +20,7 @@ use datafusion_physical_plan::metrics::{
 };
 
 #[derive(Clone, Debug)]
-pub(crate) struct ProbeStreamMetrics {
+pub struct ProbeStreamMetrics {
     pub probe_input_batches: metrics::Count,
     pub probe_input_rows: metrics::Count,
     pub repartition_time: metrics::Time,
@@ -41,6 +41,6 @@ impl ProbeStreamMetrics {
 }
 
 pub(crate) mod first_pass_stream;
-pub(crate) mod knn_results_merger;
+pub mod knn_results_merger;
 pub(crate) mod non_partitioned_stream;
-pub(crate) mod partitioned_stream_provider;
+pub mod partitioned_stream_provider;

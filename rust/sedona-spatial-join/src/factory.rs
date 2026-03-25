@@ -110,7 +110,7 @@ impl SpatialJoinFactory for DefaultSpatialJoinFactory {
 /// 2. If row-count statistics are unavailable (for example, for CSV sources),
 ///    fall back to total input size as an estimate.
 /// 3. Do not swap the join order if no relevant statistics are available.
-fn should_swap_join_order(left: &dyn ExecutionPlan, right: &dyn ExecutionPlan) -> Result<bool> {
+pub fn should_swap_join_order(left: &dyn ExecutionPlan, right: &dyn ExecutionPlan) -> Result<bool> {
     let left_stats = left.partition_statistics(None)?;
     let right_stats = right.partition_statistics(None)?;
 
@@ -150,7 +150,7 @@ fn should_swap_join_order(left: &dyn ExecutionPlan, right: &dyn ExecutionPlan) -
 ///   the current `left` will become `right` (probe) after swap, so we repartition `left`.
 /// - For KNN predicates: `should_swap` is always false, and the probe side is determined by
 ///   `KNNPredicate::probe_side`.
-fn repartition_probe_side(
+pub fn repartition_probe_side(
     mut physical_left: Arc<dyn ExecutionPlan>,
     mut physical_right: Arc<dyn ExecutionPlan>,
     spatial_predicate: &SpatialPredicate,

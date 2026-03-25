@@ -50,7 +50,7 @@ use crate::SpatialPredicate;
 ///
 /// For example of the `Left` join, in each iteration of right side, can get the matched result, but need
 /// to maintain the matched indices bit map to get the unmatched row for the left side.
-pub(crate) fn need_produce_result_in_final(join_type: JoinType) -> bool {
+pub fn need_produce_result_in_final(join_type: JoinType) -> bool {
     matches!(
         join_type,
         JoinType::Left
@@ -72,7 +72,7 @@ pub(crate) fn need_produce_result_in_final(join_type: JoinType) -> bool {
 /// - **Right/Full Outer**: Emit probe rows that never matched any build partition (checked at the last build partition).
 /// - **Right Semi**: Emit a probe row the first time it matches, and suppress subsequent matches (deduplication).
 /// - **Right Anti**: Emit probe rows only if they never match any build partition (checked at the last build partition).
-pub(crate) fn need_probe_multi_partition_bitmap(join_type: JoinType) -> bool {
+pub fn need_probe_multi_partition_bitmap(join_type: JoinType) -> bool {
     matches!(
         join_type,
         JoinType::Right
@@ -92,7 +92,7 @@ pub(crate) fn need_probe_multi_partition_bitmap(join_type: JoinType) -> bool {
 /// 2. join_type: `Left`
 ///
 /// The result is: `([1,4], [null, null])`
-pub(crate) fn get_final_indices_from_bit_map(
+pub fn get_final_indices_from_bit_map(
     left_bit_map: &BooleanBufferBuilder,
     join_type: JoinType,
 ) -> (UInt64Array, UInt32Array) {
@@ -123,7 +123,7 @@ pub(crate) fn get_final_indices_from_bit_map(
     (left_indices, right_indices)
 }
 
-pub(crate) fn adjust_indices_with_visited_info(
+pub fn adjust_indices_with_visited_info(
     left_indices: UInt64Array,
     right_indices: UInt32Array,
     adjust_range: Range<usize>,
@@ -278,7 +278,7 @@ pub(crate) fn adjust_indices_with_visited_info(
     }
 }
 
-pub(crate) fn apply_join_filter_to_indices(
+pub fn apply_join_filter_to_indices(
     build_input_buffer: &RecordBatch,
     probe_batch: &RecordBatch,
     build_indices: UInt64Array,
@@ -343,7 +343,7 @@ pub(crate) fn apply_join_filter_to_indices(
 /// Returns a new [RecordBatch] by combining the `left` and `right` according to `indices`.
 /// The resulting batch has [Schema] `schema`.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn build_batch_from_indices(
+pub fn build_batch_from_indices(
     schema: &Schema,
     build_input_buffer: &RecordBatch,
     probe_batch: &RecordBatch,
@@ -691,7 +691,7 @@ fn append_probe_indices_in_order(
     (new_build_indices.finish(), new_probe_indices.finish())
 }
 
-pub(crate) fn asymmetric_join_output_partitioning(
+pub fn asymmetric_join_output_partitioning(
     left: &Arc<dyn ExecutionPlan>,
     right: &Arc<dyn ExecutionPlan>,
     join_type: &JoinType,
@@ -746,7 +746,7 @@ pub(crate) fn asymmetric_join_output_partitioning(
 /// This function is copied from
 /// [`datafusion_physical_plan::physical_plan::execution_plan::boundedness_from_children`].
 /// It is used to determine the boundedness of the join operator based on the boundedness of its children.
-pub(crate) fn boundedness_from_children<'a>(
+pub fn boundedness_from_children<'a>(
     children: impl IntoIterator<Item = &'a Arc<dyn ExecutionPlan>>,
 ) -> Boundedness {
     let mut unbounded_with_finite_mem = false;
@@ -778,7 +778,7 @@ pub(crate) fn boundedness_from_children<'a>(
     }
 }
 
-pub(crate) fn compute_join_emission_type(
+pub fn compute_join_emission_type(
     left: &Arc<dyn ExecutionPlan>,
     right: &Arc<dyn ExecutionPlan>,
     join_type: JoinType,
@@ -824,7 +824,7 @@ pub(crate) fn compute_join_emission_type(
 
 /// Data required to push down a projection through a spatial join.
 /// This is mostly taken from https://github.com/apache/datafusion/blob/51.0.0/datafusion/physical-plan/src/projection.rs
-pub(crate) struct JoinPushdownData {
+pub struct JoinPushdownData {
     pub projected_left_child: ProjectionExec,
     pub projected_right_child: ProjectionExec,
     pub join_filter: Option<JoinFilter>,
@@ -833,7 +833,7 @@ pub(crate) struct JoinPushdownData {
 
 /// Push down the given `projection` through the spatial join.
 /// This code is adapted from https://github.com/apache/datafusion/blob/51.0.0/datafusion/physical-plan/src/projection.rs
-pub(crate) fn try_pushdown_through_join(
+pub fn try_pushdown_through_join(
     projection: &ProjectionExec,
     join_left: &Arc<dyn ExecutionPlan>,
     join_right: &Arc<dyn ExecutionPlan>,

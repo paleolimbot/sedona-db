@@ -121,7 +121,7 @@ impl<E: Evaluator> Stream for EvaluateOperandBatchStream<E> {
 
 /// Returns a `SendableEvaluatedBatchStream` that eagerly evaluates the build-side
 /// geometry expression for every incoming `RecordBatch`.
-pub(crate) fn create_evaluated_build_stream(
+pub fn create_evaluated_build_stream(
     stream: SendableRecordBatchStream,
     evaluator: Arc<dyn OperandEvaluator>,
     evaluation_time: metrics::Time,
@@ -139,7 +139,7 @@ pub(crate) fn create_evaluated_build_stream(
 
 /// Returns a `SendableEvaluatedBatchStream` that eagerly evaluates the probe-side
 /// geometry expression for every incoming `RecordBatch`.
-pub(crate) fn create_evaluated_probe_stream(
+pub fn create_evaluated_probe_stream(
     stream: SendableRecordBatchStream,
     evaluator: Arc<dyn OperandEvaluator>,
     evaluation_time: metrics::Time,

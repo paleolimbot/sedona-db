@@ -52,11 +52,11 @@ pub trait SpatialIndexBuilder {
 
 /// Metrics for the build phase of the spatial join.
 #[derive(Clone, Debug, Default)]
-pub(crate) struct SpatialJoinBuildMetrics {
+pub struct SpatialJoinBuildMetrics {
     /// Total time for collecting build-side of join
-    pub(crate) build_time: metrics::Time,
+    pub build_time: metrics::Time,
     /// Memory used by the spatial-index in bytes
-    pub(crate) build_mem_used: metrics::Gauge,
+    pub build_mem_used: metrics::Gauge,
 }
 
 impl SpatialJoinBuildMetrics {
@@ -68,4 +68,4 @@ impl SpatialJoinBuildMetrics {
     }
 }
 
-pub(crate) type SpatialIndexBuilderRef = Arc<dyn SpatialIndexBuilder + Send + Sync>;
+pub type SpatialIndexBuilderRef = Arc<dyn SpatialIndexBuilder + Send + Sync>;

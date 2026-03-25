@@ -62,7 +62,7 @@ struct DefaultSpatialIndexInner {
     pub(crate) options: SpatialJoinOptions,
 
     /// The spatial predicate evaluator for the spatial predicate.
-    pub(crate) evaluator: Arc<dyn OperandEvaluator>,
+    pub evaluator: Arc<dyn OperandEvaluator>,
 
     /// The refiner for refining the index query results.
     pub(crate) refiner: Arc<dyn IndexQueryResultRefiner>,
@@ -100,7 +100,7 @@ struct DefaultSpatialIndexInner {
 }
 
 #[derive(Clone)]
-pub(crate) struct DefaultSpatialIndex {
+pub struct DefaultSpatialIndex {
     inner: Arc<DefaultSpatialIndexInner>,
 }
 
@@ -139,7 +139,7 @@ impl DefaultSpatialIndex {
         }
     }
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub(crate) fn new(
         schema: SchemaRef,
         options: SpatialJoinOptions,
         evaluator: Arc<dyn OperandEvaluator>,

@@ -41,7 +41,7 @@ use std::task::{Context, Poll};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
 
-pub(crate) struct PartitionedIndexProvider {
+pub struct PartitionedIndexProvider {
     schema: SchemaRef,
     spatial_predicate: SpatialPredicate,
     options: SpatialJoinOptions,

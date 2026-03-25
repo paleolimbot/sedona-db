@@ -25,7 +25,7 @@ use super::BuildPartition;
 /// during the build side collection phase and used to estimate the memory usage for
 /// running spatial join.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct PartitionMemorySummary {
+pub struct PartitionMemorySummary {
     /// Number of rows in the partition.
     pub num_rows: usize,
     /// The total memory reserved when collecting this build side partition.
@@ -49,7 +49,7 @@ impl From<&BuildPartition> for PartitionMemorySummary {
 /// could be spatial-partitioned if the reserved memory is not sufficient to hold the
 /// entire spatial index.
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) struct MemoryPlan {
+pub struct MemoryPlan {
     /// The total number of rows in the build side.
     pub num_rows: usize,
     /// The total memory reserved for the build side.
@@ -69,7 +69,7 @@ pub(crate) struct MemoryPlan {
 
 /// Compute the memory plan for running spatial join based on the memory summaries of
 /// build side partitions.
-pub(crate) fn compute_memory_plan<I>(partition_summaries: I) -> Result<MemoryPlan>
+pub fn compute_memory_plan<I>(partition_summaries: I) -> Result<MemoryPlan>
 where
     I: IntoIterator<Item = PartitionMemorySummary>,
 {

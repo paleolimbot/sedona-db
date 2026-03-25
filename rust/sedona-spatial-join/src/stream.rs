@@ -62,7 +62,7 @@ use arrow::datatypes::{Schema, SchemaRef};
 use sedona_common::option::SpatialJoinOptions;
 
 /// Stream for producing spatial join result batches.
-pub(crate) struct SpatialJoinStream {
+pub struct SpatialJoinStream {
     /// The partition id of the probe side stream
     probe_partition_id: usize,
     /// Schema of joined results
