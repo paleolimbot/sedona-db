@@ -84,6 +84,7 @@ sedona-raster-functions = { workspace = true }
 sedona-schema = { workspace = true }
 sedona-spatial-join = { workspace = true, optional = true }
 sedona-spatial-join-gpu = { workspace = true, optional = true }
+sedona-libgpuspatial = { workspace = true }
 sedona-query-planner = { workspace = true }
 sedona-s2geography = { workspace = true, optional = true }
 sedona-testing = { workspace = true }

@@ -30,6 +30,9 @@ rust-version.workspace = true
 [lints.clippy]
 result_large_err = "allow"
 
+[features]
+gpu = ["sedona-libgpuspatial/gpu"]
+
 [dependencies]
 arrow = { workspace = true }
 arrow-array = { workspace = true }
@@ -37,11 +40,34 @@ arrow-schema = { workspace = true }
 async-trait = { workspace = true }
 datafusion = { workspace = true }
 datafusion-common = { workspace = true }
+datafusion-common-runtime = { workspace = true }
 datafusion-physical-plan = { workspace = true }
+datafusion-execution = { workspace = true }
+datafusion-expr = { workspace = true }
+datafusion-physical-expr = { workspace = true }
 geo-types = { workspace = true }
 parking_lot = { workspace = true }
 sedona-common = { workspace = true }
 sedona-expr = { workspace = true }
+sedona-geometry = { workspace = true }
+tokio = { workspace = true }
+rand = { workspace = true }
 sedona-query-planner = { workspace = true }
+sedona-schema = { workspace = true }
+sedona-functions = { workspace = true }
 sedona-spatial-join = { workspace = true }
+sedona-libgpuspatial = { workspace = true }
+futures = { workspace = true }
 wkb = { workspace = true }
+fastrand = { workspace = true }
+log = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+datafusion = { workspace = true, features = ["sql"] }
+rstest = { workspace = true }
+sedona-testing = { workspace = true }
+wkt = { workspace = true }
+tokio = { workspace = true, features = ["macros"] }
+rand = { workspace = true }
+env_logger = { workspace = true }
