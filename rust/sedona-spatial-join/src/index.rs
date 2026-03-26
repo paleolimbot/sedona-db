@@ -28,7 +28,6 @@ pub(crate) use build_side_collector::{
     BuildPartition, BuildSideBatchesCollector, CollectBuildSideMetrics,
 };
 pub(crate) use spatial_index::SpatialIndex;
-pub(crate) use default_spatial_index_builder::DefaultSpatialIndexBuilder;
 
 use wkb::reader::Wkb;
 

@@ -406,13 +406,12 @@ impl ExecutionPlan for SpatialJoinExec {
 
                     let probe_thread_count = probe_plan.output_partitioning().partition_count();
 
-                    let factory: Arc<dyn SpatialIndexBuilderFactory + Send + Sync>;
-
-                    if GPUSpatialIndexBuilder::is_using_gpu(&self.on, &self.options)? {
-                        factory = Arc::new(GpuSpatialIndexBuilderFactory);
-                    } else {
-                        factory = Arc::new(DefaultSpatialIndexBuilderFactory);
-                    }
+                    let factory: Arc<dyn SpatialIndexBuilderFactory + Send + Sync> =
+                        if GPUSpatialIndexBuilder::is_using_gpu(&self.on, &self.options)? {
+                            Arc::new(GpuSpatialIndexBuilderFactory)
+                        } else {
+                            Arc::new(DefaultSpatialIndexBuilderFactory)
+                        };
 
                     let spatial_join_components_builder = SpatialJoinComponentsBuilder::new(
                         Arc::clone(&context),

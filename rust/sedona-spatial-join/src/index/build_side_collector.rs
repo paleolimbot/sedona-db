@@ -90,18 +90,18 @@ pub(crate) struct BuildSideBatchesCollector {
 #[derive(Clone)]
 pub(crate) struct CollectBuildSideMetrics {
     /// Number of batches collected
-    pub num_batches: metrics::Count,
+    num_batches: metrics::Count,
     /// Number of rows collected
-    pub num_rows: metrics::Count,
+    num_rows: metrics::Count,
     /// Total in-memory size of batches collected. If the batches were spilled, this size is the
     /// in-memory size if we load all batches into memory. This does not represent the in-memory size
     /// of the resulting BuildPartition.
-    pub total_size_bytes: metrics::Gauge,
+    total_size_bytes: metrics::Gauge,
     /// Total time taken to collect and process the build side batches. This does not include the time awaiting
     /// for batches from the input stream.
-    pub time_taken: metrics::Time,
+    time_taken: metrics::Time,
     /// Spill metrics of build partitions collecting phase
-    pub spill_metrics: SpillMetrics,
+    spill_metrics: SpillMetrics,
 }
 
 impl CollectBuildSideMetrics {
@@ -443,7 +443,7 @@ impl BuildSideBatchesCollector {
 mod tests {
     use super::*;
     use crate::index::spatial_index_builder::SpatialJoinBuildMetrics;
-    use crate::index::DefaultSpatialIndexBuilder;
+    use crate::index::default_spatial_index_builder::DefaultSpatialIndexBuilder;
     use crate::{
         operand_evaluator::EvaluatedGeometryArray,
         spatial_predicate::{RelationPredicate, SpatialRelationType},

@@ -139,7 +139,7 @@ impl DefaultSpatialIndex {
         }
     }
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn new(
+    pub fn new(
         schema: SchemaRef,
         options: SpatialJoinOptions,
         evaluator: Arc<dyn OperandEvaluator>,
@@ -675,7 +675,7 @@ mod tests {
     };
     use crate::index::spatial_index::SpatialIndexRef;
     use crate::index::spatial_index_builder::{SpatialIndexBuilder, SpatialJoinBuildMetrics};
-    use crate::index::DefaultSpatialIndexBuilder;
+    use crate::index::default_spatial_index_builder::DefaultSpatialIndexBuilder;
     use arrow_array::RecordBatch;
     use arrow_schema::{DataType, Field};
     use datafusion_common::JoinSide;

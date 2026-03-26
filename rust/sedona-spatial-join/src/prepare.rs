@@ -54,8 +54,8 @@ use crate::{
 };
 
 pub struct SpatialJoinComponents {
-    pub partitioned_index_provider: Arc<PartitionedIndexProvider>,
-    pub probe_stream_options: ProbeStreamOptions,
+    pub(crate) partitioned_index_provider: Arc<PartitionedIndexProvider>,
+    pub(crate) probe_stream_options: ProbeStreamOptions,
 }
 
 /// Builder for constructing `SpatialJoinComponents` from build-side streams.
@@ -80,6 +80,7 @@ pub struct SpatialJoinComponentsBuilder {
 impl SpatialJoinComponentsBuilder {
     /// Create a new builder capturing the execution context and configuration
     /// required to produce `SpatialJoinComponents` from build-side streams.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         context: Arc<TaskContext>,
         build_schema: SchemaRef,
