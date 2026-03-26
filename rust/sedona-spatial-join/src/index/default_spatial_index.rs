@@ -62,7 +62,7 @@ struct DefaultSpatialIndexInner {
     pub(crate) options: SpatialJoinOptions,
 
     /// The spatial predicate evaluator for the spatial predicate.
-    pub evaluator: Arc<dyn OperandEvaluator>,
+    pub(crate) evaluator: Arc<dyn OperandEvaluator>,
 
     /// The refiner for refining the index query results.
     pub(crate) refiner: Arc<dyn IndexQueryResultRefiner>,
@@ -100,7 +100,7 @@ struct DefaultSpatialIndexInner {
 }
 
 #[derive(Clone)]
-pub struct DefaultSpatialIndex {
+pub(crate) struct DefaultSpatialIndex {
     inner: Arc<DefaultSpatialIndexInner>,
 }
 

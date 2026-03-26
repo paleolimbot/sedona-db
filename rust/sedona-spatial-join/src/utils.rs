@@ -16,8 +16,8 @@
 // under the License.
 
 pub(crate) mod arrow_utils;
-pub mod bbox_sampler;
-pub mod disposable_async_cell;
+pub(crate) mod bbox_sampler;
+pub(crate) mod disposable_async_cell;
 pub(crate) mod init_once_array;
 pub mod internal_benchmark_util;
 pub mod join_utils;

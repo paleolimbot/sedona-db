@@ -562,7 +562,7 @@ impl SpatialJoinStream {
                             let result = iterator.next_batch().await;
                             (iterator, result)
                         }
-                        .boxed();
+                            .boxed();
                         self.state =
                             SpatialJoinStreamState::ProcessProbeBatch(partition_desc, future);
                         Poll::Ready(Ok(StatefulStreamResult::Continue))
@@ -619,7 +619,7 @@ impl SpatialJoinStream {
                         let result = iterator.next_batch().await;
                         (iterator, result)
                     }
-                    .boxed();
+                        .boxed();
                     self.state = SpatialJoinStreamState::ProcessProbeBatch(partition_desc, future);
                 }
                 Poll::Ready(Ok(StatefulStreamResult::Ready(Some(batch))))
@@ -1753,7 +1753,7 @@ mod tests {
                     Arc::new(partition_builder.finish()),
                 ],
             )
-            .unwrap();
+                .unwrap();
             batches.push(batch);
         }
 
@@ -1939,7 +1939,7 @@ mod tests {
                 .as_primitive::<arrow::datatypes::Int32Type>()
                 .value(i);
             assert_eq!(original_id, assembled_id,
-                "Data mismatch when mapping back from assembled batch row {i} to original batch {original_batch_idx} row {original_row_idx}");
+                       "Data mismatch when mapping back from assembled batch row {i} to original batch {original_batch_idx} row {original_row_idx}");
         }
     }
 
@@ -2040,7 +2040,7 @@ mod tests {
             None,
             true,
         )
-        .unwrap();
+            .unwrap();
         let mut expected_probe_indices = result_probe_indices.values().to_vec();
         expected_probe_indices.sort();
         expected_probe_indices
@@ -2078,7 +2078,7 @@ mod tests {
                 None,
                 true,
             )
-            .unwrap();
+                .unwrap();
             produced_probe_indices.extend(result_probe_indices.values().as_ref());
         }
         if let Some(last_range) = progress.last_probe_range(num_rows) {
@@ -2093,7 +2093,7 @@ mod tests {
                 None,
                 true,
             )
-            .unwrap();
+                .unwrap();
             produced_probe_indices.extend(result_probe_indices.values().as_ref());
         }
 

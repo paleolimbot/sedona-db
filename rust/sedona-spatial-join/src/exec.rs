@@ -61,7 +61,7 @@ type BuildProbePlans<'a> = (&'a Arc<dyn ExecutionPlan>, &'a Arc<dyn ExecutionPla
 ///
 /// We determine which execution plan corresponds to probe/build by analyzing the column indices
 /// in the context of the overall join schema structure.
-fn determine_knn_build_probe_plans<'a>(
+pub fn determine_knn_build_probe_plans<'a>(
     knn_pred: &KNNPredicate,
     left_plan: &'a Arc<dyn ExecutionPlan>,
     right_plan: &'a Arc<dyn ExecutionPlan>,
@@ -256,7 +256,7 @@ impl SpatialJoinExec {
 
     /// This function creates the cache object that stores the plan properties such as schema,
     /// equivalence properties, ordering, partitioning, etc.
-    fn compute_properties(
+    pub fn compute_properties(
         left: &Arc<dyn ExecutionPlan>,
         right: &Arc<dyn ExecutionPlan>,
         on: &SpatialPredicate,

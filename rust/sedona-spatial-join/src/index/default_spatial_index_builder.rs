@@ -57,7 +57,7 @@ const RTREE_MEMORY_ESTIMATE_PER_RECT: usize = 60;
 /// 2. Building the spatial R-tree index
 /// 3. Setting up memory tracking and visited bitmaps
 /// 4. Configuring prepared geometries based on execution mode
-pub struct DefaultSpatialIndexBuilder {
+pub(crate) struct DefaultSpatialIndexBuilder {
     schema: SchemaRef,
     spatial_predicate: SpatialPredicate,
     options: SpatialJoinOptions,

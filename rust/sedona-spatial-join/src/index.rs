@@ -15,12 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-pub mod build_side_collector;
+pub(crate) mod build_side_collector;
 pub(crate) mod default_spatial_index;
 pub mod default_spatial_index_builder;
 mod knn_adapter;
-pub mod memory_plan;
-pub mod partitioned_index_provider;
+pub(crate) mod memory_plan;
+pub(crate) mod partitioned_index_provider;
 pub mod spatial_index;
 pub mod spatial_index_builder;
 
@@ -28,9 +28,8 @@ pub(crate) use build_side_collector::{
     BuildPartition, BuildSideBatchesCollector, CollectBuildSideMetrics,
 };
 pub(crate) use spatial_index::SpatialIndex;
+pub(crate) use default_spatial_index_builder::DefaultSpatialIndexBuilder;
 
-pub use default_spatial_index::DefaultSpatialIndex;
-pub use default_spatial_index_builder::DefaultSpatialIndexBuilder;
 use wkb::reader::Wkb;
 
 /// The result of a spatial index query

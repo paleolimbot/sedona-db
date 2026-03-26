@@ -72,7 +72,7 @@ pub fn need_produce_result_in_final(join_type: JoinType) -> bool {
 /// - **Right/Full Outer**: Emit probe rows that never matched any build partition (checked at the last build partition).
 /// - **Right Semi**: Emit a probe row the first time it matches, and suppress subsequent matches (deduplication).
 /// - **Right Anti**: Emit probe rows only if they never match any build partition (checked at the last build partition).
-pub fn need_probe_multi_partition_bitmap(join_type: JoinType) -> bool {
+pub(crate) fn need_probe_multi_partition_bitmap(join_type: JoinType) -> bool {
     matches!(
         join_type,
         JoinType::Right
@@ -92,7 +92,7 @@ pub fn need_probe_multi_partition_bitmap(join_type: JoinType) -> bool {
 /// 2. join_type: `Left`
 ///
 /// The result is: `([1,4], [null, null])`
-pub fn get_final_indices_from_bit_map(
+pub(crate) fn get_final_indices_from_bit_map(
     left_bit_map: &BooleanBufferBuilder,
     join_type: JoinType,
 ) -> (UInt64Array, UInt32Array) {
@@ -123,7 +123,7 @@ pub fn get_final_indices_from_bit_map(
     (left_indices, right_indices)
 }
 
-pub fn adjust_indices_with_visited_info(
+pub(crate) fn adjust_indices_with_visited_info(
     left_indices: UInt64Array,
     right_indices: UInt32Array,
     adjust_range: Range<usize>,
@@ -278,7 +278,7 @@ pub fn adjust_indices_with_visited_info(
     }
 }
 
-pub fn apply_join_filter_to_indices(
+pub(crate) fn apply_join_filter_to_indices(
     build_input_buffer: &RecordBatch,
     probe_batch: &RecordBatch,
     build_indices: UInt64Array,
@@ -343,7 +343,7 @@ pub fn apply_join_filter_to_indices(
 /// Returns a new [RecordBatch] by combining the `left` and `right` according to `indices`.
 /// The resulting batch has [Schema] `schema`.
 #[allow(clippy::too_many_arguments)]
-pub fn build_batch_from_indices(
+pub(crate) fn build_batch_from_indices(
     schema: &Schema,
     build_input_buffer: &RecordBatch,
     probe_batch: &RecordBatch,
@@ -691,7 +691,7 @@ fn append_probe_indices_in_order(
     (new_build_indices.finish(), new_probe_indices.finish())
 }
 
-pub fn asymmetric_join_output_partitioning(
+pub(crate) fn asymmetric_join_output_partitioning(
     left: &Arc<dyn ExecutionPlan>,
     right: &Arc<dyn ExecutionPlan>,
     join_type: &JoinType,
@@ -746,7 +746,7 @@ pub fn asymmetric_join_output_partitioning(
 /// This function is copied from
 /// [`datafusion_physical_plan::physical_plan::execution_plan::boundedness_from_children`].
 /// It is used to determine the boundedness of the join operator based on the boundedness of its children.
-pub fn boundedness_from_children<'a>(
+pub(crate) fn boundedness_from_children<'a>(
     children: impl IntoIterator<Item = &'a Arc<dyn ExecutionPlan>>,
 ) -> Boundedness {
     let mut unbounded_with_finite_mem = false;
@@ -778,7 +778,7 @@ pub fn boundedness_from_children<'a>(
     }
 }
 
-pub fn compute_join_emission_type(
+pub(crate) fn compute_join_emission_type(
     left: &Arc<dyn ExecutionPlan>,
     right: &Arc<dyn ExecutionPlan>,
     join_type: JoinType,
@@ -960,7 +960,7 @@ mod tests {
             Some((&mut bitmap_builder, offset)),
             true,
         )
-        .unwrap();
+            .unwrap();
 
         (l, r, bitmap_builder)
     }
@@ -1537,7 +1537,7 @@ mod tests {
             Some(&join_filter),
             &join_on,
         )?
-        .expect("expected pushdown");
+            .expect("expected pushdown");
 
         assert_eq!(pushdown.projected_left_child.expr().len(), 1);
         let left_proj = &pushdown.projected_left_child.expr()[0];

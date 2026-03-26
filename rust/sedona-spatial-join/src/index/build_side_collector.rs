@@ -47,7 +47,7 @@ use crate::{
     utils::bbox_sampler::{BoundingBoxSampler, BoundingBoxSamples},
 };
 
-pub struct BuildPartition {
+pub(crate) struct BuildPartition {
     pub num_rows: usize,
     pub build_side_batch_stream: SendableEvaluatedBatchStream,
     pub geo_statistics: GeoStatistics,
@@ -78,7 +78,7 @@ pub struct BuildPartition {
 /// could then be fed into the spatial index builder to build an in-memory or external
 /// spatial index, depending on the statistics collected by the collector.
 #[derive(Clone)]
-pub struct BuildSideBatchesCollector {
+pub(crate) struct BuildSideBatchesCollector {
     spatial_predicate: SpatialPredicate,
     spatial_join_options: SpatialJoinOptions,
     evaluator: Arc<dyn OperandEvaluator>,
@@ -88,7 +88,7 @@ pub struct BuildSideBatchesCollector {
 }
 
 #[derive(Clone)]
-pub struct CollectBuildSideMetrics {
+pub(crate) struct CollectBuildSideMetrics {
     /// Number of batches collected
     pub num_batches: metrics::Count,
     /// Number of rows collected

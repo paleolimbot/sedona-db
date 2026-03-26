@@ -22,7 +22,7 @@ pub mod index;
 pub mod operand_evaluator;
 pub mod partitioning;
 pub mod prepare;
-pub mod probe;
+mod probe;
 pub mod refine;
 pub use sedona_query_planner::spatial_predicate;
 pub mod stream;

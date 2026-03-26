@@ -22,7 +22,7 @@ use tokio::sync::Notify;
 
 /// Error returned when writing to a [`DisposableAsyncCell`] fails.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CellSetError {
+pub(crate) enum CellSetError {
     /// The cell has already been disposed, so new values are rejected.
     Disposed,
 
@@ -46,7 +46,7 @@ pub enum CellSetError {
 /// Awaiters calling [`DisposableAsyncCell::get`] will park until a value is set
 /// or the cell is disposed. Once disposed, `get` returns `None` and `set`
 /// returns [`CellSetError::Disposed`].
-pub struct DisposableAsyncCell<T> {
+pub(crate) struct DisposableAsyncCell<T> {
     state: Mutex<CellState<T>>,
     notify: Notify,
 }
@@ -65,7 +65,7 @@ impl<T> Default for DisposableAsyncCell<T> {
 
 impl<T> DisposableAsyncCell<T> {
     /// Creates a new empty cell with no stored value.
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             state: Mutex::new(CellState::Empty),
             notify: Notify::new(),
@@ -73,7 +73,7 @@ impl<T> DisposableAsyncCell<T> {
     }
 
     /// Marks the cell as disposed and wakes every waiter.
-    pub fn dispose(&self) {
+    pub(crate) fn dispose(&self) {
         {
             let mut state = self.state.lock();
             *state = CellState::Disposed;
@@ -82,13 +82,13 @@ impl<T> DisposableAsyncCell<T> {
     }
 
     /// Check whether the cell has a value or not.
-    pub fn is_set(&self) -> bool {
+    pub(crate) fn is_set(&self) -> bool {
         let state = self.state.lock();
         matches!(*state, CellState::Value(_))
     }
 
     /// Check whether the cell is empty (not set or disposed)
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         let state = self.state.lock();
         matches!(*state, CellState::Empty)
     }
@@ -97,7 +97,7 @@ impl<T> DisposableAsyncCell<T> {
 impl<T: Clone> DisposableAsyncCell<T> {
     /// Waits until a value is set or the cell is disposed.
     /// Returns `None` if the cell is disposed without a value.
-    pub async fn get(&self) -> Option<T> {
+    pub(crate) async fn get(&self) -> Option<T> {
         loop {
             let notified = self.notify.notified();
             {
@@ -114,7 +114,7 @@ impl<T: Clone> DisposableAsyncCell<T> {
 
     /// Stores the provided value if the cell is still empty.
     /// Fails if a value already exists or the cell has been disposed.
-    pub fn set(&self, value: T) -> std::result::Result<(), CellSetError> {
+    pub(crate) fn set(&self, value: T) -> std::result::Result<(), CellSetError> {
         {
             let mut state = self.state.lock();
             match &mut *state {

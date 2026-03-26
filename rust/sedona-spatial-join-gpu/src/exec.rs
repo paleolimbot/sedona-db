@@ -20,10 +20,9 @@ use crate::index::gpu_spatial_index_builder::{
     GPUSpatialIndexBuilder, GpuSpatialIndexBuilderFactory,
 };
 use arrow_schema::SchemaRef;
-use datafusion_common::{project_schema, JoinSide, Result};
+use datafusion_common::{JoinSide, Result};
 use datafusion_execution::{SendableRecordBatchStream, TaskContext};
 use datafusion_expr::JoinType;
-use datafusion_physical_expr::equivalence::{join_equivalence_properties, ProjectionMapping};
 use datafusion_physical_plan::{
     common::can_project,
     joins::utils::{build_join_schema, check_join_is_valid, ColumnIndex, JoinFilter},
@@ -33,47 +32,17 @@ use datafusion_physical_plan::{
     DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties, PlanProperties,
 };
 use parking_lot::Mutex;
-use sedona_common::{sedona_internal_err, SpatialJoinOptions};
-use sedona_query_planner::spatial_predicate::{
-    KNNPredicate, SpatialPredicate, SpatialPredicateTrait,
+use sedona_common::SpatialJoinOptions;
+use sedona_query_planner::spatial_predicate::{SpatialPredicate, SpatialPredicateTrait};
+use sedona_spatial_join::exec::{
+    determine_knn_build_probe_plans, SpatialJoinExec as DefaultSpatialJoinExec,
 };
 use sedona_spatial_join::index::default_spatial_index_builder::DefaultSpatialIndexBuilderFactory;
 use sedona_spatial_join::index::spatial_index_builder::SpatialIndexBuilderFactory;
 use sedona_spatial_join::prepare::{SpatialJoinComponents, SpatialJoinComponentsBuilder};
 use sedona_spatial_join::stream::SpatialJoinStream;
-use sedona_spatial_join::utils::join_utils::{
-    asymmetric_join_output_partitioning, boundedness_from_children, compute_join_emission_type,
-    try_pushdown_through_join, JoinPushdownData,
-};
+use sedona_spatial_join::utils::join_utils::{try_pushdown_through_join, JoinPushdownData};
 use sedona_spatial_join::utils::once_fut::OnceAsync;
-
-/// Type alias for build and probe execution plans
-type BuildProbePlans<'a> = (&'a Arc<dyn ExecutionPlan>, &'a Arc<dyn ExecutionPlan>);
-
-/// Determine the correct build/probe execution plan assignment for KNN joins.
-///
-/// For KNN joins, we need to determine which execution plan should be used as the build side
-/// (indexed candidates) and which should be the probe side (queries that search the index).
-///
-/// The key insight is that the KNNPredicate expressions have already been correctly reprojected
-/// by the optimizer, so we can use the join schema structure to determine the mapping:
-/// - KNNPredicate.left should always be the probe side (queries)
-/// - KNNPredicate.right should always be the build side (candidates)
-///
-/// We determine which execution plan corresponds to probe/build by analyzing the column indices
-/// in the context of the overall join schema structure.
-fn determine_knn_build_probe_plans<'a>(
-    knn_pred: &KNNPredicate,
-    left_plan: &'a Arc<dyn ExecutionPlan>,
-    right_plan: &'a Arc<dyn ExecutionPlan>,
-) -> Result<BuildProbePlans<'a>> {
-    // Use the probe_side information from the optimizer to determine build/probe assignment
-    match knn_pred.probe_side {
-        JoinSide::Left => Ok((right_plan, left_plan)),
-        JoinSide::Right => Ok((left_plan, right_plan)),
-        JoinSide::None => sedona_internal_err!("KNN join requires explicit probe_side designation"),
-    }
-}
 
 /// Physical execution plan for performing spatial joins between two tables. It uses a spatial
 /// index to speed up the join operation.
@@ -163,7 +132,7 @@ impl SpatialJoinExec {
         let (join_schema, column_indices) =
             build_join_schema(&left_schema, &right_schema, join_type);
         let join_schema = Arc::new(join_schema);
-        let cache = Self::compute_properties(
+        let cache = DefaultSpatialJoinExec::compute_properties(
             &left,
             &right,
             &on,
@@ -267,53 +236,6 @@ impl SpatialJoinExec {
             self.seed,
             self.options.clone(),
         )
-    }
-
-    /// This function creates the cache object that stores the plan properties such as schema,
-    /// equivalence properties, ordering, partitioning, etc.
-    fn compute_properties(
-        left: &Arc<dyn ExecutionPlan>,
-        right: &Arc<dyn ExecutionPlan>,
-        on: &SpatialPredicate,
-        schema: SchemaRef,
-        join_type: JoinType,
-        projection: Option<&Vec<usize>>,
-    ) -> Result<PlanProperties> {
-        let mut eq_properties = join_equivalence_properties(
-            left.equivalence_properties().clone(),
-            right.equivalence_properties().clone(),
-            &join_type,
-            Arc::clone(&schema),
-            &[false, false],
-            None,
-            // Pass extracted equality conditions to preserve equivalences
-            &[],
-        )?;
-
-        let probe_side = if let SpatialPredicate::KNearestNeighbors(knn) = on {
-            knn.probe_side
-        } else {
-            JoinSide::Right
-        };
-        let mut output_partitioning =
-            asymmetric_join_output_partitioning(left, right, &join_type, probe_side)?;
-
-        if let Some(projection) = projection {
-            // construct a map from the input expressions to the output expression of the Projection
-            let projection_mapping = ProjectionMapping::from_indices(projection, &schema)?;
-            let out_schema = project_schema(&schema, Some(projection))?;
-            output_partitioning = output_partitioning.project(&projection_mapping, &eq_properties);
-            eq_properties = eq_properties.project(&projection_mapping, out_schema);
-        }
-
-        let emission_type = compute_join_emission_type(left, right, join_type, probe_side);
-
-        Ok(PlanProperties::new(
-            eq_properties,
-            output_partitioning,
-            emission_type,
-            boundedness_from_children([left, right]),
-        ))
     }
 }
 
@@ -555,7 +477,9 @@ mod exec_transform_tests {
 
     use super::*;
     use sedona_common::{sedona_internal_err, SpatialJoinOptions};
-    use sedona_query_planner::spatial_predicate::{RelationPredicate, SpatialRelationType};
+    use sedona_query_planner::spatial_predicate::{
+        KNNPredicate, RelationPredicate, SpatialRelationType,
+    };
 
     fn make_schema(fields: &[(&str, DataType)]) -> SchemaRef {
         Arc::new(Schema::new(

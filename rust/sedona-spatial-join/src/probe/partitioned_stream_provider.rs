@@ -43,7 +43,7 @@ use crate::{
 /// When a `partitioner` is provided, the provider performs an initial first pass that
 /// repartitions and spills the probe-side input into per-partition spill files. Subsequent
 /// calls can then open a stream for a specific [`SpatialPartition`].
-pub struct ProbeStreamOptions {
+pub(crate) struct ProbeStreamOptions {
     /// Optional spatial partitioner.
     ///
     /// - `None` means the probe side is treated as a single, non-partitioned stream and only
@@ -106,7 +106,7 @@ impl Clone for ProbeStreamOptions {
 /// For partitioned joins this provider is a small state machine:
 /// it first runs the first pass to materialize per-partition spill files, then serves
 /// per-partition streams from those spill files.
-pub struct PartitionedProbeStreamProvider {
+pub(crate) struct PartitionedProbeStreamProvider {
     state: Arc<Mutex<ProbeStreamState>>,
     runtime_env: Arc<RuntimeEnv>,
     options: ProbeStreamOptions,
