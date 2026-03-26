@@ -32,6 +32,7 @@ use datafusion_physical_plan::{
 use parking_lot::Mutex;
 use sedona_common::{sedona_internal_err, SpatialJoinOptions};
 
+use crate::index::default_spatial_index_builder::DefaultSpatialIndexBuilderFactory;
 use crate::{
     prepare::{SpatialJoinComponents, SpatialJoinComponentsBuilder},
     spatial_predicate::{KNNPredicate, SpatialPredicate, SpatialPredicateTrait},
@@ -465,6 +466,7 @@ impl ExecutionPlan for SpatialJoinExec {
                     }
 
                     let probe_thread_count = probe_plan.output_partitioning().partition_count();
+                    let factory = Arc::new(DefaultSpatialIndexBuilderFactory);
                     let spatial_join_components_builder = SpatialJoinComponentsBuilder::new(
                         Arc::clone(&context),
                         build_plan.schema(),
@@ -473,6 +475,7 @@ impl ExecutionPlan for SpatialJoinExec {
                         probe_thread_count,
                         self.metrics.clone(),
                         self.seed,
+                        factory,
                     );
                     Ok(spatial_join_components_builder.build(build_streams))
                 })?

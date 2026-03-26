@@ -18,7 +18,5 @@
 mod exec;
 mod factory;
 mod index;
-mod prepare;
-mod stream;
 
 pub use factory::GpuSpatialJoinFactory;

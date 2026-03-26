@@ -29,15 +29,18 @@ use parking_lot::Mutex;
 use sedona_common::SpatialJoinOptions;
 use sedona_expr::statistics::GeoStatistics;
 use sedona_libgpuspatial::{GpuSpatialIndex, GpuSpatialOptions, GpuSpatialRefiner};
-use std::sync::atomic::AtomicUsize;
-use std::sync::Arc;
 use sedona_query_planner::spatial_predicate::{SpatialPredicate, SpatialRelationType};
 use sedona_spatial_join::evaluated_batch::evaluated_batch_stream::SendableEvaluatedBatchStream;
 use sedona_spatial_join::evaluated_batch::EvaluatedBatch;
 use sedona_spatial_join::index::spatial_index::SpatialIndexRef;
-use sedona_spatial_join::index::spatial_index_builder::{SpatialIndexBuilder, SpatialJoinBuildMetrics};
+use sedona_spatial_join::index::spatial_index_builder::{
+    SpatialIndexBuilder, SpatialIndexBuilderFactory, SpatialIndexBuilderRef,
+    SpatialJoinBuildMetrics,
+};
 use sedona_spatial_join::operand_evaluator::{create_operand_evaluator, EvaluatedGeometryArray};
 use sedona_spatial_join::utils::join_utils::need_produce_result_in_final;
+use std::sync::atomic::AtomicUsize;
+use std::sync::Arc;
 
 pub struct GPUSpatialIndexBuilder {
     schema: SchemaRef,
@@ -159,7 +162,7 @@ impl SpatialIndexBuilder for GPUSpatialIndexBuilder {
         num_geoms * (4 * 4)
     }
     /// Finish building and return the completed SpatialIndex.
-    fn finish(mut self) -> Result<SpatialIndexRef> {
+    fn finish(mut self: Box<Self>) -> Result<SpatialIndexRef> {
         if self.indexed_batches.is_empty() {
             return Ok(Arc::new(GPUSpatialIndex::empty(
                 self.spatial_predicate,
@@ -309,5 +312,29 @@ impl SpatialIndexBuilder for GPUSpatialIndexBuilder {
             self.add_batch(indexed_batch)?;
         }
         Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct GpuSpatialIndexBuilderFactory;
+
+impl SpatialIndexBuilderFactory for GpuSpatialIndexBuilderFactory {
+    fn create_index_builder(
+        &self,
+        schema: SchemaRef,
+        spatial_predicate: SpatialPredicate,
+        options: SpatialJoinOptions,
+        join_type: JoinType,
+        probe_threads_count: usize,
+        metrics: SpatialJoinBuildMetrics,
+    ) -> Result<SpatialIndexBuilderRef> {
+        Ok(Box::new(GPUSpatialIndexBuilder::new(
+            schema,
+            spatial_predicate,
+            options,
+            join_type,
+            probe_threads_count,
+            metrics,
+        )))
     }
 }

@@ -15,10 +15,5 @@
 // specific language governing permissions and limitations
 // under the License.
 
-pub mod build_side_collector;
 pub(crate) mod gpu_spatial_index;
 pub(crate) mod gpu_spatial_index_builder;
-
-pub(crate) mod partitioned_index_provider;
-
-pub(crate) use build_side_collector::BuildPartition;

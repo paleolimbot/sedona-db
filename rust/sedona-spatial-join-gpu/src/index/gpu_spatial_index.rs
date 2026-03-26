@@ -27,15 +27,15 @@ use sedona_expr::statistics::GeoStatistics;
 use sedona_libgpuspatial::{
     GpuSpatialIndex, GpuSpatialOptions, GpuSpatialRefiner, GpuSpatialRelationPredicate,
 };
+use sedona_query_planner::spatial_predicate::{SpatialPredicate, SpatialRelationType};
+use sedona_spatial_join::evaluated_batch::EvaluatedBatch;
+use sedona_spatial_join::index::spatial_index::SpatialIndex;
+use sedona_spatial_join::index::QueryResultMetrics;
+use sedona_spatial_join::operand_evaluator::{create_operand_evaluator, OperandEvaluator};
 use std::ops::Range;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use wkb::reader::Wkb;
-use sedona_query_planner::spatial_predicate::{SpatialPredicate, SpatialRelationType};
-use sedona_spatial_join::evaluated_batch::EvaluatedBatch;
-use sedona_spatial_join::index::QueryResultMetrics;
-use sedona_spatial_join::index::spatial_index::SpatialIndex;
-use sedona_spatial_join::operand_evaluator::{create_operand_evaluator, OperandEvaluator};
 
 pub struct GPUSpatialIndex {
     pub(crate) schema: SchemaRef,
@@ -319,18 +319,24 @@ mod tests {
     use futures::Stream;
     use sedona_common::{ExecutionMode, GpuOptions, SpatialJoinOptions};
     use sedona_expr::statistics::GeoStatistics;
+    use sedona_query_planner::spatial_predicate::{
+        RelationPredicate, SpatialPredicate, SpatialRelationType,
+    };
     use sedona_schema::datatypes::WKB_GEOMETRY;
+    use sedona_spatial_join::evaluated_batch::evaluated_batch_stream::{
+        EvaluatedBatchStream, SendableEvaluatedBatchStream,
+    };
+    use sedona_spatial_join::evaluated_batch::EvaluatedBatch;
+    use sedona_spatial_join::index::spatial_index::SpatialIndexRef;
+    use sedona_spatial_join::index::spatial_index_builder::{
+        SpatialIndexBuilder, SpatialJoinBuildMetrics,
+    };
+    use sedona_spatial_join::operand_evaluator::EvaluatedGeometryArray;
     use sedona_testing::create::create_array;
     use std::pin::Pin;
     use std::sync::Arc;
     use std::task::{Context, Poll};
     use std::vec::IntoIter;
-    use sedona_query_planner::spatial_predicate::{RelationPredicate, SpatialPredicate, SpatialRelationType};
-    use sedona_spatial_join::evaluated_batch::evaluated_batch_stream::{EvaluatedBatchStream, SendableEvaluatedBatchStream};
-    use sedona_spatial_join::evaluated_batch::EvaluatedBatch;
-    use sedona_spatial_join::index::spatial_index::SpatialIndexRef;
-    use sedona_spatial_join::index::spatial_index_builder::{SpatialIndexBuilder, SpatialJoinBuildMetrics};
-    use sedona_spatial_join::operand_evaluator::EvaluatedGeometryArray;
 
     pub struct SingleBatchStream {
         // We use an Option so we can `take()` it on the first poll,
@@ -370,13 +376,14 @@ mod tests {
     }
 
     async fn build_index(
-        mut builder: GPUSpatialIndexBuilder,
+        builder: GPUSpatialIndexBuilder,
         indexed_batch: EvaluatedBatch,
         schema: SchemaRef,
     ) -> SpatialIndexRef {
         let single_batch_stream = SingleBatchStream::new(indexed_batch, schema);
         let sendable_stream: SendableEvaluatedBatchStream = Box::pin(single_batch_stream);
         let stats = GeoStatistics::empty();
+        let mut builder = Box::new(builder);
         builder.add_stream(sendable_stream, stats).await.unwrap();
         builder.finish().unwrap()
     }
@@ -419,7 +426,7 @@ mod tests {
 
     // 2. Write the new build_index function that accepts the Vec
     async fn build_index_from_vec(
-        mut builder: GPUSpatialIndexBuilder,
+        mut builder: Box<GPUSpatialIndexBuilder>,
         indexed_batches: Vec<EvaluatedBatch>,
         schema: SchemaRef,
     ) -> SpatialIndexRef {
@@ -446,14 +453,14 @@ mod tests {
             SpatialRelationType::Intersects,
         ));
 
-        let builder = GPUSpatialIndexBuilder::new(
+        let builder = Box::new(GPUSpatialIndexBuilder::new(
             schema.clone(),
             spatial_predicate,
             options,
             JoinType::Inner,
             4,
             metrics,
-        );
+        ));
 
         // Test finishing with empty data
         let index = builder.finish().unwrap();
@@ -581,7 +588,7 @@ mod tests {
         let indexed_batches = vec![evaluated_batch1, evaluated_batch2];
 
         // Note: This relies on the `build_index_from_vec` function we created earlier
-        let index = build_index_from_vec(builder, indexed_batches, schema.clone()).await;
+        let index = build_index_from_vec(Box::new(builder), indexed_batches, schema.clone()).await;
 
         // --- Assertions ---
         assert_eq!(index.schema(), schema);
@@ -737,7 +744,7 @@ mod tests {
 
         // Build the multi-batch index using the helper function we created previously
         let indexed_batches = vec![evaluated_build0, evaluated_build1];
-        let index = build_index_from_vec(builder, indexed_batches, schema.clone()).await;
+        let index = build_index_from_vec(Box::new(builder), indexed_batches, schema.clone()).await;
 
         // --- Probe Side: One Batch of Points ---
         let probe_geoms = &[

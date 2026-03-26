@@ -15,18 +15,18 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use datafusion_physical_plan::metrics::{self, ExecutionPlanMetricsSet, MetricBuilder};
-use sedona_common::SpatialJoinOptions;
-use sedona_expr::statistics::GeoStatistics;
-use std::sync::Arc;
-
 use crate::index::spatial_index::SpatialIndexRef;
 use crate::{
     evaluated_batch::evaluated_batch_stream::SendableEvaluatedBatchStream,
     spatial_predicate::SpatialPredicate,
 };
+use arrow_schema::SchemaRef;
 use async_trait::async_trait;
-use datafusion_common::Result;
+use datafusion_common::{JoinType, Result};
+use datafusion_physical_plan::metrics::{self, ExecutionPlanMetricsSet, MetricBuilder};
+use sedona_common::SpatialJoinOptions;
+use sedona_expr::statistics::GeoStatistics;
+use std::fmt::Debug;
 
 /// Builder for constructing a SpatialIndex from geometry batches.
 #[async_trait]
@@ -42,7 +42,7 @@ pub trait SpatialIndexBuilder {
     ) -> usize;
 
     /// Finish building and return the completed SpatialIndex.
-    fn finish(self) -> Result<SpatialIndexRef>;
+    fn finish(self: Box<Self>) -> Result<SpatialIndexRef>;
     async fn add_stream(
         &mut self,
         stream: SendableEvaluatedBatchStream,
@@ -68,4 +68,16 @@ impl SpatialJoinBuildMetrics {
     }
 }
 
-pub type SpatialIndexBuilderRef = Arc<dyn SpatialIndexBuilder + Send + Sync>;
+pub type SpatialIndexBuilderRef = Box<dyn SpatialIndexBuilder + Send + Sync>;
+
+pub trait SpatialIndexBuilderFactory: Debug + Send + Sync {
+    fn create_index_builder(
+        &self,
+        schema: SchemaRef,
+        spatial_predicate: SpatialPredicate,
+        options: SpatialJoinOptions,
+        join_type: JoinType,
+        probe_threads_count: usize,
+        metrics: SpatialJoinBuildMetrics,
+    ) -> Result<SpatialIndexBuilderRef>;
+}

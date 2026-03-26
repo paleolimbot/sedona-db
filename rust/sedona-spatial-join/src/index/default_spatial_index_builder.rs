@@ -22,7 +22,10 @@ use sedona_expr::statistics::GeoStatistics;
 use std::sync::Arc;
 
 use crate::index::spatial_index::SpatialIndexRef;
-use crate::index::spatial_index_builder::{SpatialIndexBuilder, SpatialJoinBuildMetrics};
+use crate::index::spatial_index_builder::{
+    SpatialIndexBuilder, SpatialIndexBuilderFactory, SpatialIndexBuilderRef,
+    SpatialJoinBuildMetrics,
+};
 use crate::{
     evaluated_batch::{evaluated_batch_stream::SendableEvaluatedBatchStream, EvaluatedBatch},
     index::{default_spatial_index::DefaultSpatialIndex, knn_adapter::KnnComponents},
@@ -232,7 +235,7 @@ impl SpatialIndexBuilder for DefaultSpatialIndexBuilder {
         refiner_mem_usage + knn_components_mem_usage + rtree_mem_usage
     }
 
-    fn finish(mut self) -> Result<SpatialIndexRef> {
+    fn finish(mut self: Box<Self>) -> Result<SpatialIndexRef> {
         if self.indexed_batches.is_empty() {
             return Ok(Arc::new(DefaultSpatialIndex::empty(
                 self.spatial_predicate,
@@ -307,5 +310,29 @@ impl SpatialIndexBuilder for DefaultSpatialIndexBuilder {
         }
         self.merge_stats(geo_statistics);
         Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct DefaultSpatialIndexBuilderFactory;
+
+impl SpatialIndexBuilderFactory for DefaultSpatialIndexBuilderFactory {
+    fn create_index_builder(
+        &self,
+        schema: SchemaRef,
+        spatial_predicate: SpatialPredicate,
+        options: SpatialJoinOptions,
+        join_type: JoinType,
+        probe_threads_count: usize,
+        metrics: SpatialJoinBuildMetrics,
+    ) -> Result<SpatialIndexBuilderRef> {
+        Ok(Box::new(DefaultSpatialIndexBuilder::new(
+            schema,
+            spatial_predicate,
+            options,
+            join_type,
+            probe_threads_count,
+            metrics,
+        )?))
     }
 }

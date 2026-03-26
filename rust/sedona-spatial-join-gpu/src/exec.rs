@@ -16,6 +16,9 @@
 // under the License.
 use std::{fmt::Formatter, sync::Arc};
 
+use crate::index::gpu_spatial_index_builder::{
+    GPUSpatialIndexBuilder, GpuSpatialIndexBuilderFactory,
+};
 use arrow_schema::SchemaRef;
 use datafusion_common::{project_schema, JoinSide, Result};
 use datafusion_execution::{SendableRecordBatchStream, TaskContext};
@@ -31,11 +34,18 @@ use datafusion_physical_plan::{
 };
 use parking_lot::Mutex;
 use sedona_common::{sedona_internal_err, SpatialJoinOptions};
-use sedona_query_planner::spatial_predicate::{KNNPredicate, SpatialPredicate, SpatialPredicateTrait};
-use sedona_spatial_join::utils::join_utils::{asymmetric_join_output_partitioning, boundedness_from_children, compute_join_emission_type, try_pushdown_through_join, JoinPushdownData};
+use sedona_query_planner::spatial_predicate::{
+    KNNPredicate, SpatialPredicate, SpatialPredicateTrait,
+};
+use sedona_spatial_join::index::default_spatial_index_builder::DefaultSpatialIndexBuilderFactory;
+use sedona_spatial_join::index::spatial_index_builder::SpatialIndexBuilderFactory;
+use sedona_spatial_join::prepare::{SpatialJoinComponents, SpatialJoinComponentsBuilder};
+use sedona_spatial_join::stream::SpatialJoinStream;
+use sedona_spatial_join::utils::join_utils::{
+    asymmetric_join_output_partitioning, boundedness_from_children, compute_join_emission_type,
+    try_pushdown_through_join, JoinPushdownData,
+};
 use sedona_spatial_join::utils::once_fut::OnceAsync;
-use crate::prepare::{SpatialJoinComponents, SpatialJoinComponentsBuilder};
-use crate::stream::SpatialJoinStream;
 
 /// Type alias for build and probe execution plans
 type BuildProbePlans<'a> = (&'a Arc<dyn ExecutionPlan>, &'a Arc<dyn ExecutionPlan>);
@@ -105,6 +115,7 @@ pub struct SpatialJoinExec {
     once_async_spatial_join_components: Arc<Mutex<Option<OnceAsync<SpatialJoinComponents>>>>,
     /// A random seed for making random procedures in spatial join deterministic
     seed: u64,
+    options: SpatialJoinOptions,
 }
 
 impl SpatialJoinExec {
@@ -122,7 +133,16 @@ impl SpatialJoinExec {
             .debug
             .random_seed
             .unwrap_or(fastrand::u64(0..0xFFFF));
-        Self::try_new_internal(left, right, on, filter, join_type, projection, seed)
+        Self::try_new_internal(
+            left,
+            right,
+            on,
+            filter,
+            join_type,
+            projection,
+            seed,
+            options.clone(),
+        )
     }
 
     /// Create a new SpatialJoinExec with additional options
@@ -135,6 +155,7 @@ impl SpatialJoinExec {
         join_type: &JoinType,
         projection: Option<Vec<usize>>,
         seed: u64,
+        options: SpatialJoinOptions,
     ) -> Result<Self> {
         let left_schema = left.schema();
         let right_schema = right.schema();
@@ -164,6 +185,7 @@ impl SpatialJoinExec {
             cache,
             once_async_spatial_join_components: Arc::new(Mutex::new(None)),
             seed,
+            options,
         })
     }
 
@@ -206,6 +228,7 @@ impl SpatialJoinExec {
             &self.join_type.swap(),
             swapped_projection,
             self.seed,
+            self.options.clone(),
         )?;
 
         let swapped_join: Arc<dyn ExecutionPlan> = Arc::new(swapped_join);
@@ -242,6 +265,7 @@ impl SpatialJoinExec {
             &self.join_type,
             projection,
             self.seed,
+            self.options.clone(),
         )
     }
 
@@ -394,6 +418,7 @@ impl ExecutionPlan for SpatialJoinExec {
                 &self.join_type,
                 None,
                 self.seed,
+                self.options.clone(),
             )?;
             Ok(Some(Arc::new(new_exec)))
         } else {
@@ -413,6 +438,7 @@ impl ExecutionPlan for SpatialJoinExec {
             &self.join_type,
             self.projection.clone(),
             self.seed,
+            self.options.clone(),
         )?;
         Ok(Arc::new(new_exec))
     }
@@ -457,6 +483,15 @@ impl ExecutionPlan for SpatialJoinExec {
                     }
 
                     let probe_thread_count = probe_plan.output_partitioning().partition_count();
+
+                    let factory: Arc<dyn SpatialIndexBuilderFactory + Send + Sync>;
+
+                    if GPUSpatialIndexBuilder::is_using_gpu(&self.on, &self.options)? {
+                        factory = Arc::new(GpuSpatialIndexBuilderFactory);
+                    } else {
+                        factory = Arc::new(DefaultSpatialIndexBuilderFactory);
+                    }
+
                     let spatial_join_components_builder = SpatialJoinComponentsBuilder::new(
                         Arc::clone(&context),
                         build_plan.schema(),
@@ -465,6 +500,7 @@ impl ExecutionPlan for SpatialJoinExec {
                         probe_thread_count,
                         self.metrics.clone(),
                         self.seed,
+                        factory,
                     );
                     Ok(spatial_join_components_builder.build(build_streams))
                 })?
@@ -517,9 +553,9 @@ mod exec_transform_tests {
     use datafusion_physical_plan::projection::{ProjectionExec, ProjectionExpr};
     use datafusion_physical_plan::ExecutionPlan;
 
+    use super::*;
     use sedona_common::{sedona_internal_err, SpatialJoinOptions};
     use sedona_query_planner::spatial_predicate::{RelationPredicate, SpatialRelationType};
-    use super::*;
 
     fn make_schema(fields: &[(&str, DataType)]) -> SchemaRef {
         Arc::new(Schema::new(
@@ -618,6 +654,7 @@ mod exec_transform_tests {
             &JoinType::Inner,
             None,
             0,
+            SpatialJoinOptions::default(),
         )?);
 
         // Project only columns used by the predicate: l2 then r1.
@@ -692,6 +729,7 @@ mod exec_transform_tests {
             &JoinType::Inner,
             None,
             0,
+            SpatialJoinOptions::default(),
         )?);
 
         // Project only geometry columns (left then right) so pushdown is allowed.
@@ -749,8 +787,16 @@ mod exec_transform_tests {
             Arc::new(Column::new("rgeom", 1)),
             SpatialRelationType::Contains,
         ));
-        let exec =
-            SpatialJoinExec::try_new_internal(left, right, on, None, &JoinType::Left, None, 0)?;
+        let exec = SpatialJoinExec::try_new_internal(
+            left,
+            right,
+            on,
+            None,
+            &JoinType::Left,
+            None,
+            0,
+            SpatialJoinOptions::default(),
+        )?;
 
         let swapped = exec.swap_inputs()?;
         let spatial_execs = collect_spatial_join_exec(&swapped)?;
@@ -801,8 +847,16 @@ mod exec_transform_tests {
             use_spheroid: false,
             probe_side: JoinSide::Right,
         });
-        let exec =
-            SpatialJoinExec::try_new_internal(left, right, on, None, &JoinType::Inner, None, 0)?;
+        let exec = SpatialJoinExec::try_new_internal(
+            left,
+            right,
+            on,
+            None,
+            &JoinType::Inner,
+            None,
+            0,
+            SpatialJoinOptions::default(),
+        )?;
 
         let swapped = exec.swap_inputs()?;
         let spatial_execs = collect_spatial_join_exec(&swapped)?;

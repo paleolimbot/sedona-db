@@ -726,13 +726,14 @@ mod tests {
     }
 
     async fn build_index(
-        mut builder: DefaultSpatialIndexBuilder,
+        builder: DefaultSpatialIndexBuilder,
         indexed_batch: EvaluatedBatch,
         schema: SchemaRef,
     ) -> SpatialIndexRef {
         let single_batch_stream = SingleBatchStream::new(indexed_batch, schema);
         let sendable_stream: SendableEvaluatedBatchStream = Box::pin(single_batch_stream);
         let stats = GeoStatistics::empty();
+        let mut builder = Box::new(builder);
         builder.add_stream(sendable_stream, stats).await.unwrap();
         builder.finish().unwrap()
     }
@@ -751,15 +752,17 @@ mod tests {
             SpatialRelationType::Intersects,
         ));
 
-        let builder = DefaultSpatialIndexBuilder::new(
-            schema.clone(),
-            spatial_predicate,
-            options,
-            JoinType::Inner,
-            4,
-            metrics,
-        )
-        .unwrap();
+        let builder = Box::new(
+            DefaultSpatialIndexBuilder::new(
+                schema.clone(),
+                spatial_predicate,
+                options,
+                JoinType::Inner,
+                4,
+                metrics,
+            )
+            .unwrap(),
+        );
 
         // Test finishing with empty data
         let index = builder.finish().unwrap();
@@ -1225,15 +1228,17 @@ mod tests {
             JoinSide::Left,
         ));
 
-        let builder = DefaultSpatialIndexBuilder::new(
-            schema.clone(),
-            spatial_predicate,
-            options,
-            JoinType::Inner,
-            4,
-            metrics,
-        )
-        .unwrap();
+        let builder = Box::new(
+            DefaultSpatialIndexBuilder::new(
+                schema.clone(),
+                spatial_predicate,
+                options,
+                JoinType::Inner,
+                4,
+                metrics,
+            )
+            .unwrap(),
+        );
 
         let index = builder.finish().unwrap();
 

@@ -84,7 +84,7 @@ pub struct BuildSideBatchesCollector {
     evaluator: Arc<dyn OperandEvaluator>,
     runtime_env: Arc<RuntimeEnv>,
     spill_compression: SpillCompression,
-    spatial_index_builder: SpatialIndexBuilderRef,
+    spatial_index_builder: Arc<SpatialIndexBuilderRef>,
 }
 
 #[derive(Clone)]
@@ -137,7 +137,7 @@ impl BuildSideBatchesCollector {
             evaluator,
             runtime_env,
             spill_compression,
-            spatial_index_builder,
+            spatial_index_builder: Arc::new(spatial_index_builder),
         }
     }
 
@@ -503,7 +503,7 @@ mod tests {
             SpatialJoinOptions::default(),
             Arc::new(RuntimeEnv::default()),
             SpillCompression::Uncompressed,
-            Arc::new(builder),
+            Box::new(builder),
         )
     }
 

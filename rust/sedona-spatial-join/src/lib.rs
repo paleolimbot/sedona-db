@@ -21,7 +21,7 @@ pub mod factory;
 pub mod index;
 pub mod operand_evaluator;
 pub mod partitioning;
-mod prepare;
+pub mod prepare;
 pub mod probe;
 pub mod refine;
 pub use sedona_query_planner::spatial_predicate;

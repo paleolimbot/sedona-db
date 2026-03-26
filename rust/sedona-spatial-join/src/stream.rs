@@ -132,7 +132,7 @@ impl SpatialJoinStream {
     /// This wraps the incoming probe stream with expression evaluation (geometry extraction,
     /// envelopes, etc.) and initializes the stream state machine to wait for shared
     /// `SpatialJoinComponents` (index provider + probe stream provider).
-    pub(crate) fn new(
+    pub fn new(
         probe_partition_id: usize,
         schema: Arc<Schema>,
         on: &SpatialPredicate,

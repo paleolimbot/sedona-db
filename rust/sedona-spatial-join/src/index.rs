@@ -17,7 +17,7 @@
 
 pub mod build_side_collector;
 pub(crate) mod default_spatial_index;
-pub(crate) mod default_spatial_index_builder;
+pub mod default_spatial_index_builder;
 mod knn_adapter;
 pub mod memory_plan;
 pub mod partitioned_index_provider;
