@@ -59,11 +59,6 @@ def test_st_centroid(eng, geom, expected):
         pytest.param(
             "LINESTRING (0 0, 0 1, 0 5)", "POINT (0 2.5)", id="linestring_two_segments"
         ),
-        pytest.param(
-            "LINESTRING (-90 80, -90 85, 90 80)",
-            "POINT (-31.7828668356 90)",
-            id="linestring_crossing_pole",
-        ),
         # Polygons
         pytest.param(
             "POLYGON ((0 0, 0 1, 1 0, 0 0))",
@@ -77,6 +72,14 @@ def test_st_centroid_extended(eng, geog, expected):
     eng.assert_query_result(
         f"SELECT ST_Centroid({geog_or_null(geog)})", expected, wkt_precision=10
     )
+
+
+# Separate test for north pole returning centroid (longitude varies by platform)
+@pytest.mark.parametrize("eng", [SedonaDB, BigQuery])
+def test_st_centroid_pole(eng):
+    eng = eng.create_or_skip()
+    geog = "LINESTRING (-90 80, -90 85, 90 80)"
+    eng.assert_query_result(f"SELECT ST_Y(ST_Centroid({geog_or_null(geog)}))", 90)
 
 
 # Neither PostGIS nor BigQuery support ZM in their centroid calculation
