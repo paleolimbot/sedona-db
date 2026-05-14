@@ -550,6 +550,9 @@ def test_write_geoparquet_no_metadata(con, geoarrow_data):
         assert geo_stats.xmin <= -180
         assert geo_stats.xmax >= 180
 
+        # Close file handle before temp dir cleanup (Windows compatibility)
+        del file
+
 
 def test_write_geoparquet_geography_no_metadata(con, geoarrow_data):
     # Checks a read and write of geography (roundtrip, since nobody else can read/write)
@@ -589,6 +592,9 @@ def test_write_geoparquet_geography_no_metadata(con, geoarrow_data):
             assert geo_stats.geospatial_types == [3, 6]
             assert geo_stats.xmin == -180
             assert geo_stats.xmax == 180
+
+        # Close file handle before temp dir cleanup (Windows compatibility)
+        del file
 
 
 def test_read_parquet_validate_wkb_single_valid_row(con, tmp_path):
@@ -695,19 +701,19 @@ def test_prune_geography_parquet():
         )
 
         # Verify the parquet file has geography statistics with antimeridian wraparound
-        f = parquet.ParquetFile(tmp_parquet)
-        assert f.metadata.num_row_groups > 1
+        with parquet.ParquetFile(tmp_parquet) as f:
+            assert f.metadata.num_row_groups > 1
 
-        # Check that at least one row group has wraparound statistics (xmin > xmax)
-        has_wraparound = False
-        for i in range(f.metadata.num_row_groups):
-            stats = f.metadata.row_group(i).column(0).geo_statistics
-            if stats is not None and stats.xmin > stats.xmax:
-                has_wraparound = True
-                break
-        assert has_wraparound, (
-            "Expected at least one row group with antimeridian wraparound"
-        )
+            # Check that at least one row group has wraparound statistics (xmin > xmax)
+            has_wraparound = False
+            for i in range(f.metadata.num_row_groups):
+                stats = f.metadata.row_group(i).column(0).geo_statistics
+                if stats is not None and stats.xmin > stats.xmax:
+                    has_wraparound = True
+                    break
+            assert has_wraparound, (
+                "Expected at least one row group with antimeridian wraparound"
+            )
 
         # Query 1: Query crossing the antimeridian - should match results
         query_antimeridian = f"""
