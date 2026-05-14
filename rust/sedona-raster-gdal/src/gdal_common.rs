@@ -222,6 +222,13 @@ pub unsafe fn raster_ref_to_gdal_mem<R: RasterRef + ?Sized>(
             .band(src_band_index)
             .map_err(|e| arrow_datafusion_err!(e))?;
 
+        if !band.is_2d() {
+            return exec_err!(
+                "GDAL backend requires a 2-dim band; got dim_names={:?}",
+                band.dim_names()
+            );
+        }
+
         if band.metadata().storage_type()? != StorageType::InDb {
             return Err(DataFusionError::NotImplemented(
                 "OutDb bands are not supported in raster_to_mem_dataset".to_string(),
@@ -824,5 +831,41 @@ mod tests {
             .err()
             .unwrap();
         assert!(err.to_string().contains("OutDb bands are not supported"));
+    }
+
+    #[test]
+    fn test_raster_ref_to_gdal_mem_rejects_nd_bands() {
+        // Build a 3-D in-db band shaped ["time","y","x"] over a 2-D raster.
+        // The N-D guard should fire before any GDAL call.
+        let mut builder = RasterBuilder::new(1);
+        builder
+            .start_raster_2d(2, 2, 0.0, 2.0, 1.0, -1.0, 0.0, 0.0, None)
+            .unwrap();
+        builder
+            .start_band_nd(
+                None,
+                &["time", "y", "x"],
+                &[3, 2, 2],
+                BandDataType::UInt8,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+        builder
+            .band_data_writer()
+            .append_value(vec![0u8; 3 * 2 * 2]);
+        builder.finish_band().unwrap();
+        builder.finish_raster().unwrap();
+        let raster_array = builder.finish().unwrap();
+        let raster = single_raster(&raster_array);
+
+        let err = with_gdal(|gdal| unsafe { raster_ref_to_gdal_mem(gdal, &raster, &[1]) })
+            .err()
+            .unwrap();
+        assert!(
+            err.to_string().contains("requires a 2-dim band"),
+            "got: {err}"
+        );
     }
 }

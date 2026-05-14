@@ -259,6 +259,14 @@ impl GDALDatasetCache {
 
         for i in 1..=num_bands {
             let band = bands.band(i).map_err(|e| arrow_datafusion_err!(e))?;
+
+            if !band.is_2d() {
+                return exec_err!(
+                    "GDAL backend requires 2-dim bands; got dim_names={:?}",
+                    band.dim_names()
+                );
+            }
+
             let band_metadata = band.metadata();
             let band_type = band_metadata.data_type()?;
             let gdal_type = band_data_type_to_gdal(&band_type);
@@ -660,6 +668,32 @@ mod tests {
         path_str
     }
 
+    /// Two-band GeoTIFF on disk: band 1 is filled with `band1_fill`, band 2
+    /// with `band2_fill`. Used to exercise `#band=2` selection end-to-end.
+    fn create_two_band_source_tiff(temp_dir: &TempDir, band1_fill: u8, band2_fill: u8) -> String {
+        let path = temp_dir.path().join("two_band.tif");
+        let path_str = path.to_string_lossy().to_string();
+
+        with_gdal(|gdal| {
+            let driver = gdal.get_driver_by_name("GTiff").unwrap();
+            let dataset = driver
+                .create_with_band_type::<u8>(&path_str, 8, 8, 2)
+                .unwrap();
+            dataset
+                .set_geo_transform(&[0.0, 1.0, 0.0, 8.0, 0.0, -1.0])
+                .unwrap();
+            for (i, fill) in [band1_fill, band2_fill].iter().enumerate() {
+                let band = dataset.rasterband(i + 1).unwrap();
+                let mut buffer = Buffer::new((8, 8), vec![*fill; 8 * 8]);
+                band.write((0, 0), (8, 8), &mut buffer).unwrap();
+            }
+            Ok(())
+        })
+        .unwrap();
+
+        path_str
+    }
+
     fn build_outdb_raster(path: &str) -> arrow_array::StructArray {
         let mut builder = RasterBuilder::new(1);
         let metadata = RasterMetadata {
@@ -975,5 +1009,110 @@ mod tests {
             super::VrtKey::from_raster(&RasterStructArray::new(&raster_b).get(0).unwrap()).unwrap();
 
         assert!(key_a != key_b);
+    }
+
+    #[test]
+    fn test_provider_rejects_nd_band_in_vrt_path() {
+        let temp_dir = TempDir::new().unwrap();
+        let path = create_source_tiff(&temp_dir);
+
+        // Build a raster mixing one in-db 3-D band (forces N-D rejection inside
+        // build_vrt_from_sources) with one out-db band.
+        let mut builder = RasterBuilder::new(1);
+        builder
+            .start_raster_2d(8, 8, 0.0, 8.0, 1.0, -1.0, 0.0, 0.0, None)
+            .unwrap();
+        builder
+            .start_band_nd(
+                None,
+                &["time", "y", "x"],
+                &[2, 8, 8],
+                BandDataType::UInt8,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+        builder
+            .band_data_writer()
+            .append_value(vec![0u8; 2 * 8 * 8]);
+        builder.finish_band().unwrap();
+        builder
+            .start_band_nd(
+                None,
+                &["y", "x"],
+                &[8, 8],
+                BandDataType::UInt8,
+                Some(&[0u8]),
+                Some(&path),
+                Some("geotiff"),
+            )
+            .unwrap();
+        builder.band_data_writer().append_value([]);
+        builder.finish_band().unwrap();
+        builder.finish_raster().unwrap();
+        let raster_struct = builder.finish().unwrap();
+        let raster_array = RasterStructArray::new(&raster_struct);
+        let raster = raster_array.get(0).unwrap();
+        let cache = Rc::new(GDALDatasetCache::try_new(4, 4).unwrap());
+
+        let err = with_gdal(|gdal| {
+            let provider = GDALDatasetProvider::new(gdal, Rc::clone(&cache));
+            provider.raster_ref_to_gdal(&raster)
+        })
+        .err()
+        .unwrap();
+        assert!(err.to_string().contains("2-dim band"), "got: {err}");
+    }
+
+    #[test]
+    fn test_provider_selects_outdb_band_via_band_fragment() {
+        let temp_dir = TempDir::new().unwrap();
+        // Source TIFF: band 1 filled with 7s, band 2 filled with 99s.
+        let path = create_two_band_source_tiff(&temp_dir, 7u8, 99u8);
+
+        // Build a 1-band raster whose single band points at source band 2.
+        let metadata = RasterMetadata {
+            width: 8,
+            height: 8,
+            upperleft_x: 0.0,
+            upperleft_y: 8.0,
+            scale_x: 1.0,
+            scale_y: -1.0,
+            skew_x: 0.0,
+            skew_y: 0.0,
+        };
+        let mut builder = RasterBuilder::new(1);
+        builder.start_raster(&metadata, None).unwrap();
+        builder
+            .start_band(BandMetadata {
+                nodata_value: Some(vec![0u8]),
+                storage_type: StorageType::OutDbRef,
+                datatype: BandDataType::UInt8,
+                outdb_url: Some(path.clone()),
+                outdb_band_id: Some(2),
+            })
+            .unwrap();
+        builder.band_data_writer().append_value([]);
+        builder.finish_band().unwrap();
+        builder.finish_raster().unwrap();
+        let raster_struct = builder.finish().unwrap();
+        let raster_array = RasterStructArray::new(&raster_struct);
+        let raster = raster_array.get(0).unwrap();
+        let cache = Rc::new(GDALDatasetCache::try_new(4, 4).unwrap());
+
+        let dataset = with_gdal(|gdal| {
+            let provider = GDALDatasetProvider::new(gdal, Rc::clone(&cache));
+            provider.raster_ref_to_gdal(&raster)
+        })
+        .unwrap();
+
+        let band = dataset
+            .as_dataset()
+            .rasterband(1)
+            .unwrap()
+            .read_as::<u8>((0, 0), (8, 8), (8, 8), None)
+            .unwrap();
+        assert_eq!(band.data().to_vec(), vec![99u8; 8 * 8]);
     }
 }
