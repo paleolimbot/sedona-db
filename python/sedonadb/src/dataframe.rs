@@ -123,6 +123,34 @@ impl InternalDataFrame {
         Ok(InternalDataFrame::new(inner, self.runtime.clone()))
     }
 
+    /// Filter rows by one or more boolean expressions, producing a new
+    /// lazy `DataFrame`.
+    ///
+    /// The Python side guarantees `exprs` is non-empty and that every
+    /// element is an `Expr` (no strings, no Literals — those rejections
+    /// happen at the Python boundary so the error message can point at
+    /// the right alternative). Multiple predicates are combined into a
+    /// single composed `Expr` using DataFusion's `conjunction` helper,
+    /// which yields one conjunction node for the optimizer to reason
+    /// about rather than stacked filter nodes. Column-validity errors
+    /// surface at plan-build time from DataFusion, matching the
+    /// behavior of `select`.
+    fn filter(&self, exprs: Vec<PyExpr>) -> Result<InternalDataFrame, PySedonaError> {
+        // `conjunction` returns None only for an empty iterator; the
+        // `else` arm doubles as defense-in-depth against an empty
+        // predicate list slipping past the Python-side guard.
+        if let Some(combined) =
+            datafusion_expr::utils::conjunction(exprs.into_iter().map(|e| e.inner))
+        {
+            let inner = self.inner.clone().filter(combined)?;
+            Ok(InternalDataFrame::new(inner, self.runtime.clone()))
+        } else {
+            Err(PySedonaError::SedonaPython(
+                "filter() requires at least one predicate".to_string(),
+            ))
+        }
+    }
+
     fn execute<'py>(&self, py: Python<'py>) -> Result<usize, PySedonaError> {
         let df = self.inner.clone();
         let count = wait_for_future(py, &self.runtime, async move {
