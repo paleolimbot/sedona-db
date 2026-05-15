@@ -275,6 +275,7 @@ mod tests {
     use arrow_array::{Array, ArrayRef, ListArray, StructArray, UInt32Array};
     use datafusion_expr::ScalarUDF;
     use rstest::rstest;
+    use sedona_schema::{crs::lnglat, datatypes::Edges};
     use sedona_testing::{
         compare::assert_array_equal, create::create_array, testers::ScalarUdfTester,
     };
@@ -289,7 +290,10 @@ mod tests {
     }
 
     #[rstest]
-    fn udf(#[values(WKB_GEOMETRY, WKB_GEOGRAPHY)] sedona_type: SedonaType) {
+    fn udf(
+        #[values(WKB_GEOMETRY, WKB_GEOGRAPHY, SedonaType::Wkb(Edges::Planar, lnglat()))]
+        sedona_type: SedonaType,
+    ) {
         let tester = ScalarUdfTester::new(st_dump_udf().into(), vec![sedona_type.clone()]);
 
         let input = create_array(
