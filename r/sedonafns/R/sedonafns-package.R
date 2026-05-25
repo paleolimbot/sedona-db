@@ -1,4 +1,3 @@
----
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -16,21 +15,18 @@
 # specific language governing permissions and limitations
 # under the License.
 
-title: ST_PointM
-description: Constructs a Point with an M (measure) coordinate from X, Y, and M values.
-kernels:
-  - returns: geometry
-    args:
-    - name: x
-      type: double
-    - name: "y"
-      type: double
-    - name: m
-      type: double
----
+#' @keywords internal
+"_PACKAGE"
 
-## Examples
+## usethis namespace: start
+## usethis namespace: end
+NULL
 
-```sql
-SELECT ST_PointM(-64.36, 45.09, 50.0);
-```
+
+#' Missing argument sentinel
+#'
+#' @returns An object of class 'sd_missing_arg'
+#' @export
+sd_missing_arg <- function() {
+  structure(list(), class = "sd_missing_arg")
+}

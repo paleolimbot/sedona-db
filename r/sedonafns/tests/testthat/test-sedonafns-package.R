@@ -1,4 +1,3 @@
----
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -16,21 +15,22 @@
 # specific language governing permissions and limitations
 # under the License.
 
-title: ST_PointM
-description: Constructs a Point with an M (measure) coordinate from X, Y, and M values.
-kernels:
-  - returns: geometry
-    args:
-    - name: x
-      type: double
-    - name: "y"
-      type: double
-    - name: m
-      type: double
----
+test_that("basic usage with sedonadb integration works", {
+  skip_if_not_installed("sedonadb")
 
-## Examples
+  df_out <- data.frame(x = 1, y = 2) |>
+    sedonadb::sd_transmute(x, y, geom = sd_point(x, y) |> sd_astext())
 
-```sql
-SELECT ST_PointM(-64.36, 45.09, 50.0);
-```
+  expect_identical(
+    as.data.frame(df_out),
+    data.frame(x = 1, y = 2, geom = "POINT(1 2)")
+  )
+})
+
+test_that("functions error when called outside a translation context", {
+  expect_error(
+    sd_point(),
+    "Can't use `sd_point()` outside a SedonaDB translation context",
+    fixed = TRUE
+  )
+})
