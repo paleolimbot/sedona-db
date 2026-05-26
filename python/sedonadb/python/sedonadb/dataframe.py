@@ -28,7 +28,7 @@ from sedonadb.utility import sedona  # noqa: F401
 if TYPE_CHECKING:
     import geopandas
     import pandas
-    import pyarrow
+    import pyarrow as pa
 
 
 class DataFrame:
@@ -502,6 +502,41 @@ class DataFrame:
             requested_schema=requested_schema
         )
 
+    def to_arrow_reader(self, *, simplify: bool = False) -> "pa.RecordBatchReader":
+        """Execute and stream results as a PyArrow RecordBatchReader
+
+        Executes the logical plan represented by this object and returns a
+        PyArrow RecordBatchReader. This requires that pyarrow is installed.
+
+        Args:
+            simplify: Use `True` to simplify Arrow storage types at the export
+                boundary, for example `Utf8View` to `Utf8` and `BinaryView` to
+                `Binary`.
+
+        Examples:
+
+            >>> sd = sedona.db.connect()
+            >>> reader = sd.sql(
+            ...     "SELECT ST_Point(0, 1) as geometry"
+            ... ).to_arrow_reader()
+            >>> reader.read_all()
+            pyarrow.Table
+            geometry: extension<geoarrow.wkb<WkbType>> not null
+            ----
+            geometry: [[01010000000000000000000000000000000000F03F]]
+
+        """
+        import geoarrow.pyarrow  # noqa: F401
+        import pyarrow as pa
+
+        return pa.RecordBatchReader.from_stream(
+            self._impl.to_stream(self._ctx, simplify=simplify)
+        )
+
+    def arrow(self, *, simplify: bool = False) -> "pa.RecordBatchReader":
+        """Alias of `to_arrow_reader()`"""
+        return self.to_arrow_reader(simplify=simplify)
+
     def to_view(self, name: str, overwrite: bool = False):
         """Create a view based on the query represented by this object
 
@@ -553,7 +588,7 @@ class DataFrame:
     def __datafusion_table_provider__(self):
         return self._impl.__datafusion_table_provider__()
 
-    def to_arrow_table(self, schema: Any = None) -> "pyarrow.Table":
+    def to_arrow_table(self, schema: Any = None) -> "pa.Table":
         """Execute and collect results as a PyArrow Table
 
         Executes the logical plan represented by this object and returns a
