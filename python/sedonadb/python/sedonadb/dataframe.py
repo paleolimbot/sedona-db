@@ -34,9 +34,112 @@ if TYPE_CHECKING:
 class DataFrame:
     """Representation of a (lazy) collection of columns
 
-    This object is usually constructed from a
-    SedonaContext][sedonadb.context.SedonaContext] by importing an object,
-    reading a file, or executing SQL.
+    This object is usually constructed from `sd = sedona.db.connect()`
+    by importing an object with `sd.create_data_frame()`, reading a file
+    with `sd.read_parquet()`/`sd.read_pyogrio()`, or executing SQL with
+    `sd.sql()`. Once created, a DataFrame can be modified using the Python
+    API (e.g., `.select()`, `.filter()`, `.sort()`, `.limit()`) or by
+    creating a temporary view with `.to_view("name")` and querying the
+    resulting view using `sd.sql()`. The Python API aims to provide
+    a minimal subset of functionality derived primarily from Ibis and
+    DuckDB's relational APIs.
+
+    Examples:
+
+        >>> sd = sedona.db.connect()
+        >>> sd.options.interactive = True
+        >>> df = sd.sql("SELECT * FROM (VALUES (1, 'a'), (2, 'b'), (3, 'c')) AS t(x, y)")
+        >>> df.limit(2)
+        ┌───────┬──────┐
+        │   x   ┆   y  │
+        │ int64 ┆ utf8 │
+        ╞═══════╪══════╡
+        │     1 ┆ a    │
+        ├╌╌╌╌╌╌╌┼╌╌╌╌╌╌┤
+        │     2 ┆ b    │
+        └───────┴──────┘
+
+        Columns can be specified as part of the Python API in several ways:
+
+        >>> df.select("y", z=df.x + 1)
+        ┌──────┬───────┐
+        │   y  ┆   z   │
+        │ utf8 ┆ int64 │
+        ╞══════╪═══════╡
+        │ a    ┆     2 │
+        ├╌╌╌╌╌╌┼╌╌╌╌╌╌╌┤
+        │ b    ┆     3 │
+        ├╌╌╌╌╌╌┼╌╌╌╌╌╌╌┤
+        │ c    ┆     4 │
+        └──────┴───────┘
+        >>> df.select("y", z=df["x"] + 1)
+        ┌──────┬───────┐
+        │   y  ┆   z   │
+        │ utf8 ┆ int64 │
+        ╞══════╪═══════╡
+        │ a    ┆     2 │
+        ├╌╌╌╌╌╌┼╌╌╌╌╌╌╌┤
+        │ b    ┆     3 │
+        ├╌╌╌╌╌╌┼╌╌╌╌╌╌╌┤
+        │ c    ┆     4 │
+        └──────┴───────┘
+        >>> df.select("y", z=sd.col("x") + 1)
+        ┌──────┬───────┐
+        │   y  ┆   z   │
+        │ utf8 ┆ int64 │
+        ╞══════╪═══════╡
+        │ a    ┆     2 │
+        ├╌╌╌╌╌╌┼╌╌╌╌╌╌╌┤
+        │ b    ┆     3 │
+        ├╌╌╌╌╌╌┼╌╌╌╌╌╌╌┤
+        │ c    ┆     4 │
+        └──────┴───────┘
+
+        Literals can be specified explicitly using `sd.lit(obj)` but can also
+        be used directly in function calls or comparisons.
+
+        >>> df.filter(df.x > 1)
+        ┌───────┬──────┐
+        │   x   ┆   y  │
+        │ int64 ┆ utf8 │
+        ╞═══════╪══════╡
+        │     2 ┆ b    │
+        ├╌╌╌╌╌╌╌┼╌╌╌╌╌╌┤
+        │     3 ┆ c    │
+        └───────┴──────┘
+        >>> df.filter(df.x > sd.lit(1))
+        ┌───────┬──────┐
+        │   x   ┆   y  │
+        │ int64 ┆ utf8 │
+        ╞═══════╪══════╡
+        │     2 ┆ b    │
+        ├╌╌╌╌╌╌╌┼╌╌╌╌╌╌┤
+        │     3 ┆ c    │
+        └───────┴──────┘
+
+        Supported literals include any Python object supported by pyarrow
+        in addition to GeoPandas, Shapely, and PyProj objects for use in
+        geometry functions.
+
+        Functions are available from `sd.funcs`. Assigning this to a local
+        variable generally leads to better autocomplete but is not necessary.
+        In addition to standard DataFusion scalar and aggregate functions,
+        a number of spatial functions are provided. See the
+        [SedonaDB SQL Reference](https://sedona.apache.org/sedonadb/latest/reference/sql/)
+        for a list of supported functions.
+
+        >>> f = sd.funcs
+        >>> df.select(geometry=f.st_point(df.x, df.x + 1))
+        ┌────────────┐
+        │  geometry  │
+        │  geometry  │
+        ╞════════════╡
+        │ POINT(1 2) │
+        ├╌╌╌╌╌╌╌╌╌╌╌╌┤
+        │ POINT(2 3) │
+        ├╌╌╌╌╌╌╌╌╌╌╌╌┤
+        │ POINT(3 4) │
+        └────────────┘
     """
 
     def __init__(self, ctx, impl, options):
@@ -89,6 +192,19 @@ class DataFrame:
         """
         return self.limit(n)
 
+    def alias(self, name: str) -> "DataFrame":
+        """Qualify all columns of this DataFrame with a given name
+
+        Returns a DataFrame where all columns are qualified to disambiguate
+        references in join expressions. This is the equivalent of aliasing a subquery
+        in SQL (`(SELECT * FROM df) AS name`).
+        """
+        return DataFrame(
+            self._ctx,
+            self._impl.alias(name),
+            self._options,
+        )
+
     def __getitem__(self, key: Union[str, int]) -> Expr:
         """Reference a single column by name or position.
 
@@ -114,40 +230,70 @@ class DataFrame:
         Examples:
 
             >>> sd = sedona.db.connect()
-            >>> df = sd.sql("SELECT * FROM (VALUES (1, 10), (2, 20)) AS t(x, y)")
+            >>> df = sd.sql("SELECT * FROM (VALUES (1, 10), (2, 20)) AS t(x, y)").alias("t")
             >>> df["x"]
-            Expr(x)
+            Expr(t.x)
             >>> df[1]
-            Expr(y)
+            Expr(t.y)
             >>> df[-1]
-            Expr(y)
+            Expr(t.y)
         """
         # `bool` is a subclass of `int`, so guard explicitly — otherwise
         # `df[True]` would silently mean `df[1]`.
-        if isinstance(key, bool) or not isinstance(key, (str, int)):
+        if isinstance(key, bool):
             raise TypeError(
-                f"DataFrame indexing is not supported for "
-                f"{type(key).__name__}. Use df['name'] or df[i] for a "
-                f"column expression; use df.select(*cols) for multi-column "
-                f"projection and df.filter(expr) for row filtering."
+                "DataFrame indexing is not supported for bool. "
+                "Use df['name'] or df[i] for a column expression; "
+                "use df.select(*cols) for multi-column projection "
+                "and df.filter(expr) for row filtering."
             )
-
-        columns = self._impl.columns()
-        if isinstance(key, str):
-            if key not in columns:
-                raise KeyError(
-                    f"Column {key!r} not found. Available columns: {columns}"
-                )
-            return _col(key)
-        # int (and not bool, by the guard above)
-        if not -len(columns) <= key < len(columns):
-            raise IndexError(
-                f"Column index {key} is out of range for DataFrame with "
-                f"{len(columns)} columns"
+        if isinstance(key, list):
+            raise TypeError(
+                "DataFrame indexing with a list is not supported. "
+                "Use df.select(*cols) for multi-column projection."
             )
-        return _col(columns[key])
+        if isinstance(key, Expr):
+            raise TypeError(
+                "DataFrame indexing with an Expr is not supported. "
+                "Use df.filter(expr) for row filtering."
+            )
+        if isinstance(key, slice):
+            raise TypeError(
+                "DataFrame slicing is not supported. "
+                "Use df.limit(n) or df.limit(n, offset=k)."
+            )
+        inner_expr = self._impl.qualified_column_expr(key)
+        return Expr(inner_expr)
 
-    def select(self, *exprs: Union[Expr, str, _SedonaLit]) -> "DataFrame":
+    def __getattr__(self, name):
+        """Syntactic sugar for column access
+
+        Allows columns to be accessed like `t.geometry` for columns
+        that do not collide with existing attributes. Programmatic usage
+        should use `sd.col()` or `t["col"]`.
+        """
+        try:
+            return self[name]
+        except KeyError as e:
+            raise AttributeError(str(e))
+
+    def __dir__(self):
+        """List attributes of this object
+
+        This is primarily intended to power autocomplete, so columns
+        are placed first.
+        """
+        return self.columns + super().__dir__()
+
+    def _ipython_key_completions_(self):
+        """Enable tab completion for df["col"] in IPython/Jupyter."""
+        return self.columns
+
+    def select(
+        self,
+        *exprs: Union[Expr, str, _SedonaLit],
+        **kwargs: Union[Expr, str, _SedonaLit],
+    ) -> "DataFrame":
         """Project a set of columns or expressions.
 
         Returns a new lazy `DataFrame` whose columns are exactly the
@@ -157,17 +303,34 @@ class DataFrame:
         produced by `sedonadb.expr.lit()` are also accepted; use
         `lit(value).alias(name)` to give the literal column a name.
 
+        Keyword arguments provide a shorthand for aliasing: the key becomes
+        the output column name and the value is the expression. For example,
+        `df.select(z=df.x + 1)` is equivalent to `df.select((df.x + 1).alias("z"))`.
+
         Args:
-            *exprs: One or more arguments. Each argument is either a column
-                name (`str`), a `sedonadb.expr.Expr`, or a `sedonadb.expr.Literal`.
-                At least one argument is required.
+            *exprs: Zero or more positional arguments. Each argument is either
+                a column name (`str`), a `sedonadb.expr.Expr`, or a
+                `sedonadb.expr.Literal`.
+            **kwargs: Zero or more keyword arguments where each key is the
+                desired output column name and each value is a column name
+                (`str`), an `Expr`, or a `Literal`.
+
+        Note:
+            At least one positional or keyword argument is required.
 
         Examples:
 
-            >>> from sedonadb.expr import col, lit
             >>> sd = sedona.db.connect()
             >>> df = sd.sql("SELECT 1 AS a, 2 AS b")
-            >>> df.select("a", (col("b") + 1).alias("b_plus_1")).show()
+            >>> df.select("a", (df.b + 1).alias("b_plus_1")).show()
+            ┌───────┬──────────┐
+            │   a   ┆ b_plus_1 │
+            │ int64 ┆   int64  │
+            ╞═══════╪══════════╡
+            │     1 ┆        3 │
+            └───────┴──────────┘
+
+            >>> df.select("a", b_plus_1=df.b + 1).show()
             ┌───────┬──────────┐
             │   a   ┆ b_plus_1 │
             │ int64 ┆   int64  │
@@ -175,7 +338,7 @@ class DataFrame:
             │     1 ┆        3 │
             └───────┴──────────┘
         """
-        if not exprs:
+        if not exprs and not kwargs:
             raise ValueError("select() requires at least one column or expression")
 
         coerced = []
@@ -194,6 +357,21 @@ class DataFrame:
                     f"select() expects str, Expr, or Literal arguments, "
                     f"got {type(e).__name__}"
                 )
+
+        # Process keyword arguments: alias each value with its key
+        for name, e in kwargs.items():
+            if isinstance(e, Expr):
+                coerced.append(e.alias(name)._impl)
+            elif isinstance(e, str):
+                coerced.append(_col(e).alias(name)._impl)
+            elif isinstance(e, _SedonaLit):
+                coerced.append(_to_expr(e).alias(name)._impl)
+            else:
+                raise TypeError(
+                    f"select() expects str, Expr, or Literal keyword arguments, "
+                    f"got {type(e).__name__} for '{name}'"
+                )
+
         return DataFrame(self._ctx, self._impl.select(coerced), self._options)
 
     def filter(self, *exprs: Expr) -> "DataFrame":
@@ -216,10 +394,9 @@ class DataFrame:
 
         Examples:
 
-            >>> from sedonadb.expr import col
             >>> sd = sedona.db.connect()
             >>> df = sd.sql("SELECT * FROM (VALUES (1), (2), (3), (4)) AS t(x)")
-            >>> df.filter(col("x") > 2).show()
+            >>> df.filter(df.x > 2).show()
             ┌───────┐
             │   x   │
             │ int64 │
@@ -272,7 +449,6 @@ class DataFrame:
 
         Examples:
 
-            >>> from sedonadb.expr import col
             >>> sd = sedona.db.connect()
             >>> df = sd.sql("SELECT * FROM (VALUES (3), (1), (2)) AS t(x)")
             >>> df.sort("x").show()
@@ -286,7 +462,7 @@ class DataFrame:
             ├╌╌╌╌╌╌╌┤
             │     3 │
             └───────┘
-            >>> df.sort(col("x").desc()).show()
+            >>> df.sort(sd.col("x").desc()).show()
             ┌───────┐
             │   x   │
             │ int64 │
