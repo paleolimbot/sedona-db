@@ -45,8 +45,15 @@ impl TryFrom<SedonaCObjectStore> for ImportedObjectStore {
     type Error = DataFusionError;
 
     fn try_from(value: SedonaCObjectStore) -> Result<Self> {
-        match (&value.display, &value.debug, &value.delete, &value.release) {
-            (Some(_), Some(_), Some(_), Some(_)) => Ok(Self { inner: value }),
+        match (
+            &value.display,
+            &value.debug,
+            &value.delete,
+            &value.copy,
+            &value.copy_if_not_exists,
+            &value.release,
+        ) {
+            (Some(_), Some(_), Some(_), Some(_), Some(_), Some(_)) => Ok(Self { inner: value }),
             _ => {
                 sedona_internal_err!("Can't import released or uninitialized SedonaCObjectStore")
             }
@@ -268,12 +275,111 @@ impl ObjectStore for ImportedObjectStore {
         todo!()
     }
 
-    async fn copy(&self, _from: &Path, _to: &Path) -> object_store::Result<()> {
-        todo!()
+    async fn copy(&self, from: &Path, to: &Path) -> object_store::Result<()> {
+        // Convert paths to C strings
+        let from_cstr = CString::new(from.as_ref()).map_err(|e| object_store::Error::Generic {
+            store: "ImportedObjectStore",
+            source: e.into(),
+        })?;
+        let to_cstr = CString::new(to.as_ref()).map_err(|e| object_store::Error::Generic {
+            store: "ImportedObjectStore",
+            source: e.into(),
+        })?;
+
+        // Create a oneshot channel to receive the result
+        let (tx, rx) = oneshot::channel::<std::result::Result<(), (c_int, String)>>();
+
+        // Create the handler that signals the channel
+        let handler = ImportedAsyncResultHandler::new(tx);
+        let mut ffi_handler: SedonaCAsyncResultHandler = handler.into();
+
+        // Call the C copy function
+        let copy_fn = self.inner.copy.expect("copy callback missing");
+        let code = unsafe {
+            copy_fn(
+                &self.inner,
+                from_cstr.as_ptr(),
+                to_cstr.as_ptr(),
+                &mut ffi_handler,
+            )
+        };
+
+        if code != 0 {
+            std::mem::forget(ffi_handler);
+            return Err(object_store::Error::Generic {
+                store: "ImportedObjectStore",
+                source: format!("copy failed to start: errno {}", code).into(),
+            });
+        }
+
+        std::mem::forget(ffi_handler);
+
+        match rx.await {
+            Ok(Ok(())) => Ok(()),
+            Ok(Err((code, msg))) => Err(object_store::Error::Generic {
+                store: "ImportedObjectStore",
+                source: format!("copy failed ({}): {}", code, msg).into(),
+            }),
+            Err(_) => Err(object_store::Error::Generic {
+                store: "ImportedObjectStore",
+                source: "copy callback channel cancelled".into(),
+            }),
+        }
     }
 
-    async fn copy_if_not_exists(&self, _from: &Path, _to: &Path) -> object_store::Result<()> {
-        todo!()
+    async fn copy_if_not_exists(&self, from: &Path, to: &Path) -> object_store::Result<()> {
+        // Convert paths to C strings
+        let from_cstr = CString::new(from.as_ref()).map_err(|e| object_store::Error::Generic {
+            store: "ImportedObjectStore",
+            source: e.into(),
+        })?;
+        let to_cstr = CString::new(to.as_ref()).map_err(|e| object_store::Error::Generic {
+            store: "ImportedObjectStore",
+            source: e.into(),
+        })?;
+
+        // Create a oneshot channel to receive the result
+        let (tx, rx) = oneshot::channel::<std::result::Result<(), (c_int, String)>>();
+
+        // Create the handler that signals the channel
+        let handler = ImportedAsyncResultHandler::new(tx);
+        let mut ffi_handler: SedonaCAsyncResultHandler = handler.into();
+
+        // Call the C copy_if_not_exists function
+        let copy_fn = self
+            .inner
+            .copy_if_not_exists
+            .expect("copy_if_not_exists callback missing");
+        let code = unsafe {
+            copy_fn(
+                &self.inner,
+                from_cstr.as_ptr(),
+                to_cstr.as_ptr(),
+                &mut ffi_handler,
+            )
+        };
+
+        if code != 0 {
+            std::mem::forget(ffi_handler);
+            return Err(object_store::Error::Generic {
+                store: "ImportedObjectStore",
+                source: format!("copy_if_not_exists failed to start: errno {}", code).into(),
+            });
+        }
+
+        std::mem::forget(ffi_handler);
+
+        match rx.await {
+            Ok(Ok(())) => Ok(()),
+            Ok(Err((code, msg))) => Err(object_store::Error::Generic {
+                store: "ImportedObjectStore",
+                source: format!("copy_if_not_exists failed ({}): {}", code, msg).into(),
+            }),
+            Err(_) => Err(object_store::Error::Generic {
+                store: "ImportedObjectStore",
+                source: "copy_if_not_exists callback channel cancelled".into(),
+            }),
+        }
     }
 }
 
@@ -320,6 +426,8 @@ impl From<ExportedObjectStore> for SedonaCObjectStore {
             display: Some(c_object_store_display),
             debug: Some(c_object_store_debug),
             delete: Some(c_object_store_delete),
+            copy: Some(c_object_store_copy),
+            copy_if_not_exists: Some(c_object_store_copy_if_not_exists),
             release: Some(c_object_store_release),
             private_data: Box::leak(box_value) as *mut ExportedObjectStore as *mut c_void,
         }
@@ -401,6 +509,128 @@ unsafe extern "C" fn c_object_store_delete(
         let result = store.delete(&path).await;
 
         // Now extract the handler pointer after the await
+        handler_wrapper.complete(result);
+    });
+
+    0 // Operation accepted
+}
+
+/// C callable wrapper for async copy operation
+///
+/// This spawns the async copy on the runtime and calls the handler callbacks
+/// when complete.
+unsafe extern "C" fn c_object_store_copy(
+    self_: *const SedonaCObjectStore,
+    from: *const c_char,
+    to: *const c_char,
+    handler: *mut SedonaCAsyncResultHandler,
+) -> c_int {
+    assert!(!self_.is_null());
+    let self_ref = self_.as_ref().unwrap();
+
+    assert!(!self_ref.private_data.is_null());
+    let private_data = (self_ref.private_data as *mut ExportedObjectStore)
+        .as_ref()
+        .unwrap();
+
+    // Validate handler
+    if handler.is_null() {
+        return libc::EINVAL;
+    }
+    let handler_ref = handler.as_ref().unwrap();
+    if handler_ref.on_success.is_none()
+        || handler_ref.on_error.is_none()
+        || handler_ref.release.is_none()
+    {
+        return libc::EINVAL;
+    }
+
+    // Convert paths to Rust Path
+    if from.is_null() || to.is_null() {
+        return libc::EINVAL;
+    }
+    let from_str = match CStr::from_ptr(from).to_str() {
+        Ok(s) => s,
+        Err(_) => return libc::EINVAL,
+    };
+    let to_str = match CStr::from_ptr(to).to_str() {
+        Ok(s) => s,
+        Err(_) => return libc::EINVAL,
+    };
+    let from_path = Path::from(from_str);
+    let to_path = Path::from(to_str);
+
+    // Clone what we need for the async task
+    let store = private_data.inner.clone();
+    let handle = private_data.runtime_handle.clone();
+
+    // Wrap the handler pointer in a Send-safe wrapper
+    let handler_wrapper = SendableHandler(handler);
+
+    // Spawn the async work
+    handle.spawn(async move {
+        let result = store.copy(&from_path, &to_path).await;
+        handler_wrapper.complete(result);
+    });
+
+    0 // Operation accepted
+}
+
+/// C callable wrapper for async copy_if_not_exists operation
+///
+/// This spawns the async copy_if_not_exists on the runtime and calls the handler
+/// callbacks when complete.
+unsafe extern "C" fn c_object_store_copy_if_not_exists(
+    self_: *const SedonaCObjectStore,
+    from: *const c_char,
+    to: *const c_char,
+    handler: *mut SedonaCAsyncResultHandler,
+) -> c_int {
+    assert!(!self_.is_null());
+    let self_ref = self_.as_ref().unwrap();
+
+    assert!(!self_ref.private_data.is_null());
+    let private_data = (self_ref.private_data as *mut ExportedObjectStore)
+        .as_ref()
+        .unwrap();
+
+    // Validate handler
+    if handler.is_null() {
+        return libc::EINVAL;
+    }
+    let handler_ref = handler.as_ref().unwrap();
+    if handler_ref.on_success.is_none()
+        || handler_ref.on_error.is_none()
+        || handler_ref.release.is_none()
+    {
+        return libc::EINVAL;
+    }
+
+    // Convert paths to Rust Path
+    if from.is_null() || to.is_null() {
+        return libc::EINVAL;
+    }
+    let from_str = match CStr::from_ptr(from).to_str() {
+        Ok(s) => s,
+        Err(_) => return libc::EINVAL,
+    };
+    let to_str = match CStr::from_ptr(to).to_str() {
+        Ok(s) => s,
+        Err(_) => return libc::EINVAL,
+    };
+    let from_path = Path::from(from_str);
+    let to_path = Path::from(to_str);
+
+    // Clone what we need for the async task
+    let store = private_data.inner.clone();
+    let handle = private_data.runtime_handle.clone();
+
+    // Wrap the handler pointer in a Send-safe wrapper
+    let handler_wrapper = SendableHandler(handler);
+
+    // Spawn the async work
+    handle.spawn(async move {
+        let result = store.copy_if_not_exists(&from_path, &to_path).await;
         handler_wrapper.complete(result);
     });
 
@@ -535,5 +765,86 @@ mod test {
         let path = Path::from("nonexistent.txt");
         let result = imported.delete(&path).await;
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_copy_roundtrip() {
+        // Create an in-memory object store with a file
+        let store = Arc::new(InMemory::new());
+        let src_path = Path::from("source.txt");
+        let dst_path = Path::from("dest.txt");
+        store
+            .put(&src_path, PutPayload::from_static(b"hello copy"))
+            .await
+            .unwrap();
+
+        // Export and import the store
+        let exported = ExportedObjectStore::from(store.clone() as Arc<dyn ObjectStore>);
+        let ffi_store: SedonaCObjectStore = exported.into();
+        let imported = ImportedObjectStore::try_from(ffi_store).unwrap();
+
+        // Copy through the FFI boundary
+        imported.copy(&src_path, &dst_path).await.unwrap();
+
+        // Verify both files exist with same content
+        let src_data = store.get(&src_path).await.unwrap().bytes().await.unwrap();
+        let dst_data = store.get(&dst_path).await.unwrap().bytes().await.unwrap();
+        assert_eq!(src_data, dst_data);
+        assert_eq!(&src_data[..], b"hello copy");
+    }
+
+    #[tokio::test]
+    async fn test_copy_if_not_exists_success() {
+        // Create an in-memory object store with a file
+        let store = Arc::new(InMemory::new());
+        let src_path = Path::from("source.txt");
+        let dst_path = Path::from("new_dest.txt");
+        store
+            .put(&src_path, PutPayload::from_static(b"hello"))
+            .await
+            .unwrap();
+
+        // Export and import the store
+        let exported = ExportedObjectStore::from(store.clone() as Arc<dyn ObjectStore>);
+        let ffi_store: SedonaCObjectStore = exported.into();
+        let imported = ImportedObjectStore::try_from(ffi_store).unwrap();
+
+        // Copy should succeed since dest doesn't exist
+        imported
+            .copy_if_not_exists(&src_path, &dst_path)
+            .await
+            .unwrap();
+
+        // Verify dest was created
+        assert!(store.get(&dst_path).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_copy_if_not_exists_fails_when_exists() {
+        // Create an in-memory object store with source and dest files
+        let store = Arc::new(InMemory::new());
+        let src_path = Path::from("source.txt");
+        let dst_path = Path::from("existing_dest.txt");
+        store
+            .put(&src_path, PutPayload::from_static(b"source"))
+            .await
+            .unwrap();
+        store
+            .put(&dst_path, PutPayload::from_static(b"existing"))
+            .await
+            .unwrap();
+
+        // Export and import the store
+        let exported = ExportedObjectStore::from(store.clone() as Arc<dyn ObjectStore>);
+        let ffi_store: SedonaCObjectStore = exported.into();
+        let imported = ImportedObjectStore::try_from(ffi_store).unwrap();
+
+        // Copy should fail since dest exists
+        let result = imported.copy_if_not_exists(&src_path, &dst_path).await;
+        assert!(result.is_err());
+
+        // Verify dest was not overwritten
+        let dst_data = store.get(&dst_path).await.unwrap().bytes().await.unwrap();
+        assert_eq!(&dst_data[..], b"existing");
     }
 }

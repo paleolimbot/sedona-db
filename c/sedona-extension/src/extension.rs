@@ -141,6 +141,47 @@ pub struct SedonaCObjectStore {
         ) -> c_int,
     >,
 
+    /// Copy an object from one location to another.
+    ///
+    /// This is an async operation. The implementation MUST eventually call
+    /// either `on_success` or `on_error` on the handler, followed by `release`.
+    ///
+    /// `from` and `to` are null-terminated path strings that remain valid for
+    /// the duration of this call only.
+    ///
+    /// Return value: 0 if the operation was successfully initiated,
+    /// `errno`-compatible error code if the operation could not be started.
+    /// If non-zero is returned, the handler callbacks must NOT be called.
+    pub copy: Option<
+        unsafe extern "C" fn(
+            self_: *const SedonaCObjectStore,
+            from: *const c_char,
+            to: *const c_char,
+            handler: *mut SedonaCAsyncResultHandler,
+        ) -> c_int,
+    >,
+
+    /// Copy an object from one location to another, only if the destination
+    /// does not already exist.
+    ///
+    /// This is an async operation. The implementation MUST eventually call
+    /// either `on_success` or `on_error` on the handler, followed by `release`.
+    ///
+    /// `from` and `to` are null-terminated path strings that remain valid for
+    /// the duration of this call only.
+    ///
+    /// Return value: 0 if the operation was successfully initiated,
+    /// `errno`-compatible error code if the operation could not be started.
+    /// If non-zero is returned, the handler callbacks must NOT be called.
+    pub copy_if_not_exists: Option<
+        unsafe extern "C" fn(
+            self_: *const SedonaCObjectStore,
+            from: *const c_char,
+            to: *const c_char,
+            handler: *mut SedonaCAsyncResultHandler,
+        ) -> c_int,
+    >,
+
     /// Release callback: release the object store's own resources.
     pub release: Option<unsafe extern "C" fn(self_: *mut SedonaCObjectStore)>,
 
