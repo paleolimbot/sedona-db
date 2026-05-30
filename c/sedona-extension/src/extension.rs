@@ -23,6 +23,52 @@ use std::{
 
 use arrow_array::ffi::{FFI_ArrowArray, FFI_ArrowSchema};
 
+/// Raw FFI representation of an ObjectStore
+///
+/// This follows the Arrow C Data Interface pattern with function pointers
+/// for callbacks and a `release` callback for cleanup.
+///
+/// See the ImportedObjectStore and ExportedObjectStore for high-level
+/// APIs to import and export implementations using this struct.
+#[derive(Default)]
+#[repr(C)]
+pub struct SedonaCObjectStore {
+    /// Callback to get a display string for the object store.
+    ///
+    /// The returned pointer must remain valid until the next call to any
+    /// method on this struct or until `release` is called.
+    ///
+    /// Return value: pointer to a null-terminated character array.
+    pub display: Option<unsafe extern "C" fn(self_: *const SedonaCObjectStore) -> *const c_char>,
+
+    /// Callback to get a debug string for the object store.
+    ///
+    /// The returned pointer must remain valid until the next call to any
+    /// method on this struct or until `release` is called.
+    ///
+    /// Return value: pointer to a null-terminated character array.
+    pub debug: Option<unsafe extern "C" fn(self_: *const SedonaCObjectStore) -> *const c_char>,
+
+    /// Release callback: release the object store's own resources.
+    pub release: Option<unsafe extern "C" fn(self_: *mut SedonaCObjectStore)>,
+
+    /// Opaque producer-specific data
+    pub private_data: *mut c_void,
+}
+
+unsafe impl Send for SedonaCObjectStore {}
+unsafe impl Sync for SedonaCObjectStore {}
+
+impl Drop for SedonaCObjectStore {
+    fn drop(&mut self) {
+        if let Some(releaser) = self.release {
+            unsafe { releaser(self) }
+            self.release = None;
+            self.private_data = null_mut();
+        }
+    }
+}
+
 /// Raw FFI representation of the SedonaCScalarKernel
 ///
 /// See the ImportedScalarKernel and ExportedScalarKernel for high-level
