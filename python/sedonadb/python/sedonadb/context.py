@@ -87,6 +87,13 @@ class SedonaContext:
         self.__impl = None
         self.options = Options()
 
+    @classmethod
+    def _init_from_impl(cls, impl, options):
+        instance = cls()
+        instance.__impl = impl
+        instance.options = options
+        return instance
+
     @property
     def _impl(self):
         """Lazily initialize the internal Rust context on first use.
@@ -509,7 +516,7 @@ class SedonaContext:
             >>> sd.col("x", "t")
             Expr(t.x)
         """
-        return col_expr(name, qualifier=qualifier)
+        return col_expr(name, qualifier=qualifier, ctx=self)
 
     def lit(self, value: Any) -> LiteralExpr:
         """Create a literal (constant) expression
@@ -536,7 +543,7 @@ class SedonaContext:
         - pyproj CRS objects become PROJJSON strings (e.g., so they may be used
         in `ST_SetCRS()`, `ST_Point()`, or `ST_GeomFromWKT()`).
         """
-        return lit_expr(value)
+        return lit_expr(value, ctx=self)
 
 
 def connect() -> SedonaContext:

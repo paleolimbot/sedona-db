@@ -38,8 +38,9 @@ class Literal:
         value: An arbitrary Python object.
     """
 
-    def __init__(self, value: Any):
+    def __init__(self, value: Any, ctx=None):
         self._value = value
+        self._ctx = ctx
 
     def __arrow_c_array__(self, requested_schema=None):
         resolved_lit = _resolve_arrow_lit(self._value)
@@ -64,18 +65,20 @@ class Literal:
         """
         from sedonadb.expr.expression import _to_expr
 
-        return _to_expr(self).alias(name)
+        return _to_expr(self, self._ctx).alias(name)
 
 
-def lit(value: Any) -> Literal:
+def lit(value: Any, ctx: Any=None) -> Literal:
     """Create a literal (constant) expression
 
     See documentation in `SedonaContext`.
     """
     if isinstance(value, Literal):
+        if value._ctx is None:
+            value._ctx = ctx
         return value
     else:
-        return Literal(value)
+        return Literal(value, ctx)
 
 
 def _resolve_arrow_lit(obj: Any):

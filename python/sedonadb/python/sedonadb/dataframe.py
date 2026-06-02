@@ -238,6 +238,8 @@ class DataFrame:
             >>> df[-1]
             Expr(t.y)
         """
+        from sedonadb.context import SedonaContext
+
         # `bool` is a subclass of `int`, so guard explicitly — otherwise
         # `df[True]` would silently mean `df[1]`.
         if isinstance(key, bool):
@@ -262,8 +264,9 @@ class DataFrame:
                 "DataFrame slicing is not supported. "
                 "Use df.limit(n) or df.limit(n, offset=k)."
             )
+
         inner_expr = self._impl.qualified_column_expr(key)
-        return Expr(inner_expr)
+        return Expr(inner_expr, SedonaContext._init_from_impl(self._ctx, self._options))
 
     def __getattr__(self, name):
         """Syntactic sugar for column access

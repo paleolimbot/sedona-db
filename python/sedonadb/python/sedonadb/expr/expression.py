@@ -46,9 +46,9 @@ class Expr:
     that accept value lists (e.g. `isin`).
     """
 
-    __slots__ = ("_impl",)
+    __slots__ = ("_impl", "_ctx")
 
-    def __init__(self, impl):
+    def __init__(self, impl, ctx=None):
         # `impl` is the underlying _lib.InternalExpr handle. Users normally do
         # not construct `Expr` directly; use `col()` (or operator composition)
         # instead. Validate the type so a misuse fails clearly here rather
@@ -60,6 +60,7 @@ class Expr:
                 f"Use sedonadb.expr.col() to construct a column expression."
             )
         self._impl = impl
+        self._ctx = ctx
 
     def __repr__(self) -> str:
         return f"Expr({self._impl!r})"
@@ -76,7 +77,7 @@ class Expr:
             >>> col("x").alias("y")
             Expr(x AS y)
         """
-        return Expr(self._impl.alias(name))
+        return Expr(self._impl.alias(name), self._ctx)
 
     def cast(self, target) -> "Expr":
         """Cast the expression to the given Arrow type.
@@ -96,7 +97,7 @@ class Expr:
             >>> col("x").cast(pa.int32())
             Expr(CAST(x AS Int32))
         """
-        return Expr(self._impl.cast(target))
+        return Expr(self._impl.cast(target), self._ctx)
 
     def is_null(self) -> "Expr":
         """Return a boolean expression that is true where this expression is
@@ -112,7 +113,7 @@ class Expr:
             >>> col("x").is_null()
             Expr(x IS NULL)
         """
-        return Expr(self._impl.is_null())
+        return Expr(self._impl.is_null(), self._ctx)
 
     def is_not_null(self) -> "Expr":
         """Return a boolean expression that is true where this expression is
@@ -124,7 +125,7 @@ class Expr:
             >>> col("x").is_not_null()
             Expr(x IS NOT NULL)
         """
-        return Expr(self._impl.is_not_null())
+        return Expr(self._impl.is_not_null(), self._ctx)
 
     def isin(self, values: Iterable[Any]) -> "Expr":
         """Return a boolean expression that is true where this expression
@@ -144,7 +145,7 @@ class Expr:
             Expr(x IN ([Int64(1), Int64(2), Int64(3)]))
         """
         coerced = [_to_expr(v) for v in values]
-        return Expr(self._impl.isin([e._impl for e in coerced], False))
+        return Expr(self._impl.isin([e._impl for e in coerced], False), self._ctx)
 
     def negate(self) -> "Expr":
         """Return the arithmetic negation of this expression.
@@ -155,7 +156,7 @@ class Expr:
             >>> col("x").negate()
             Expr((- x))
         """
-        return Expr(self._impl.negate())
+        return Expr(self._impl.negate(), self._ctx)
 
     def asc(self, nulls_first: bool = False) -> "SortExpr":
         """Wrap this expression as an ascending sort key.
@@ -188,6 +189,9 @@ class Expr:
             SortExpr(x DESC NULLS LAST)
         """
         return SortExpr(self._impl.desc(nulls_first))
+
+    def _call(self, name, *args) -> "Expr":
+        return self._ctx.funcs[name](*args)
 
     # Arithmetic operators -------------------------------------------------
     #
@@ -352,7 +356,7 @@ def sort_expr(
     return SortExpr(_expr_sort_expr(expr._impl, asc, nulls_first))
 
 
-def col(name: str, qualifier: Optional[str] = None) -> Expr:
+def col(name: str, qualifier: Optional[str] = None, ctx: Any = None) -> Expr:
     """Reference a column by name.
 
     Args:
@@ -361,6 +365,7 @@ def col(name: str, qualifier: Optional[str] = None) -> Expr:
             when the same column name appears in multiple input tables of a
             join. Defaults to `None`, which leaves the column unqualified and
             lets the planner resolve against the surrounding schema.
+        ctx: A SedonaContext from which function definitions should be derived
 
     Examples:
 
@@ -370,7 +375,7 @@ def col(name: str, qualifier: Optional[str] = None) -> Expr:
         >>> col("x", "t")
         Expr(t.x)
     """
-    return Expr(_expr_col(name, qualifier))
+    return Expr(_expr_col(name, qualifier), ctx)
 
 
 class ScalarUdf:
@@ -380,18 +385,19 @@ class ScalarUdf:
     the Python expression API.
     """
 
-    def __init__(self, impl):
+    def __init__(self, impl, ctx=None):
         if type(impl).__name__ not in ("PySedonaScalarUdf", "PyScalarUdf"):
             raise TypeError(
                 "ScalarUdf must be constructed from internal scalar UDF wrapper"
             )
         self._impl = impl
+        self._ctx = ctx
 
     def __repr__(self) -> str:
         return f"ScalarUdf({self._impl!r})"
 
     def __call__(self, *args: Any) -> Expr:
-        return Expr(self._impl.call([_to_expr(arg)._impl for arg in args]))
+        return Expr(self._impl.call([_to_expr(arg)._impl for arg in args]), self._ctx)
 
 
 class AggregateUdf:
@@ -401,21 +407,22 @@ class AggregateUdf:
     the Python expression API.
     """
 
-    def __init__(self, impl):
+    def __init__(self, impl, ctx=None):
         if type(impl).__name__ not in ("PyAggregateUdf",):
             raise TypeError(
                 "AggregateUdf must be constructed from internal aggregate UDF wrapper"
             )
         self._impl = impl
+        self._ctx = ctx
 
     def __repr__(self) -> str:
         return f"AggregateUdf({self._impl!r})"
 
     def __call__(self, *args: Any) -> Expr:
-        return Expr(self._impl.call([_to_expr(arg)._impl for arg in args]))
+        return Expr(self._impl.call([_to_expr(arg)._impl for arg in args]), self._ctx)
 
 
-def _to_expr(value: Any) -> Expr:
+def _to_expr(value: Any, ctx=None) -> Expr:
     """Coerce a Python value to an `Expr`.
 
     `Expr` values pass through unchanged. Anything else is wrapped as a
@@ -428,7 +435,7 @@ def _to_expr(value: Any) -> Expr:
     if isinstance(value, Expr):
         return value
     arrow_obj = value if isinstance(value, Literal) else Literal(value)
-    return Expr(_expr_lit(arrow_obj))
+    return Expr(_expr_lit(arrow_obj), ctx)
 
 
 def _binary(op: str, lhs: Any, rhs: Any) -> Expr:
@@ -440,4 +447,5 @@ def _binary(op: str, lhs: Any, rhs: Any) -> Expr:
     """
     lhs_expr = _to_expr(lhs)
     rhs_expr = _to_expr(rhs)
-    return Expr(_expr_binary(op, lhs_expr._impl, rhs_expr._impl))
+    ctx = lhs_expr._ctx if lhs_expr._ctx is not None else rhs_expr._ctx
+    return Expr(_expr_binary(op, lhs_expr._impl, rhs_expr._impl), ctx)
