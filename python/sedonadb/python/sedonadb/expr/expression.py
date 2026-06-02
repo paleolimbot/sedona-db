@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable, Optional, TYPE_CHECKING
 
 from sedonadb._lib import (
     InternalExpr as _InternalExpr,
@@ -27,6 +27,10 @@ from sedonadb._lib import (
     expr_sort_expr as _expr_sort_expr,
 )
 from sedonadb.expr.literal import Literal
+
+
+if TYPE_CHECKING:
+    from sedonadb.functions import Functions
 
 
 class Expr:
@@ -64,6 +68,12 @@ class Expr:
 
     def __repr__(self) -> str:
         return f"Expr({self._impl!r})"
+
+    @property
+    def funcs(self) -> "Functions":
+        from sedonadb.functions import Functions
+
+        return Functions(self._ctx, self)
 
     def alias(self, name: str) -> "Expr":
         """Return a copy of the expression with a new output name.
@@ -193,7 +203,8 @@ class Expr:
     def _call(self, name, *args) -> "Expr":
         if self._ctx is None:
             raise ValueError("Can't _call() Expr constructed without a SedonaContext")
-        return self._ctx.funcs[name](*args)
+
+        return self._ctx.funcs[name](self, *args)
 
     # Arithmetic operators -------------------------------------------------
     #
@@ -387,19 +398,24 @@ class ScalarUdf:
     the Python expression API.
     """
 
-    def __init__(self, impl, ctx=None):
+    def __init__(self, impl, ctx=None, expr=None):
         if type(impl).__name__ not in ("PySedonaScalarUdf", "PyScalarUdf"):
             raise TypeError(
                 "ScalarUdf must be constructed from internal scalar UDF wrapper"
             )
         self._impl = impl
         self._ctx = ctx
+        self._expr = expr
 
     def __repr__(self) -> str:
         return f"ScalarUdf({self._impl!r})"
 
     def __call__(self, *args: Any) -> Expr:
-        return Expr(self._impl.call([_to_expr(arg)._impl for arg in args]), self._ctx)
+        args = [_to_expr(arg)._impl for arg in args]
+        if self._expr is not None:
+            args = [self._expr._impl] + args
+
+        return Expr(self._impl.call(args), self._ctx)
 
 
 class AggregateUdf:
@@ -409,19 +425,24 @@ class AggregateUdf:
     the Python expression API.
     """
 
-    def __init__(self, impl, ctx=None):
+    def __init__(self, impl, ctx=None, expr=None):
         if type(impl).__name__ not in ("PyAggregateUdf",):
             raise TypeError(
                 "AggregateUdf must be constructed from internal aggregate UDF wrapper"
             )
         self._impl = impl
         self._ctx = ctx
+        self._expr = expr
 
     def __repr__(self) -> str:
         return f"AggregateUdf({self._impl!r})"
 
     def __call__(self, *args: Any) -> Expr:
-        return Expr(self._impl.call([_to_expr(arg)._impl for arg in args]), self._ctx)
+        args = [_to_expr(arg)._impl for arg in args]
+        if self._expr is not None:
+            args = [self._expr._impl] + args
+
+        return Expr(self._impl.call(args), self._ctx)
 
 
 def _to_expr(value: Any, ctx=None) -> Expr:
