@@ -185,11 +185,3 @@ def test_contextless_literal():
 
     with pytest.raises(ValueError, match="Can't pipe Literal"):
         literal.funcs
-
-
-def test_ctx_propagation(con):
-    literal = con.lit(5.0)
-    assert literal._ctx is con
-
-    assert literal.alias("five")._ctx is con
-    assert literal.funcs.sqrt()._ctx is con

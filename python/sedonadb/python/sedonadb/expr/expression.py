@@ -454,7 +454,7 @@ class AggregateUdf:
         # the first argument
         args = [_to_expr(arg)._impl for arg in args]
         if self._expr is not None:
-            args = [self._expr._impl] + args
+            args = [_to_expr(self._expr)._impl] + args
 
         return Expr(self._impl.call(args), self._ctx)
 
@@ -470,9 +470,13 @@ def _to_expr(value: Any, ctx=None) -> Expr:
     literal-handling logic.
     """
     if isinstance(value, Expr):
+        ctx = value._ctx if value._ctx is not None else ctx
         return value
-    arrow_obj = value if isinstance(value, Literal) else Literal(value)
-    return Expr(_expr_lit(arrow_obj), ctx)
+    elif isinstance(value, Literal):
+        ctx = value._ctx if value._ctx is not None else ctx
+        return Expr(_expr_lit(value), ctx)
+    else:
+        return Expr(_expr_lit(Literal(value)), ctx)
 
 
 def _binary(op: str, lhs: Any, rhs: Any) -> Expr:
