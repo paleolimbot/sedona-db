@@ -191,6 +191,8 @@ class Expr:
         return SortExpr(self._impl.desc(nulls_first))
 
     def _call(self, name, *args) -> "Expr":
+        if self._ctx is None:
+            raise ValueError("Can't _call() Expr constructed without a SedonaContext")
         return self._ctx.funcs[name](*args)
 
     # Arithmetic operators -------------------------------------------------
