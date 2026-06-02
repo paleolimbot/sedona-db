@@ -82,6 +82,9 @@ class Expr:
         """
         from sedonadb.functions import Functions
 
+        if self._ctx is None:
+            raise ValueError("Can't pipe Expr without context into Functions")
+
         return Functions(self._ctx, self)
 
     def alias(self, name: str) -> "Expr":
@@ -208,12 +211,6 @@ class Expr:
             SortExpr(x DESC NULLS LAST)
         """
         return SortExpr(self._impl.desc(nulls_first))
-
-    def _call(self, name, *args) -> "Expr":
-        if self._ctx is None:
-            raise ValueError("Can't _call() Expr constructed without a SedonaContext")
-
-        return self._ctx.funcs[name](self, *args)
 
     # Arithmetic operators -------------------------------------------------
     #

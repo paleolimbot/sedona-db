@@ -66,6 +66,9 @@ class Literal:
         """
         from sedonadb.functions import Functions
 
+        if self._ctx is None:
+            raise ValueError("Can't pipe Literal without context into Functions")
+
         return Functions(self._ctx, self)
 
     def alias(self, name: str):

@@ -23,6 +23,7 @@ import geoarrow.pyarrow as ga
 import geopandas.testing
 
 from sedonadb.expr.literal import lit
+from sedonadb.expr.expression import Expr
 import pytest
 
 
@@ -170,3 +171,25 @@ def test_crs_literal():
     # A StringCrs
     ga_crs = ga.wkb().with_crs("EPSG:26920").crs
     assert pa.array(lit(ga_crs)) == pa.array([crs.to_json()])
+
+
+def test_literal_funcs(con):
+    literal = con.lit(5.0)
+    e = literal.funcs.sqrt()
+    assert isinstance(e, Expr)
+    assert repr(e) == "Expr(sqrt(Float64(5)))"
+
+
+def test_contextless_literal():
+    literal = lit(5.0)
+
+    with pytest.raises(ValueError, match="Can't pipe Literal"):
+        literal.funcs
+
+
+def test_ctx_propagation(con):
+    literal = con.lit(5.0)
+    assert literal._ctx is con
+
+    assert literal.alias("five")._ctx is con
+    assert literal.funcs.sqrt()._ctx is con

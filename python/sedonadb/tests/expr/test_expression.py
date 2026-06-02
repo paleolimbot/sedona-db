@@ -283,6 +283,19 @@ def test_len_raises():
         len(col("x"))
 
 
+def test_literal_funcs(con):
+    e = con.col("foofy").funcs.sqrt()
+    assert isinstance(e, Expr)
+    assert repr(e) == "Expr(sqrt(foofy))"
+
+
+def test_contextless_literal():
+    e = col("foofy")
+
+    with pytest.raises(ValueError, match="Can't pipe Expr"):
+        e.funcs
+
+
 def test_ctx_propagation(con):
     e = con.col("foofy")
     assert e._ctx is con
