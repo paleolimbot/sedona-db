@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import Any, Iterable, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Iterable, Optional
 
 from sedonadb._lib import (
     InternalExpr as _InternalExpr,
@@ -27,6 +27,7 @@ from sedonadb._lib import (
     expr_sort_expr as _expr_sort_expr,
 )
 from sedonadb.expr.literal import Literal
+from sedonadb.utility import sedona  # noqa: F401
 
 
 if TYPE_CHECKING:
@@ -71,6 +72,14 @@ class Expr:
 
     @property
     def funcs(self) -> "Functions":
+        """Pipe this expression into another SedonaDB function
+
+        Examples:
+
+            >>> sd = sedona.db.connect()
+            >>> sd.col("geom").funcs.st_envelope()
+            Expr(st_envelope(geom))
+        """
         from sedonadb.functions import Functions
 
         return Functions(self._ctx, self)
@@ -83,8 +92,8 @@ class Expr:
 
         Examples:
 
-            >>> from sedonadb.expr import col
-            >>> col("x").alias("y")
+            >>> sd = sedona.db.connect()
+            >>> sd.col("x").alias("y")
             Expr(x AS y)
         """
         return Expr(self._impl.alias(name), self._ctx)
@@ -103,8 +112,8 @@ class Expr:
         Examples:
 
             >>> import pyarrow as pa
-            >>> from sedonadb.expr import col
-            >>> col("x").cast(pa.int32())
+            >>> sd = sedona.db.connect()
+            >>> sd.col("x").cast(pa.int32())
             Expr(CAST(x AS Int32))
         """
         return Expr(self._impl.cast(target), self._ctx)
@@ -119,8 +128,8 @@ class Expr:
 
         Examples:
 
-            >>> from sedonadb.expr import col
-            >>> col("x").is_null()
+            >>> sd = sedona.db.connect()
+            >>> sd.col("x").is_null()
             Expr(x IS NULL)
         """
         return Expr(self._impl.is_null(), self._ctx)
@@ -131,8 +140,8 @@ class Expr:
 
         Examples:
 
-            >>> from sedonadb.expr import col
-            >>> col("x").is_not_null()
+            >>> sd = sedona.db.connect()
+            >>> sd.col("x").is_not_null()
             Expr(x IS NOT NULL)
         """
         return Expr(self._impl.is_not_null(), self._ctx)
@@ -150,8 +159,8 @@ class Expr:
 
         Examples:
 
-            >>> from sedonadb.expr import col
-            >>> col("x").isin([1, 2, 3])
+            >>> sd = sedona.db.connect()
+            >>> sd.col("x").isin([1, 2, 3])
             Expr(x IN ([Int64(1), Int64(2), Int64(3)]))
         """
         coerced = [_to_expr(v) for v in values]
@@ -162,8 +171,8 @@ class Expr:
 
         Examples:
 
-            >>> from sedonadb.expr import col
-            >>> col("x").negate()
+            >>> sd = sedona.db.connect()
+            >>> sd.col("x").negate()
             Expr((- x))
         """
         return Expr(self._impl.negate(), self._ctx)
@@ -182,8 +191,8 @@ class Expr:
 
         Examples:
 
-            >>> from sedonadb.expr import col
-            >>> col("x").asc()
+            >>> sd = sedona.db.connect()
+            >>> sd.col("x").asc()
             SortExpr(x ASC NULLS LAST)
         """
         return SortExpr(self._impl.asc(nulls_first))
@@ -194,8 +203,8 @@ class Expr:
 
         Examples:
 
-            >>> from sedonadb.expr import col
-            >>> col("x").desc()
+            >>> sd = sedona.db.connect()
+            >>> sd.col("x").desc()
             SortExpr(x DESC NULLS LAST)
         """
         return SortExpr(self._impl.desc(nulls_first))
@@ -355,10 +364,11 @@ def sort_expr(
 
     Examples:
 
-        >>> from sedonadb.expr import col, sort_expr
-        >>> sort_expr(col("x"))
+        >>> from sedonadb.expr import sort_expr
+        >>> sd = sedona.db.connect()
+        >>> sort_expr(sd.col("x"))
         SortExpr(x ASC NULLS LAST)
-        >>> sort_expr(col("x"), asc=False, nulls_first=True)
+        >>> sort_expr(sd.col("x"), asc=False, nulls_first=True)
         SortExpr(x DESC NULLS FIRST)
     """
     if not isinstance(expr, Expr):
@@ -371,6 +381,9 @@ def sort_expr(
 
 def col(name: str, qualifier: Optional[str] = None, ctx: Any = None) -> Expr:
     """Reference a column by name.
+
+    This is typically constructed using `sd.col()`, which provides the
+    associated context automatically.
 
     Args:
         name: The column name to reference.
@@ -411,9 +424,11 @@ class ScalarUdf:
         return f"ScalarUdf({self._impl!r})"
 
     def __call__(self, *args: Any) -> Expr:
+        # When generated from a piped Functions, self._expr should be
+        # the first argument
         args = [_to_expr(arg)._impl for arg in args]
         if self._expr is not None:
-            args = [self._expr._impl] + args
+            args = [_to_expr(self._expr)._impl] + args
 
         return Expr(self._impl.call(args), self._ctx)
 
@@ -438,6 +453,8 @@ class AggregateUdf:
         return f"AggregateUdf({self._impl!r})"
 
     def __call__(self, *args: Any) -> Expr:
+        # When generated from a piped Functions, self._expr should be
+        # the first argument
         args = [_to_expr(arg)._impl for arg in args]
         if self._expr is not None:
             args = [self._expr._impl] + args

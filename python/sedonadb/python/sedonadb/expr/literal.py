@@ -15,7 +15,12 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+from sedonadb.utility import sedona  # noqa: F401
+
+if TYPE_CHECKING:
+    from sedonadb.functions import Functions
 
 
 class Literal:
@@ -49,6 +54,20 @@ class Literal:
     def __repr__(self):
         return f"<Literal>\n{repr(self._value)}"
 
+    @property
+    def funcs(self) -> "Functions":
+        """Pipe this expression into another SedonaDB function
+
+        Examples:
+
+            >>> sd = sedona.db.connect()
+            >>> sd.lit(5.0).funcs.sqrt()
+            Expr(sqrt(Float64(5)))
+        """
+        from sedonadb.functions import Functions
+
+        return Functions(self._ctx, self)
+
     def alias(self, name: str):
         """Give this literal a column name.
 
@@ -68,7 +87,7 @@ class Literal:
         return _to_expr(self, self._ctx).alias(name)
 
 
-def lit(value: Any, ctx: Any=None) -> Literal:
+def lit(value: Any, ctx: Any = None) -> Literal:
     """Create a literal (constant) expression
 
     See documentation in `SedonaContext`.
@@ -149,8 +168,8 @@ def _lit_from_shapely(obj):
 
 
 def _lit_from_wkb_and_crs(wkb, crs):
-    import pyarrow as pa
     import geoarrow.pyarrow as ga
+    import pyarrow as pa
 
     type = ga.wkb().with_crs(crs)
     storage = pa.array([wkb], type.storage_type)

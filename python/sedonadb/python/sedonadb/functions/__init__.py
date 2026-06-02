@@ -53,7 +53,9 @@ class Functions:
             pass
 
         try:
-            return AggregateUdf(self._ctx._impl.aggregate_udf(name), self._ctx, self._expr)
+            return AggregateUdf(
+                self._ctx._impl.aggregate_udf(name), self._ctx, self._expr
+            )
         except SedonaError:
             pass
 
