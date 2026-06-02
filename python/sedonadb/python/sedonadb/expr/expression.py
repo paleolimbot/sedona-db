@@ -288,7 +288,7 @@ class Expr:
         return _binary("|", other, self)
 
     def __invert__(self) -> "Expr":
-        return Expr(_expr_not(self._impl))
+        return Expr(_expr_not(self._impl), self._ctx)
 
     # Defining `__eq__` makes the class unhashable by default. Be explicit
     # so users see a clear error instead of a confusing one. Expressions are
