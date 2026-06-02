@@ -44,12 +44,12 @@ class Functions:
 
     def __getattr__(self, name) -> Union["ScalarUdf", "AggregateUdf"]:
         try:
-            return ScalarUdf(self._ctx._impl.scalar_udf(name))
+            return ScalarUdf(self._ctx._impl.scalar_udf(name), self._ctx)
         except SedonaError:
             pass
 
         try:
-            return AggregateUdf(self._ctx._impl.aggregate_udf(name))
+            return AggregateUdf(self._ctx._impl.aggregate_udf(name), self._ctx)
         except SedonaError:
             pass
 
