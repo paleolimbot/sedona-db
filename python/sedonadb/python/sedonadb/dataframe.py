@@ -142,10 +142,9 @@ class DataFrame:
         └────────────┘
     """
 
-    def __init__(self, ctx, impl, options):
+    def __init__(self, ctx, impl):
         self._ctx = ctx
         self._impl = impl
-        self._options = options
 
     @property
     def schema(self):
@@ -199,11 +198,7 @@ class DataFrame:
         references in join expressions. This is the equivalent of aliasing a subquery
         in SQL (`(SELECT * FROM df) AS name`).
         """
-        return DataFrame(
-            self._ctx,
-            self._impl.alias(name),
-            self._options,
-        )
+        return DataFrame(self._ctx, self._impl.alias(name))
 
     def __getitem__(self, key: Union[str, int]) -> Expr:
         """Reference a single column by name or position.
@@ -238,8 +233,6 @@ class DataFrame:
             >>> df[-1]
             Expr(t.y)
         """
-        from sedonadb.context import SedonaContext
-
         # `bool` is a subclass of `int`, so guard explicitly — otherwise
         # `df[True]` would silently mean `df[1]`.
         if isinstance(key, bool):
@@ -266,7 +259,7 @@ class DataFrame:
             )
 
         inner_expr = self._impl.qualified_column_expr(key)
-        return Expr(inner_expr, SedonaContext._init_from_impl(self._ctx, self._options))
+        return Expr(inner_expr, self._ctx)
 
     def __getattr__(self, name):
         """Syntactic sugar for column access
@@ -375,7 +368,7 @@ class DataFrame:
                     f"got {type(e).__name__} for '{name}'"
                 )
 
-        return DataFrame(self._ctx, self._impl.select(coerced), self._options)
+        return DataFrame(self._ctx, self._impl.select(coerced))
 
     def filter(self, *exprs: Expr) -> "DataFrame":
         """Filter rows by one or more boolean expressions.
@@ -428,7 +421,6 @@ class DataFrame:
         return DataFrame(
             self._ctx,
             self._impl.filter([e._impl for e in exprs]),
-            self._options,
         )
 
     def sort(self, *keys: Union[str, Expr, SortExpr]) -> "DataFrame":
@@ -495,7 +487,7 @@ class DataFrame:
                     f"got {type(k).__name__}"
                 )
 
-        return DataFrame(self._ctx, self._impl.sort(coerced), self._options)
+        return DataFrame(self._ctx, self._impl.sort(coerced))
 
     def drop(self, *cols: str) -> "DataFrame":
         """Drop the named columns.
@@ -540,7 +532,7 @@ class DataFrame:
                 f"Column(s) {unknown} not found. Available columns: {columns}"
             )
 
-        return DataFrame(self._ctx, self._impl.drop_columns(list(cols)), self._options)
+        return DataFrame(self._ctx, self._impl.drop_columns(list(cols)))
 
     def agg(self, *exprs: Expr, **named_exprs: Expr) -> "DataFrame":
         """Aggregate the entire DataFrame to a single row.
@@ -596,7 +588,6 @@ class DataFrame:
         return DataFrame(
             self._ctx,
             self._impl.aggregate([], [e._impl for e in all_exprs]),
-            self._options,
         )
 
     def group_by(self, *keys: Union[str, Expr]) -> "GroupedDataFrame":
@@ -673,7 +664,7 @@ class DataFrame:
             └───────┘
 
         """
-        return DataFrame(self._ctx, self._impl.limit(n, offset), self._options)
+        return DataFrame(self._ctx, self._impl.limit(n, offset))
 
     def execute(self) -> None:
         """Execute the plan represented by this DataFrame
@@ -754,7 +745,6 @@ class DataFrame:
         return DataFrame(
             self._ctx,
             self._impl.with_params(positional_params, named_params),
-            self._options,
         )
 
     def __arrow_c_schema__(self):
@@ -840,7 +830,7 @@ class DataFrame:
             └────────────┘
 
         """
-        self._impl.to_view(self._ctx, name, overwrite)
+        self._impl.to_view(self._ctx._impl, name, overwrite)
 
     def to_memtable(self) -> "DataFrame":
         """Collect a data frame into a memtable
@@ -863,7 +853,7 @@ class DataFrame:
             └────────────┘
 
         """
-        return DataFrame(self._ctx, self._impl.to_memtable(self._ctx), self._options)
+        return DataFrame(self._ctx, self._impl.to_memtable(self._ctx._impl))
 
     def __datafusion_table_provider__(self):
         return self._impl.__datafusion_table_provider__()
@@ -1037,7 +1027,7 @@ class DataFrame:
             sort_by = []
 
         self._impl.to_parquet(
-            self._ctx,
+            self._ctx._impl,
             str(path),
             options,
             partition_by,
@@ -1119,7 +1109,7 @@ class DataFrame:
 
         # GDAL does not support newer Arrow types like string views util 3.14, so we export a
         # reader with simpler types here
-        self_simplified = self._impl.to_stream(self._ctx, simplify=True)
+        self_simplified = self._impl.to_stream(self._ctx._impl, simplify=True)
 
         # Writer: pyogrio.write_arrow() via Cython ogr_write_arrow()
         # https://github.com/geopandas/pyogrio/blob/3b2d40273b501c10ecf46cbd37c6e555754c89af/pyogrio/raw.py#L755-L897
@@ -1167,7 +1157,7 @@ class DataFrame:
 
         """
         width = self._out_width(width)
-        print(self._impl.show(self._ctx, limit, width, ascii), end="")
+        print(self._impl.show(self._ctx._impl, limit, width, ascii), end="")
 
     def explain(
         self,
@@ -1210,23 +1200,21 @@ class DataFrame:
             │               ┆                                 │
             └───────────────┴─────────────────────────────────┘
         """
-        return DataFrame(self._ctx, self._impl.explain(type, format), self._options)
+        return DataFrame(self._ctx, self._impl.explain(type, format))
 
     def __repr__(self) -> str:
-        if self._options.interactive:
+        if self._ctx.options.interactive:
             width = self._out_width()
-            return self._impl.show(self._ctx, 10, width, ascii=False).strip()
+            return self._impl.show(self._ctx._impl, 10, width, ascii=False).strip()
         else:
             return super().__repr__()
 
     def _simplify_storage_types(self):
-        return DataFrame(
-            self._ctx, self._impl.simplify_storage_types(self._ctx), self._options
-        )
+        return DataFrame(self._ctx, self._impl.simplify_storage_types(self._ctx._impl))
 
     def _out_width(self, width=None) -> int:
         if width is None:
-            width = self._options.width
+            width = self._ctx.options.width
 
         if width is None:
             import shutil
@@ -1236,7 +1224,7 @@ class DataFrame:
         return width
 
 
-def _create_data_frame(ctx_impl, obj, schema, options) -> DataFrame:
+def _create_data_frame(ctx, obj, schema) -> DataFrame:
     """Create a DataFrame (internal)
 
     This is defined here because we need it in future dataframe methods like
@@ -1246,7 +1234,7 @@ def _create_data_frame(ctx_impl, obj, schema, options) -> DataFrame:
     # If we're dealing with an anonymous data frame on the same context,
     # just return it. Otherwise, fall back to the default interpretation
     # (which uses __datafusion_table_provider__).
-    if isinstance(obj, DataFrame) and obj._ctx is ctx_impl and schema is None:
+    if isinstance(obj, DataFrame) and obj._ctx is ctx and schema is None:
         return obj
 
     # We special case a few object types where collecting the __arrow_c_stream__
@@ -1255,22 +1243,22 @@ def _create_data_frame(ctx_impl, obj, schema, options) -> DataFrame:
     # This includes geopandas/pandas DataFrames, pyarrow tables, and Polars tables.
     type_name = _qualified_type_name(obj)
     if type_name in SPECIAL_CASED_SCANS:
-        return SPECIAL_CASED_SCANS[type_name](ctx_impl, obj, schema, options)
+        return SPECIAL_CASED_SCANS[type_name](ctx, obj, schema)
 
     # The default implementation handles objects that implement
     # __datafusion_table_provider__ or __arrow_c_stream__. For objects implementing
     # __arrow_c_stream__, this currently will only work for a single scan (i.e.,
     # the returned data frame can't be previewed before the query is computed).
-    return _scan_default(ctx_impl, obj, schema, options)
+    return _scan_default(ctx, obj, schema)
 
 
-def _scan_default(ctx_impl, obj, schema, options):
-    impl = ctx_impl.create_data_frame(obj, schema)
-    return DataFrame(ctx_impl, impl, options)
+def _scan_default(ctx, obj, schema):
+    impl = ctx._impl.create_data_frame(obj, schema)
+    return DataFrame(ctx, impl)
 
 
-def _scan_collected_default(ctx_impl, obj, schema, options):
-    return _scan_default(ctx_impl, obj, schema, options).to_memtable()
+def _scan_collected_default(ctx, obj, schema):
+    return _scan_default(ctx, obj, schema).to_memtable()
 
 
 class GroupedDataFrame:
@@ -1320,14 +1308,11 @@ class GroupedDataFrame:
                 [g._impl for g in self._group_exprs],
                 [e._impl for e in all_exprs],
             ),
-            self._df._options,
         )
 
 
-def _scan_geopandas(ctx_impl, obj, schema, options):
-    return _scan_collected_default(
-        ctx_impl, obj.to_arrow(geometry_encoding="WKB"), schema, options
-    )
+def _scan_geopandas(ctx, obj, schema):
+    return _scan_collected_default(ctx, obj.to_arrow(geometry_encoding="WKB"), schema)
 
 
 def _qualified_type_name(obj):
