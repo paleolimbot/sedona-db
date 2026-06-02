@@ -18,6 +18,7 @@
 import pytest
 
 from sedonadb.expr.expression import AggregateUdf, ScalarUdf
+from sedonadb.functions import Functions
 
 
 def test_random_geometry(con):
@@ -28,6 +29,27 @@ def test_random_geometry(con):
 
     # Ensure the output is reproducible
     assert df.to_arrow_table() == df.to_arrow_table()
+
+
+def test_ctx_expr_propagation(con):
+    e = con.col("foofy")
+    funcs_expr = Functions(con, expr=e)
+
+    scalar_func = funcs_expr["st_area"]
+    assert scalar_func._ctx is con
+    assert scalar_func._expr is e
+
+    scalar_func_call = scalar_func()
+    assert scalar_func_call._ctx is con
+    assert repr(scalar_func_call) == "Expr(st_area(foofy))"
+
+    aggregate_func = funcs_expr["sum"]
+    assert aggregate_func._ctx is con
+    assert aggregate_func._expr is e
+
+    aggregate_func_call = aggregate_func()
+    assert aggregate_func_call._ctx is con
+    assert repr(aggregate_func_call) == "Expr(sum(foofy))"
 
 
 def test_funcs_dir(con):
