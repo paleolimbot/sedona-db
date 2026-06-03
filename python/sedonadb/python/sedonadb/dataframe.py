@@ -768,7 +768,7 @@ class DataFrame:
         Args:
             requested_schema: A PyCapsule representing the desired output schema.
         """
-        return self._impl.to_stream(self._ctx, simplify=False).__arrow_c_stream__(
+        return self._impl.to_stream(self._ctx._impl, simplify=False).__arrow_c_stream__(
             requested_schema=requested_schema
         )
 
@@ -800,7 +800,7 @@ class DataFrame:
         import pyarrow as pa
 
         return pa.RecordBatchReader.from_stream(
-            self._impl.to_stream(self._ctx, simplify=simplify)
+            self._impl.to_stream(self._ctx._impl, simplify=simplify)
         )
 
     def arrow(self, *, simplify: bool = False) -> "pa.RecordBatchReader":
