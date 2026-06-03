@@ -96,9 +96,12 @@ def lit(value: Any, ctx: Any = None) -> Literal:
     See documentation in `SedonaContext`.
     """
     if isinstance(value, Literal):
-        if value._ctx is None:
-            value._ctx = ctx
-        return value
+        if ctx is not None:
+            # Create a new literal with the assigned context
+            return Literal(value._value, ctx)
+        else:
+            # Otherwise just return the existing literal
+            return value
     else:
         return Literal(value, ctx)
 
