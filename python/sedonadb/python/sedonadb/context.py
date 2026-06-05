@@ -87,6 +87,13 @@ class SedonaContext:
         self.__impl = None
         self.options = Options()
 
+    @classmethod
+    def _init_from_impl(cls, impl, options):
+        instance = cls()
+        instance.__impl = impl
+        instance.options = options
+        return instance
+
     @property
     def _impl(self):
         """Lazily initialize the internal Rust context on first use.
@@ -145,7 +152,7 @@ class SedonaContext:
             │     1 │
             └───────┘
         """
-        return _create_data_frame(self._impl, obj, schema, self.options)
+        return _create_data_frame(self, obj, schema)
 
     def view(self, name: str) -> DataFrame:
         """Create a [DataFrame][sedonadb.dataframe.DataFrame] from a named view
@@ -169,7 +176,7 @@ class SedonaContext:
             >>> sd.drop_view("foofy")
 
         """
-        return DataFrame(self._impl, self._impl.view(name), self.options)
+        return DataFrame(self, self._impl.view(name))
 
     def drop_view(self, name: str) -> None:
         """Remove a named view
@@ -271,11 +278,10 @@ class SedonaContext:
             geometry_columns = json.dumps(geometry_columns)
 
         return DataFrame(
-            self._impl,
+            self,
             self._impl.read_parquet(
                 [str(path) for path in table_paths], options, geometry_columns, validate
             ),
-            self.options,
         )
 
     def read_pyogrio(
@@ -344,11 +350,10 @@ class SedonaContext:
             spec = spec.with_options(options)
 
         return DataFrame(
-            self._impl,
+            self,
             self._impl.read_external_format(
                 spec, [str(path) for path in table_paths], False
             ),
-            self.options,
         )
 
     def read_format(
@@ -388,11 +393,10 @@ class SedonaContext:
             table_paths = [table_paths]
 
         return DataFrame(
-            self._impl,
+            self,
             self._impl.read_external_format(
                 spec, [str(path) for path in table_paths], check_extension
             ),
-            self.options,
         )
 
     def sql(
@@ -438,7 +442,7 @@ class SedonaContext:
             └────────────┘
 
         """
-        df = DataFrame(self._impl, self._impl.sql(sql), self.options)
+        df = DataFrame(self, self._impl.sql(sql))
 
         if params is not None:
             if isinstance(params, (tuple, list)):
@@ -509,7 +513,7 @@ class SedonaContext:
             >>> sd.col("x", "t")
             Expr(t.x)
         """
-        return col_expr(name, qualifier=qualifier)
+        return col_expr(name, qualifier=qualifier, ctx=self)
 
     def lit(self, value: Any) -> LiteralExpr:
         """Create a literal (constant) expression
@@ -536,7 +540,7 @@ class SedonaContext:
         - pyproj CRS objects become PROJJSON strings (e.g., so they may be used
         in `ST_SetCRS()`, `ST_Point()`, or `ST_GeomFromWKT()`).
         """
-        return lit_expr(value)
+        return lit_expr(value, ctx=self)
 
 
 def connect() -> SedonaContext:
