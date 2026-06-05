@@ -55,7 +55,7 @@ use crate::source_uri::build_chunk_anchor;
 /// formatting.
 ///
 /// Rows always emit OutDb-style: `data` is empty, `outdb_uri` carries
-/// a chunk anchor that the async OutDb resolver (registered separately)
+/// a chunk anchor that the async raster byte loader (registered separately)
 /// resolves to bytes on demand.
 pub struct ZarrChunkReader {
     schema: SchemaRef,
@@ -172,7 +172,7 @@ impl ZarrChunkReader {
             // Every band gets its chunk-anchor URI populated as
             // provenance metadata. `data.is_empty()` is the InDb/OutDb
             // discriminator; this reader always emits empty `data` and
-            // defers pixel-byte resolution to the OutDb resolver.
+            // defers pixel-byte resolution to the raster byte loader.
             let anchor = build_chunk_anchor(&self.group_uri, &info.path, &self.chunk_indices);
             builder.start_band_nd(
                 Some(info.path.as_str()),
@@ -706,12 +706,10 @@ fn advance_chunk_indices(chunk_indices: &mut [u64], chunk_grid_shape: &[u64]) ->
 /// types — those don't have a `BandDataType` counterpart anyway, so the
 /// dtype check in `collect_array_infos` rejects them upstream.
 ///
-/// This is the only pixel-byte read primitive in the crate. The loader
-/// itself never calls it today — it always emits OutDb anchors — but
-/// the async `RS_EnsureLoaded` resolver (follow-up PR) will. Lives
-/// behind `#[cfg(test)]` until the resolver lands; the unit test below
-/// exercises it so the implementation doesn't bit-rot in the
-/// meantime.
+/// The sync chunk-decode path, exercised by the unit test below against a
+/// filesystem fixture. The production byte loader (`raster_loader::ZarrLoader`)
+/// reads over async object_store storage and so retrieves chunks directly
+/// via `Array::async_retrieve_chunk` rather than through this helper.
 #[cfg(test)]
 fn retrieve_chunk_bytes<S>(array: &Array<S>, chunk_indices: &[u64]) -> Result<Vec<u8>, ArrowError>
 where

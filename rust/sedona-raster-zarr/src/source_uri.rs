@@ -46,12 +46,8 @@ use url::Url;
 use zarrs::storage::AsyncReadableListableStorage;
 use zarrs_object_store::AsyncObjectStore;
 
-/// Parts of a chunk-anchor URI.
-///
-/// `#[cfg(test)]`: no production consumer yet. The async byte
-/// resolver (separate follow-up) will parse `outdb_uri` values back
-/// into this struct.
-#[cfg(test)]
+/// Parts of a chunk-anchor URI. The async raster byte loader parses
+/// `outdb_uri` values back into this struct.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChunkAnchor {
     pub store_uri: String,
@@ -80,10 +76,6 @@ pub fn build_chunk_anchor(store_uri: &str, array_path: &str, chunk_indices: &[u6
 ///
 /// Strict: rejects URIs that don't carry both `array=` and `chunk=`
 /// fragment parameters with valid values.
-///
-/// `#[cfg(test)]`: pairs with [`ChunkAnchor`]; resurrected when the
-/// async byte resolver lands.
-#[cfg(test)]
 pub fn parse_chunk_anchor(uri: &str) -> Result<ChunkAnchor, ArrowError> {
     let (store_uri, fragment) = uri.split_once('#').ok_or_else(|| {
         ArrowError::InvalidArgumentError(format!(
@@ -157,6 +149,59 @@ pub fn parse_chunk_anchor(uri: &str) -> Result<ChunkAnchor, ArrowError> {
 ///
 /// Returns storage rooted at the group: callers invoke
 /// `Group::async_open(storage, "/").await`.
+/// Build an `Arc<dyn ObjectStore>` for `uri` using env-var credential
+/// discovery, per scheme: `file://` / bare paths → `LocalFileSystem`,
+/// `s3://` → `AmazonS3Builder`, `http(s)://` → `HttpBuilder`.
+///
+/// This is the in-process bridge that lets the byte loader (and the Python
+/// reader shim) resolve a store from a URI when no host-provided store is
+/// available. It is **temporary**: once a credentialed `ObjectStore` can be
+/// passed in from DataFusion's `ObjectStoreRegistry` (the obstore FFI; see
+/// the loader-FFI follow-up), callers receive the store instead of building
+/// it here, and this function — with the `object_store` `aws`/`http`
+/// features behind it — goes away.
+pub fn object_store_for_uri(uri: &str) -> Result<Arc<dyn ObjectStore>, ArrowError> {
+    // file:// and bare paths use a LocalFileSystem rooted at `/`;
+    // open_storage_from_uri prefixes it at the group's path.
+    if uri.starts_with("file://") || !uri.contains("://") {
+        return Ok(Arc::new(object_store::local::LocalFileSystem::new()));
+    }
+    let url = Url::parse(uri).map_err(|e| {
+        ArrowError::InvalidArgumentError(format!("group URI {uri:?} is not a valid URL: {e}"))
+    })?;
+    let build_err = |backend: &str, e: object_store::Error| {
+        ArrowError::ExternalError(Box::new(sedona_common::sedona_internal_datafusion_err!(
+            "failed to build {backend} object_store for {uri}: {e}. Provide credentials via \
+             standard environment variables (e.g. AWS_ACCESS_KEY_ID/AWS_REGION for s3)."
+        )))
+    };
+    match url.scheme().to_ascii_lowercase().as_str() {
+        "s3" => {
+            use object_store::aws::AmazonS3Builder;
+            let store = AmazonS3Builder::from_env()
+                .with_url(uri)
+                .build()
+                .map_err(|e| build_err("s3", e))?;
+            Ok(Arc::new(store))
+        }
+        "http" | "https" => {
+            use object_store::http::HttpBuilder;
+            // open_storage_from_uri applies the path as a PrefixStore, so the
+            // HttpStore must be rooted at scheme+authority only — unlike S3,
+            // HttpBuilder roots at whatever URL it's given.
+            let authority = format!("{}://{}", url.scheme(), url.authority());
+            let store = HttpBuilder::new()
+                .with_url(authority)
+                .build()
+                .map_err(|e| build_err("http", e))?;
+            Ok(Arc::new(store))
+        }
+        other => Err(ArrowError::NotYetImplemented(format!(
+            "unsupported Zarr URI scheme {other:?}; expected one of: file, s3, http, https"
+        ))),
+    }
+}
+
 pub fn open_storage_from_uri(
     uri: &str,
     store: Arc<dyn ObjectStore>,

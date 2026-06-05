@@ -16,7 +16,7 @@
 // under the License.
 use std::{
     collections::{HashMap, VecDeque},
-    sync::Arc,
+    sync::{Arc, RwLock},
 };
 
 use crate::exec::create_plan_from_sql;
@@ -64,12 +64,15 @@ use sedona_pointcloud::las::{
     format::{Extension, LasFormatFactory},
     options::{GeometryEncoding, LasExtraBytes, LasOptions},
 };
+use sedona_raster_functions::rs_ensure_loaded::RsEnsureLoaded;
 #[cfg(feature = "gpu")]
 use sedona_spatial_join_gpu::options::GpuOptions;
 
 use sedona_query_planner::{
-    optimizer::register_spatial_join_logical_optimizer, query_planner::SedonaQueryPlanner,
+    optimizer::{register_ensure_loaded_optimizer, register_spatial_join_logical_optimizer},
+    query_planner::SedonaQueryPlanner,
 };
+use sedona_raster::raster_loader::{AsyncRasterLoader, RasterLoaderConfig, RasterLoaderRegistry};
 
 /// Sedona SessionContext wrapper
 ///
@@ -80,6 +83,12 @@ use sedona_query_planner::{
 pub struct SedonaContext {
     pub ctx: SessionContext,
     pub functions: FunctionSet,
+    /// Per-session registry of async raster byte loaders, keyed by
+    /// `outdb_format`. Held behind an `Arc<RwLock<…>>` so the registered
+    /// `RS_EnsureLoaded` UDF instance and any extension crates' `register(&ctx)`
+    /// entry points observe the same map. See
+    /// [`SedonaContext::register_raster_loader`].
+    raster_loader_registry: Arc<RwLock<RasterLoaderRegistry>>,
 }
 
 impl SedonaContext {
@@ -186,6 +195,7 @@ impl SedonaContext {
         }
 
         state_builder = register_spatial_join_logical_optimizer(state_builder)?;
+        state_builder = register_ensure_loaded_optimizer(state_builder)?;
         state_builder = state_builder.with_query_planner(Arc::new(planner));
 
         let mut state = state_builder.build();
@@ -225,7 +235,52 @@ impl SedonaContext {
         let mut out = Self {
             ctx,
             functions: FunctionSet::new(),
+            raster_loader_registry: Arc::new(RwLock::new(RasterLoaderRegistry::new())),
         };
+
+        // Stash a clone of the shared registry handle inside
+        // `ConfigOptions` via the `RasterLoaderConfig` extension. The
+        // RS_EnsureLoaded async UDF reads from there at dispatch time —
+        // `AsyncScalarUDFImpl::invoke_async_with_args` only receives
+        // `Arc<ConfigOptions>`, so this is the path that keeps the
+        // registry reachable at the UDF's invocation site. Mirrors how
+        // `CrsProviderOption` works inside `SedonaOptions`.
+        //
+        // Writes through `SedonaContext::register_raster_loader` (which
+        // mutates the Arc held in `out.raster_loader_registry`) are immediately
+        // visible to UDF reads through this config extension because
+        // both handles share the same `RwLock`.
+        out.ctx
+            .state_ref()
+            .write()
+            .config_mut()
+            .options_mut()
+            .extensions
+            .insert(RasterLoaderConfig::from_handle(Arc::clone(
+                &out.raster_loader_registry,
+            )));
+
+        // Register the RS_EnsureLoaded async UDF. It pulls the registry
+        // out of `args.config_options` at dispatch time, so it doesn't
+        // need to close over the Arc itself — the UDF instance is
+        // session-agnostic. The logical optimizer rule registered above
+        // (`register_ensure_loaded_optimizer`) resolves this UDF from the
+        // function registry at rewrite time, so it must be registered
+        // before any query is planned.
+        {
+            use datafusion_expr::async_udf::AsyncScalarUDF;
+            let udf = AsyncScalarUDF::new(Arc::new(RsEnsureLoaded::new()));
+            out.ctx.register_udf(udf.into_scalar_udf());
+        };
+
+        // Register the GDAL raster byte loader. `sedona-raster-gdal` is a
+        // mandatory dep on `sedona`, but libgdal itself is dlopen'd
+        // lazily by `sedona-gdal` (workspace-default-features = false),
+        // so this registration is safe on systems without libgdal —
+        // the loader's `load()` call will surface a clean "libgdal not
+        // found" error when first invoked, but registration and import
+        // succeed regardless.
+        out.register_raster_loader(Arc::new(sedona_raster_gdal::GdalLoader::new()));
 
         // Register table functions
         out.ctx.register_udtf(
@@ -287,6 +342,28 @@ impl SedonaContext {
         )?;
 
         Ok(())
+    }
+
+    /// Register an async raster byte loader under a `format` key.
+    ///
+    /// Each loader declares the band `outdb_format` values it handles via
+    /// `AsyncRasterLoader::supports_format`. At query time the
+    /// `RS_EnsureLoaded` UDF matches each OutDb band's format against the
+    /// registered loaders (most-recently-registered first) and dispatches
+    /// the byte fetch through the first that accepts it.
+    ///
+    /// Used by both compiled-in backends (`sedona-raster-gdal`, the catch-all,
+    /// registered first at bootstrap) and out-of-tree extensions
+    /// (`sedona-raster-zarr::register(&ctx)` from user code after
+    /// construction). Loaders registered later win for the formats they
+    /// claim, so registration order matters: the catch-all goes first.
+    pub fn register_raster_loader(&self, loader: Arc<dyn AsyncRasterLoader>) {
+        // Lock poisoning here would mean a previous registrant panicked
+        // mid-write — recover-by-ignoring matches how DataFusion handles
+        // session-state writes elsewhere.
+        if let Ok(mut guard) = self.raster_loader_registry.write() {
+            guard.register(loader);
+        }
     }
 
     /// Register all functions in a [FunctionSet] with this context
@@ -650,6 +727,70 @@ mod tests {
     use tempfile::tempdir;
 
     use super::*;
+
+    #[tokio::test]
+    async fn outdb_registry_has_gdal_at_bootstrap_and_accepts_runtime_registration() {
+        use arrow_buffer::Buffer;
+        use sedona_raster::raster_loader::{
+            AsyncRasterLoader, RasterLoadRequest, RasterLoadResult,
+        };
+
+        let ctx = SedonaContext::new();
+        // GDAL is the catch-all backend, registered at bootstrap: it resolves
+        // any format, including the unset `None` that RS_FromPath emits.
+        // Extension backends like Zarr add themselves later via
+        // `register_raster_loader`.
+        {
+            let reg = ctx.raster_loader_registry.read().unwrap();
+            let loader = reg
+                .get(None)
+                .expect("fresh SedonaContext should register the GDAL backend at bootstrap");
+            assert_eq!(loader.name(), "gdal");
+        }
+
+        // Mock runtime registration on top of the bootstrap state.
+        #[derive(Debug)]
+        struct MockLoader;
+        #[async_trait]
+        impl AsyncRasterLoader for MockLoader {
+            fn name(&self) -> &str {
+                "mock"
+            }
+            fn supports_format(&self, format: Option<&str>) -> bool {
+                format == Some("mock")
+            }
+            async fn load(
+                &self,
+                req: &RasterLoadRequest<'_>,
+            ) -> std::result::Result<RasterLoadResult, arrow_schema::ArrowError> {
+                Ok(RasterLoadResult::unresolved(
+                    Buffer::from_vec(Vec::<u8>::new()),
+                    req,
+                ))
+            }
+        }
+        ctx.register_raster_loader(Arc::new(MockLoader));
+        {
+            let reg = ctx.raster_loader_registry.read().unwrap();
+            // The mock wins for its own format (most-recently-registered)...
+            assert_eq!(reg.get(Some("mock")).unwrap().name(), "mock");
+            // ...while everything else, including the unset `None`, still
+            // falls through to the GDAL catch-all.
+            assert_eq!(reg.get(None).unwrap().name(), "gdal");
+        }
+
+        // RS_EnsureLoaded is registered as a UDF at session bootstrap.
+        let udf = ctx
+            .ctx
+            .state()
+            .scalar_functions()
+            .get("rs_ensureloaded")
+            .cloned();
+        assert!(
+            udf.is_some(),
+            "RS_EnsureLoaded should be registered by SedonaContext::new()"
+        );
+    }
 
     #[tokio::test]
     async fn basic_sql() -> Result<()> {

@@ -5644,6 +5644,7 @@ name = "sedona"
 version = "0.4.0"
 dependencies = [
  "arrow-array",
+ "arrow-buffer",
  "arrow-schema",
  "async-trait",
  "aws-config",
@@ -5653,6 +5654,7 @@ dependencies = [
  "datafusion-common",
  "datafusion-expr",
  "datafusion-ffi",
+ "datafusion-optimizer",
  "dirs",
  "futures",
  "geo-traits",
@@ -5673,6 +5675,7 @@ dependencies = [
  "sedona-pointcloud",
  "sedona-proj",
  "sedona-query-planner",
+ "sedona-raster",
  "sedona-raster-functions",
  "sedona-raster-gdal",
  "sedona-s2geography",
@@ -6108,10 +6111,12 @@ dependencies = [
  "arrow-buffer",
  "arrow-ipc",
  "arrow-schema",
+ "async-trait",
  "datafusion-common",
  "sedona-common",
  "sedona-schema",
  "sedona-testing",
+ "tokio",
 ]
 
 [[package]]
@@ -6121,6 +6126,7 @@ dependencies = [
  "arrow-array",
  "arrow-buffer",
  "arrow-schema",
+ "async-trait",
  "criterion",
  "datafusion-common",
  "datafusion-expr",
@@ -6135,6 +6141,7 @@ dependencies = [
  "sedona-testing",
  "sedona-tg",
  "serde_json",
+ "tokio",
  "wkb",
 ]
 
@@ -6145,6 +6152,7 @@ dependencies = [
  "arrow-array",
  "arrow-buffer",
  "arrow-schema",
+ "async-trait",
  "criterion",
  "datafusion-common",
  "datafusion-expr",
@@ -6165,7 +6173,9 @@ name = "sedona-raster-zarr"
 version = "0.4.0"
 dependencies = [
  "arrow-array",
+ "arrow-buffer",
  "arrow-schema",
+ "async-trait",
  "datafusion-common",
  "futures",
  "log",
