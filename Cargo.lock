@@ -5790,6 +5790,7 @@ dependencies = [
  "sedona-expr",
  "sedona-schema",
  "sedona-testing",
+ "tokio",
 ]
 
 [[package]]
