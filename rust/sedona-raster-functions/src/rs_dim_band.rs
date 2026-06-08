@@ -230,7 +230,6 @@ impl SedonaScalarKernel for RsBandToDim {
                         return exec_err!("RS_BandToDim: raster has no bands");
                     }
 
-                    // Get reference band properties from band 0
                     let band0 = raster.band(0).map_err(|e| arrow_datafusion_err!(e))?;
                     let ref_dim_names = band0.dim_names();
                     let ref_shape = band0.shape().to_vec();
@@ -248,7 +247,6 @@ impl SedonaScalarKernel for RsBandToDim {
                         );
                     }
 
-                    // Validate all bands match
                     for i in 1..num_bands {
                         let band = raster.band(i).map_err(|e| arrow_datafusion_err!(e))?;
                         if band.dim_names() != ref_dim_names {
@@ -278,17 +276,14 @@ impl SedonaScalarKernel for RsBandToDim {
                         }
                     }
 
-                    // Build new dim_names: [new_dim_name] + original_dim_names
                     let mut new_dim_names: Vec<&str> = Vec::with_capacity(ref_dim_names.len() + 1);
                     new_dim_names.push(name);
                     new_dim_names.extend(ref_dim_names.iter());
 
-                    // Build new shape: [num_bands] + original_shape
                     let mut new_shape: Vec<u64> = Vec::with_capacity(ref_shape.len() + 1);
                     new_shape.push(num_bands as u64);
                     new_shape.extend_from_slice(&ref_shape);
 
-                    // Concatenate all band data
                     let mut concat_data = Vec::new();
                     for i in 0..num_bands {
                         let band = raster.band(i).map_err(|e| arrow_datafusion_err!(e))?;
