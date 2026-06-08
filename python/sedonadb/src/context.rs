@@ -16,6 +16,7 @@
 // under the License.
 use std::{collections::HashMap, sync::Arc};
 
+use arrow_schema::DataType;
 use datafusion_expr::ScalarUDFImpl;
 use pyo3::prelude::*;
 use sedona::context::SedonaContext;
@@ -87,6 +88,7 @@ impl InternalContext {
         options: HashMap<String, PyObject>,
         geometry_columns: Option<String>,
         validate: bool,
+        partitioning: Option<Vec<String>>,
     ) -> Result<InternalDataFrame, PySedonaError> {
         // Convert Python options to strings, filtering out None values
         let rust_options: HashMap<String, String> = options
@@ -115,6 +117,14 @@ impl InternalContext {
                 })?;
         }
         geo_options = geo_options.with_validate(validate);
+        if let Some(partitioning) = partitioning {
+            geo_options = geo_options.with_table_partition_cols(
+                partitioning
+                    .iter()
+                    .map(|name| (name.clone(), DataType::Utf8View))
+                    .collect(),
+            );
+        }
 
         let df = wait_for_future(
             py,
@@ -130,6 +140,7 @@ impl InternalContext {
         format_spec: Bound<PyAny>,
         table_paths: Vec<String>,
         check_extension: bool,
+        partitioning: Option<Vec<String>>,
     ) -> Result<InternalDataFrame, PySedonaError> {
         let spec = format_spec
             .call_method0("__sedona_external_format__")?
@@ -137,8 +148,17 @@ impl InternalContext {
         let df = wait_for_future(
             py,
             &self.runtime,
-            self.inner
-                .read_external_format(Arc::new(spec), table_paths, None, check_extension),
+            self.inner.read_external_format(
+                Arc::new(spec),
+                table_paths,
+                None,
+                check_extension,
+                partitioning.map(|cols| {
+                    cols.iter()
+                        .map(|name| (name.clone(), DataType::Utf8View))
+                        .collect()
+                }),
+            ),
         )??;
 
         Ok(InternalDataFrame::new(df, self.runtime.clone()))
