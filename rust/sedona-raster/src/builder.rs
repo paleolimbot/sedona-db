@@ -20,15 +20,21 @@ use arrow_array::{
         ArrayBuilder, BinaryBuilder, BinaryViewBuilder, BooleanBuilder, Float64Builder,
         Int64Builder, StringBuilder, StringViewBuilder, UInt32Builder, UInt64Builder,
     },
-    Array, ArrayRef, ListArray, StructArray,
+    Array, ArrayRef, BinaryViewArray, ListArray, StructArray,
 };
-use arrow_buffer::{NullBuffer, OffsetBuffer, ScalarBuffer};
+use arrow_buffer::{Buffer, NullBuffer, OffsetBuffer, ScalarBuffer};
 use arrow_schema::{ArrowError, DataType};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use sedona_schema::raster::{BandDataType, RasterSchema};
 
 use crate::traits::{BandMetadata, MetadataRef};
+
+/// Maximum byte length of an inline `BinaryViewArray` view. Views this short
+/// store their bytes in the 16-byte view itself; longer views reference a data
+/// block by `(buffer_index, offset)`. Fixed by the Arrow columnar format spec.
+const MAX_INLINE_VIEW_LEN: u32 = 12;
 
 /// Builder for constructing raster arrays with zero-copy band data writing
 ///
@@ -129,6 +135,12 @@ pub struct RasterBuilder {
     // Track band_data count at the start of each band for finish_band validation
     band_data_count_at_start: usize,
 
+    // Zero-copy band-data dedup: maps an already-appended source `Buffer`'s
+    // data pointer to its block index in `band_data`, so the same backing
+    // buffer (e.g. many bands sharing one source column block) is attached
+    // once and referenced by multiple views. See `append_band_data_buffer`.
+    band_data_blocks: HashMap<usize, u32>,
+
     raster_validity: BooleanBuilder,
 }
 
@@ -171,6 +183,7 @@ impl RasterBuilder {
             current_raster_bands: Vec::new(),
 
             band_data_count_at_start: 0,
+            band_data_blocks: HashMap::new(),
 
             raster_validity: BooleanBuilder::with_capacity(capacity),
         }
@@ -429,6 +442,81 @@ impl RasterBuilder {
     /// Get direct access to the BinaryViewBuilder for writing the current band's data.
     pub fn band_data_writer(&mut self) -> &mut BinaryViewBuilder {
         &mut self.band_data
+    }
+
+    /// Append the current band's data as a **zero-copy** view into an existing
+    /// Arrow [`Buffer`], rather than copying bytes via `append_value`.
+    ///
+    /// `buffer` is attached to the output `BinaryViewArray` as a shared data
+    /// block (a refcount bump, never a copy) and a single view row referencing
+    /// `[offset, offset + len)` is appended. Buffers are de-duplicated by data
+    /// pointer, so handing the same backing buffer for many bands attaches it
+    /// once and points every view at it.
+    ///
+    /// Bytes at or under the inline threshold ([`MAX_INLINE_VIEW_LEN`]) are
+    /// stored inline (a tiny copy) instead, since the `BinaryViewArray` layout
+    /// requires such views to be inline and a block-referencing view of that
+    /// size is non-canonical (it fails array validation on roundtrip). Band
+    /// data is realistically always larger, so this is the degenerate path.
+    ///
+    /// Counts as the one data value for the current band (see [`finish_band`]).
+    ///
+    /// [`finish_band`]: Self::finish_band
+    pub fn append_band_data_buffer(
+        &mut self,
+        buffer: &Buffer,
+        offset: u32,
+        len: u32,
+    ) -> Result<(), ArrowError> {
+        if len <= MAX_INLINE_VIEW_LEN {
+            self.band_data
+                .append_value(&buffer.as_slice()[offset as usize..(offset + len) as usize]);
+            return Ok(());
+        }
+        let block = match self.band_data_blocks.get(&(buffer.as_ptr() as usize)) {
+            Some(&idx) => idx,
+            None => {
+                // `clone` bumps the buffer's refcount; the bytes are not copied.
+                let idx = self.band_data.append_block(buffer.clone());
+                self.band_data_blocks.insert(buffer.as_ptr() as usize, idx);
+                idx
+            }
+        };
+        self.band_data.try_append_view(block, offset, len)
+    }
+
+    /// Append the current band's data by copying row `row` of `src` through —
+    /// zero-copy when the row's bytes are block-backed (shares the backing
+    /// `Buffer` via [`append_band_data_buffer`]), with a small copy only for
+    /// inline views (≤ [`MAX_INLINE_VIEW_LEN`] bytes, which live in the view
+    /// itself and have no backing buffer).
+    ///
+    /// Counts as the one data value for the current band (see [`finish_band`]).
+    ///
+    /// [`finish_band`]: Self::finish_band
+    pub fn append_band_data_from(
+        &mut self,
+        src: &BinaryViewArray,
+        row: usize,
+    ) -> Result<(), ArrowError> {
+        // Arrow BYTE_VIEW layout (u128, little-endian fields), fixed by the
+        // columnar format spec:
+        //   bits   0..32  length
+        //   bits  32..64  prefix
+        //   bits  64..96  buffer_index
+        //   bits  96..128 offset
+        // A view of `length <= MAX_INLINE_VIEW_LEN` stores its bytes inline and
+        // has no backing buffer to share.
+        let view = src.views()[row];
+        let len = view as u32;
+        if len <= MAX_INLINE_VIEW_LEN {
+            self.band_data.append_value(src.value(row));
+            Ok(())
+        } else {
+            let buffer_index = (view >> 64) as u32;
+            let offset = (view >> 96) as u32;
+            self.append_band_data_buffer(&src.data_buffers()[buffer_index as usize], offset, len)
+        }
     }
 
     /// Finish writing the current band.
@@ -1959,5 +2047,247 @@ mod tests {
         let rasters = RasterStructArray::new(restored_struct);
         let r0 = rasters.get(0).unwrap();
         assert_eq!(r0.band(0).unwrap().shape(), &[2, 3]);
+    }
+
+    /// Navigate an output raster `StructArray` to its bands' `data`
+    /// `BinaryViewArray` column.
+    fn output_band_data(arr: &StructArray) -> &BinaryViewArray {
+        use sedona_schema::raster::{band_indices, raster_indices};
+        arr.column(raster_indices::BANDS)
+            .as_any()
+            .downcast_ref::<ListArray>()
+            .unwrap()
+            .values()
+            .as_any()
+            .downcast_ref::<StructArray>()
+            .unwrap()
+            .column(band_indices::DATA)
+            .as_any()
+            .downcast_ref::<BinaryViewArray>()
+            .unwrap()
+    }
+
+    #[test]
+    fn append_band_data_buffer_borrows_source_zero_copy() {
+        let bytes: Vec<u8> = (10u8..24).collect(); // 14 bytes (> inline threshold)
+        let src = Buffer::from_vec(bytes.clone());
+        let src_ptr = src.as_ptr();
+
+        let mut builder = RasterBuilder::new(1);
+        builder
+            .start_raster_2d(7, 2, 0.0, 0.0, 1.0, -1.0, 0.0, 0.0, None)
+            .unwrap();
+        builder.start_band_2d(BandDataType::UInt8, None).unwrap();
+        builder
+            .append_band_data_buffer(&src, 0, bytes.len() as u32)
+            .unwrap();
+        builder.finish_band().unwrap();
+        builder.finish_raster().unwrap();
+        let arr = builder.finish().unwrap();
+
+        let rasters = RasterStructArray::new(&arr);
+        let r = rasters.get(0).unwrap();
+        let band = r.band(0).unwrap();
+        let out = band.nd_buffer().unwrap().as_contiguous().unwrap();
+        assert_eq!(out, bytes.as_slice());
+        // Zero-copy: the output borrows the source allocation, not a copy.
+        assert_eq!(out.as_ptr(), src_ptr);
+    }
+
+    #[test]
+    fn append_band_data_buffer_dedups_shared_buffer() {
+        // Two bands carved from the same backing buffer attach it once. Each
+        // slice is > 12 bytes so it's block-backed (the inline path attaches
+        // no block).
+        let bytes: Vec<u8> = (0u8..26).collect();
+        let src = Buffer::from_vec(bytes.clone());
+
+        let mut builder = RasterBuilder::new(1);
+        builder
+            .start_raster_2d(13, 1, 0.0, 0.0, 1.0, -1.0, 0.0, 0.0, None)
+            .unwrap();
+        builder.start_band_2d(BandDataType::UInt8, None).unwrap();
+        builder.append_band_data_buffer(&src, 0, 13).unwrap();
+        builder.finish_band().unwrap();
+        builder.start_band_2d(BandDataType::UInt8, None).unwrap();
+        builder.append_band_data_buffer(&src, 13, 13).unwrap();
+        builder.finish_band().unwrap();
+        builder.finish_raster().unwrap();
+        let arr = builder.finish().unwrap();
+
+        // Dedup: one shared data block, not two.
+        assert_eq!(output_band_data(&arr).data_buffers().len(), 1);
+
+        let rasters = RasterStructArray::new(&arr);
+        let r = rasters.get(0).unwrap();
+        assert_eq!(
+            r.band(0)
+                .unwrap()
+                .nd_buffer()
+                .unwrap()
+                .as_contiguous()
+                .unwrap(),
+            &bytes[0..13]
+        );
+        assert_eq!(
+            r.band(1)
+                .unwrap()
+                .nd_buffer()
+                .unwrap()
+                .as_contiguous()
+                .unwrap(),
+            &bytes[13..26]
+        );
+    }
+
+    #[test]
+    fn append_band_data_buffer_interleaves_with_append_value() {
+        // One band via append_value (in-progress buffer), one via a borrowed
+        // block — the view block-indexing must stay correct across the mix.
+        // Both bands are > 12 bytes so both are block-backed.
+        let src = Buffer::from_vec((100u8..113).collect::<Vec<_>>()); // 13 bytes
+        let band0: Vec<u8> = (1u8..14).collect(); // 13 bytes
+        let mut builder = RasterBuilder::new(1);
+        builder
+            .start_raster_2d(13, 1, 0.0, 0.0, 1.0, -1.0, 0.0, 0.0, None)
+            .unwrap();
+        builder.start_band_2d(BandDataType::UInt8, None).unwrap();
+        builder.band_data_writer().append_value(&band0);
+        builder.finish_band().unwrap();
+        builder.start_band_2d(BandDataType::UInt8, None).unwrap();
+        builder.append_band_data_buffer(&src, 0, 13).unwrap();
+        builder.finish_band().unwrap();
+        builder.finish_raster().unwrap();
+        let arr = builder.finish().unwrap();
+
+        let rasters = RasterStructArray::new(&arr);
+        let r = rasters.get(0).unwrap();
+        assert_eq!(
+            r.band(0)
+                .unwrap()
+                .nd_buffer()
+                .unwrap()
+                .as_contiguous()
+                .unwrap(),
+            band0.as_slice()
+        );
+        assert_eq!(
+            r.band(1)
+                .unwrap()
+                .nd_buffer()
+                .unwrap()
+                .as_contiguous()
+                .unwrap(),
+            (100u8..113).collect::<Vec<_>>().as_slice()
+        );
+    }
+
+    #[test]
+    fn append_band_data_from_shares_block_backed_row() {
+        // Source raster with block-backed band data (> 12 bytes); copying that
+        // row into a new raster must borrow the same backing buffer.
+        let bytes: Vec<u8> = (20u8..34).collect(); // 14 bytes
+        let mut src_builder = RasterBuilder::new(1);
+        src_builder
+            .start_raster_2d(7, 2, 0.0, 0.0, 1.0, -1.0, 0.0, 0.0, None)
+            .unwrap();
+        src_builder
+            .start_band_2d(BandDataType::UInt8, None)
+            .unwrap();
+        src_builder.band_data_writer().append_value(&bytes);
+        src_builder.finish_band().unwrap();
+        src_builder.finish_raster().unwrap();
+        let src_arr = src_builder.finish().unwrap();
+        let src_data = output_band_data(&src_arr);
+        let src_ptr = src_data.value(0).as_ptr();
+
+        let mut builder = RasterBuilder::new(1);
+        builder
+            .start_raster_2d(7, 2, 0.0, 0.0, 1.0, -1.0, 0.0, 0.0, None)
+            .unwrap();
+        builder.start_band_2d(BandDataType::UInt8, None).unwrap();
+        builder.append_band_data_from(src_data, 0).unwrap();
+        builder.finish_band().unwrap();
+        builder.finish_raster().unwrap();
+        let arr = builder.finish().unwrap();
+
+        let rasters = RasterStructArray::new(&arr);
+        let r = rasters.get(0).unwrap();
+        let band = r.band(0).unwrap();
+        let out = band.nd_buffer().unwrap().as_contiguous().unwrap();
+        assert_eq!(out, bytes.as_slice());
+        assert_eq!(out.as_ptr(), src_ptr); // zero-copy: same allocation
+    }
+
+    #[test]
+    fn append_band_data_from_copies_inline_row() {
+        // Inline rows (<= 12 bytes) have no backing buffer, so they're copied;
+        // verify correctness of that path.
+        let bytes: Vec<u8> = vec![1, 2, 3, 4, 5, 6]; // 6 bytes (inline)
+        let mut src_builder = RasterBuilder::new(1);
+        src_builder
+            .start_raster_2d(6, 1, 0.0, 0.0, 1.0, -1.0, 0.0, 0.0, None)
+            .unwrap();
+        src_builder
+            .start_band_2d(BandDataType::UInt8, None)
+            .unwrap();
+        src_builder.band_data_writer().append_value(&bytes);
+        src_builder.finish_band().unwrap();
+        src_builder.finish_raster().unwrap();
+        let src_arr = src_builder.finish().unwrap();
+        let src_data = output_band_data(&src_arr);
+
+        let mut builder = RasterBuilder::new(1);
+        builder
+            .start_raster_2d(6, 1, 0.0, 0.0, 1.0, -1.0, 0.0, 0.0, None)
+            .unwrap();
+        builder.start_band_2d(BandDataType::UInt8, None).unwrap();
+        builder.append_band_data_from(src_data, 0).unwrap();
+        builder.finish_band().unwrap();
+        builder.finish_raster().unwrap();
+        let arr = builder.finish().unwrap();
+
+        let rasters = RasterStructArray::new(&arr);
+        assert_eq!(
+            rasters
+                .get(0)
+                .unwrap()
+                .band(0)
+                .unwrap()
+                .nd_buffer()
+                .unwrap()
+                .as_contiguous()
+                .unwrap(),
+            bytes.as_slice()
+        );
+    }
+
+    #[test]
+    fn append_band_data_buffer_inlines_small_slice() {
+        // A <= 12-byte slice must be stored inline (no data block), since a
+        // block-referencing view of that size is non-canonical.
+        let bytes: Vec<u8> = vec![1, 2, 3, 4, 5, 6]; // 6 bytes (inline)
+        let src = Buffer::from_vec(bytes.clone());
+
+        let mut builder = RasterBuilder::new(1);
+        builder
+            .start_raster_2d(6, 1, 0.0, 0.0, 1.0, -1.0, 0.0, 0.0, None)
+            .unwrap();
+        builder.start_band_2d(BandDataType::UInt8, None).unwrap();
+        builder.append_band_data_buffer(&src, 0, 6).unwrap();
+        builder.finish_band().unwrap();
+        builder.finish_raster().unwrap();
+        let arr = builder.finish().unwrap();
+
+        // Inline: no backing block attached.
+        assert_eq!(output_band_data(&arr).data_buffers().len(), 0);
+
+        let rasters = RasterStructArray::new(&arr);
+        let r = rasters.get(0).unwrap();
+        let band = r.band(0).unwrap();
+        assert_eq!(
+            band.nd_buffer().unwrap().as_contiguous().unwrap(),
+            bytes.as_slice()
+        );
     }
 }
