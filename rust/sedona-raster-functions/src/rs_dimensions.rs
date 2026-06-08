@@ -30,10 +30,6 @@ use sedona_schema::matchers::ArgMatcher;
 
 use crate::executor::RasterExecutor;
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 /// Check that all bands agree on a value. Returns the value from band 0,
 /// or an error if any band disagrees.
 fn check_band_agreement<T: PartialEq + std::fmt::Debug>(
@@ -75,10 +71,6 @@ fn list_int64_type() -> DataType {
         true,
     )))
 }
-
-// ===========================================================================
-// RS_NumDimensions
-// ===========================================================================
 
 /// RS_NumDimensions(raster [, band]) -> Int32
 ///
@@ -181,10 +173,6 @@ impl SedonaScalarKernel for RsNumDimensionsWithBand {
         executor.finish(Arc::new(builder.finish()))
     }
 }
-
-// ===========================================================================
-// RS_DimNames
-// ===========================================================================
 
 /// RS_DimNames(raster [, band]) -> List<Utf8>
 ///
@@ -292,10 +280,6 @@ impl SedonaScalarKernel for RsDimNamesWithBand {
         executor.finish(Arc::new(list_builder.finish()))
     }
 }
-
-// ===========================================================================
-// RS_DimSize
-// ===========================================================================
 
 /// RS_DimSize(raster, dim_name [, band]) -> Int64 (nullable)
 ///
@@ -436,10 +420,6 @@ impl SedonaScalarKernel for RsDimSizeWithBand {
     }
 }
 
-// ===========================================================================
-// RS_Shape
-// ===========================================================================
-
 /// RS_Shape(raster [, band]) -> List<Int64>
 ///
 /// Returns the shape (size of each dimension) of the raster.
@@ -542,10 +522,6 @@ impl SedonaScalarKernel for RsShapeWithBand {
         executor.finish(Arc::new(list_builder.finish()))
     }
 }
-
-// ===========================================================================
-// Tests
-// ===========================================================================
 
 #[cfg(test)]
 mod tests {

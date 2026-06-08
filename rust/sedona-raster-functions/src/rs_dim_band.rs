@@ -31,10 +31,6 @@ use sedona_schema::matchers::ArgMatcher;
 use crate::executor::RasterExecutor;
 use crate::rs_slice::{extract_slice, require_any_band_has_dim};
 
-// ===========================================================================
-// RS_DimToBand
-// ===========================================================================
-
 /// RS_DimToBand(raster, dim_name) -> Raster
 ///
 /// Expands each band that has the named dimension into multiple bands
@@ -176,10 +172,6 @@ impl SedonaScalarKernel for RsDimToBand {
         executor.finish(Arc::new(new_builder.finish()?))
     }
 }
-
-// ===========================================================================
-// RS_BandToDim
-// ===========================================================================
 
 /// RS_BandToDim(raster, dim_name) -> Raster
 ///
@@ -332,10 +324,6 @@ impl SedonaScalarKernel for RsBandToDim {
         executor.finish(Arc::new(new_builder.finish()?))
     }
 }
-
-// ===========================================================================
-// Tests
-// ===========================================================================
 
 #[cfg(test)]
 mod tests {

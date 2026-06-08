@@ -30,10 +30,6 @@ use sedona_schema::matchers::ArgMatcher;
 
 use crate::executor::RasterExecutor;
 
-// ===========================================================================
-// RS_Slice
-// ===========================================================================
-
 /// RS_Slice(raster, dim_name, index) -> Raster
 ///
 /// Slices each band along the named dimension at the given index, removing
@@ -184,10 +180,6 @@ impl SedonaScalarKernel for RsSlice {
         executor.finish(Arc::new(new_builder.finish()?))
     }
 }
-
-// ===========================================================================
-// RS_SliceRange
-// ===========================================================================
 
 /// RS_SliceRange(raster, dim_name, start, end) -> Raster
 ///
@@ -348,10 +340,6 @@ impl SedonaScalarKernel for RsSliceRange {
     }
 }
 
-// ===========================================================================
-// Shared helpers
-// ===========================================================================
-
 /// Validate that the dimension name is not a spatial dimension.
 /// Verify that at least one band in `raster` carries the named dimension.
 ///
@@ -428,10 +416,6 @@ pub(crate) fn extract_slice(
 
     Ok(output)
 }
-
-// ===========================================================================
-// Tests
-// ===========================================================================
 
 #[cfg(test)]
 mod tests {
