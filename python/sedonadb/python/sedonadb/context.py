@@ -20,7 +20,20 @@ import os
 import sys
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Literal, Optional, Tuple, Union
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Literal,
+    Optional,
+    TYPE_CHECKING,
+    Tuple,
+    Union,
+)
+
+if TYPE_CHECKING:
+    from sedonadb.datasource import ExternalFormatSpec
 
 from sedonadb._lib import (
     InternalContext,
@@ -31,6 +44,11 @@ from sedonadb._lib import (
 from sedonadb._options import Options
 from sedonadb.dataframe import DataFrame, _create_data_frame
 from sedonadb.functions import Functions
+from sedonadb.expr.expression import (
+    Expr,
+    col as col_expr,
+)
+from sedonadb.expr.literal import lit as lit_expr, Literal as LiteralExpr
 from sedonadb.utility import sedona  # noqa: F401
 
 
@@ -68,6 +86,13 @@ class SedonaContext:
     def __init__(self):
         self.__impl = None
         self.options = Options()
+
+    @classmethod
+    def _init_from_impl(cls, impl, options):
+        instance = cls()
+        instance.__impl = impl
+        instance.options = options
+        return instance
 
     @property
     def _impl(self):
@@ -127,7 +152,7 @@ class SedonaContext:
             │     1 │
             └───────┘
         """
-        return _create_data_frame(self._impl, obj, schema, self.options)
+        return _create_data_frame(self, obj, schema)
 
     def view(self, name: str) -> DataFrame:
         """Create a [DataFrame][sedonadb.dataframe.DataFrame] from a named view
@@ -151,7 +176,7 @@ class SedonaContext:
             >>> sd.drop_view("foofy")
 
         """
-        return DataFrame(self._impl, self._impl.view(name), self.options)
+        return DataFrame(self, self._impl.view(name))
 
     def drop_view(self, name: str) -> None:
         """Remove a named view
@@ -174,6 +199,7 @@ class SedonaContext:
         options: Optional[Dict[str, Any]] = None,
         geometry_columns: Optional[Union[str, Dict[str, Any]]] = None,
         validate: bool = False,
+        partitioning: Union[str, Iterable[str], None] = None,
     ) -> DataFrame:
         """Create a [DataFrame][sedonadb.dataframe.DataFrame] from one or more Parquet files
 
@@ -234,7 +260,13 @@ class SedonaContext:
 
                 Currently the only property that is validated is the WKB of input geometry
                 columns.
-
+            partitioning:
+                Optional list of column names for hive-style partitioning. When reading
+                from a directory with paths like `/col=value/file.parquet`, partition
+                column names are auto-discovered by default (`partitioning=None`).
+                Explicitly specify column names (e.g., `["col"]`) to override
+                auto-discovery, or pass an empty list `[]` to disable partitioning
+                entirely.
 
         Examples:
 
@@ -252,12 +284,18 @@ class SedonaContext:
         if geometry_columns is not None and not isinstance(geometry_columns, str):
             geometry_columns = json.dumps(geometry_columns)
 
+        if isinstance(partitioning, str):
+            partitioning = [partitioning]
+
         return DataFrame(
-            self._impl,
+            self,
             self._impl.read_parquet(
-                [str(path) for path in table_paths], options, geometry_columns, validate
+                [str(path) for path in table_paths],
+                options,
+                geometry_columns,
+                validate,
+                None if partitioning is None else list(partitioning),
             ),
-            self.options,
         )
 
     def read_pyogrio(
@@ -265,6 +303,7 @@ class SedonaContext:
         table_paths: Union[str, Path, Iterable[str]],
         options: Optional[Dict[str, Any]] = None,
         extension: str = "",
+        partitioning: Union[str, Iterable[str], None] = None,
     ) -> DataFrame:
         """Read spatial file formats using GDAL/OGR via pyogrio
 
@@ -294,6 +333,13 @@ class SedonaContext:
             extension: An optional file extension (e.g., `"fgb"`) used when
                 `table_paths` specifies one or more directories or a glob
                 that does not enforce a file extension.
+            partitioning:
+                Optional list of column names for hive-style partitioning. When reading
+                from a directory with paths like `/col=value/file.fgb`, partition
+                column names are auto-discovered by default (`partitioning=None`).
+                Explicitly specify column names (e.g., `["col"]`) to override
+                auto-discovery, or pass an empty list `[]` to disable partitioning
+                entirely.
 
         Examples:
 
@@ -325,12 +371,74 @@ class SedonaContext:
         if options is not None:
             spec = spec.with_options(options)
 
+        if isinstance(partitioning, str):
+            partitioning = [partitioning]
+
         return DataFrame(
-            self._impl,
+            self,
             self._impl.read_external_format(
-                spec, [str(path) for path in table_paths], False
+                spec,
+                [str(path) for path in table_paths],
+                False,
+                None if partitioning is None else list(partitioning),
             ),
-            self.options,
+        )
+
+    def read_format(
+        self,
+        spec: "ExternalFormatSpec",
+        table_paths: Union[str, Path, Iterable[str]],
+        check_extension: bool = False,
+        partitioning: Union[str, Iterable[str], None] = None,
+    ) -> DataFrame:
+        """Read one or more paths using a Python-defined `ExternalFormatSpec`.
+
+        This is the plugin entry point: a format-specific package (e.g.
+        `sedonadb-zarr`) defines an `ExternalFormatSpec` subclass and the
+        user reads through it via this method. Built-in formats have
+        their own dedicated readers (`read_parquet`, `read_pyogrio`).
+
+        Format-specific options are passed via the spec itself using
+        `spec.with_options({...})`, which returns a configured copy.
+        Unlike `read_pyogrio`, this method has no `options=` keyword —
+        each spec class documents its own supported keys.
+
+        Args:
+            spec: An `ExternalFormatSpec` instance describing how to open
+                the underlying source.
+            table_paths: A str, Path, or iterable of paths/URLs.
+            check_extension: When `True`, error if a non-collection path
+                doesn't end in the spec's `extension`. Defaults to `False`.
+            partitioning:
+                Optional list of column names for hive-style partitioning. When reading
+                from a directory with paths like `/col=value/file.ext`, partition
+                column names are auto-discovered by default (`partitioning=None`).
+                Explicitly specify column names (e.g., `["col"]`) to override
+                auto-discovery, or pass an empty list `[]` to disable partitioning
+                entirely.
+
+        Examples:
+            >>> import sedonadb_zarr  # doctest: +SKIP
+            >>> sd = sedona.db.connect()
+            >>> spec = sedonadb_zarr.ZarrFormatSpec().with_options(  # doctest: +SKIP
+            ...     {"arrays": ["temperature"]}
+            ... )
+            >>> sd.read_format(spec, "file:///path/to/foo.zarr").show()  # doctest: +SKIP
+        """
+        if isinstance(table_paths, (str, Path)):
+            table_paths = [table_paths]
+
+        if isinstance(partitioning, str):
+            partitioning = [partitioning]
+
+        return DataFrame(
+            self,
+            self._impl.read_external_format(
+                spec,
+                [str(path) for path in table_paths],
+                check_extension,
+                None if partitioning is None else list(partitioning),
+            ),
         )
 
     def sql(
@@ -376,7 +484,7 @@ class SedonaContext:
             └────────────┘
 
         """
-        df = DataFrame(self._impl, self._impl.sql(sql), self.options)
+        df = DataFrame(self, self._impl.sql(sql))
 
         if params is not None:
             if isinstance(params, (tuple, list)):
@@ -428,6 +536,53 @@ class SedonaContext:
     def funcs(self) -> Functions:
         """Access Python wrappers for SedonaDB functions"""
         return Functions(self)
+
+    def col(self, name: str, qualifier: Optional[str] = None) -> Expr:
+        """Reference a column by name.
+
+        Args:
+            name: The column name to reference.
+            qualifier: An optional table qualifier (e.g. `"t"` for `t.x`). Useful
+                when the same column name appears in multiple input tables of a
+                join. Defaults to `None`, which leaves the column unqualified and
+                lets the planner resolve against the surrounding schema.
+
+        Examples:
+
+            >>> sd = sedona.db.connect()
+            >>> sd.col("x")
+            Expr(x)
+            >>> sd.col("x", "t")
+            Expr(t.x)
+        """
+        return col_expr(name, qualifier=qualifier, ctx=self)
+
+    def lit(self, value: Any) -> LiteralExpr:
+        """Create a literal (constant) expression
+
+        Creates a `Literal` object around value, or returns value if it is
+        already a `Literal`. This is the primary function that should be used
+        to wrap an arbitrary Python object a constant to prepare it as input
+        to any SedonaDB logical expression context (e.g., parameterized SQL).
+
+        Literal values can be created from a variety of Python objects whose
+        representation as a scalar constant is unambiguous. Any object that
+        is accepted by `pyarrow.array([...])` is supported in addition to:
+
+        - Shapely geometries become SedonaDB geometry objects.
+        - GeoSeries objects of length 1 become SedonaDB geometries
+        with CRS preserved.
+        - GeoDataFrame objects with a single column and single row become
+        SedonaDB geometries with CRS preserved.
+        - Pandas DataFrame objects with a single column and single row
+        are converted using `pa.array()`.
+        - SedonaDB DataFrame objects that evaluate to a single column and
+        row become a scalar value according to the single represented
+        value.
+        - pyproj CRS objects become PROJJSON strings (e.g., so they may be used
+        in `ST_SetCRS()`, `ST_Point()`, or `ST_GeomFromWKT()`).
+        """
+        return lit_expr(value, ctx=self)
 
 
 def connect() -> SedonaContext:

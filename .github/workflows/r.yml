@@ -40,6 +40,7 @@ jobs:
       # Run air format
       - run: curl -LsSf https://github.com/posit-dev/air/releases/latest/download/air-installer.sh | sh
       - run: cd r/sedonadb && air format . --check
+      - run: cd r/sedonafns && air format . --check
 
   test:
     runs-on: ${{ matrix.config.os }}
@@ -73,17 +74,6 @@ jobs:
         run: |
           rustup toolchain install stable --no-self-update
           rustup default stable
-
-      # The `cargo +nightly build … -Zbuild-std=panic_abort,std` path in
-      # r/sedonadb/src/Makevars.in is only meant to fire for the
-      # wasm32-unknown-emscripten target, but it has been observed firing
-      # intermittently on macos-latest (see #837). Pre-install nightly +
-      # rust-src so a stray invocation doesn't hand `cargo build` to
-      # rustup-init.
-      - name: Pre-install nightly Rust + rust-src (workaround for #837)
-        if: matrix.config.os == 'macos-latest'
-        run: |
-          rustup toolchain install nightly --component rust-src --no-self-update
 
       # Set the default toolchain here so that rust-cache saves/restores
       # the correct target. (The R package will use this target regardless,
@@ -119,17 +109,27 @@ jobs:
         with:
           prefix-key: "r-v4"
           workspaces: ${{ env.CACHE_WORKSPACE }}
+          cache-bin: false
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           needs: check
+          extra-packages: any::glue, any::here, any::rlang, any::yaml, any::roxygen2
           working-directory: r/sedonadb
           cache: false
 
-      - name: Install R Package
+      - name: Install sedonadb R Package
         run: |
           R CMD INSTALL r/sedonadb --preclean
 
-      - name: Test R Package
+      - name: Test sedonadb R Package
         run: |
           R -e 'library(testthat); test_local("r/sedonadb", MultiReporter$new(list(CheckReporter$new(), LocationReporter$new())))'
+
+      - name: Install sedonafns R Package
+        run: |
+          R CMD INSTALL r/sedonafns --preclean
+
+      - name: Test sedonafns R Package
+        run: |
+          R -e 'library(testthat); test_local("r/sedonafns", MultiReporter$new(list(CheckReporter$new(), LocationReporter$new())))'

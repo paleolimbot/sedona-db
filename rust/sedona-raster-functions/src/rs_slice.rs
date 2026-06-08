@@ -127,8 +127,9 @@ impl SedonaScalarKernel for RsSlice {
                                 None,
                                 None,
                             )?;
-                            let data = band.contiguous_data()?;
-                            new_builder.band_data_writer().append_value(&data);
+                            let ndb = band.nd_buffer()?;
+                            let data = ndb.as_contiguous()?;
+                            new_builder.band_data_writer().append_value(data);
                             new_builder.finish_band()?;
                             continue;
                         };
@@ -299,8 +300,9 @@ impl SedonaScalarKernel for RsSliceRange {
                                 None,
                                 None,
                             )?;
-                            let data = band.contiguous_data()?;
-                            new_builder.band_data_writer().append_value(&data);
+                            let ndb = band.nd_buffer()?;
+                            let data = ndb.as_contiguous()?;
+                            new_builder.band_data_writer().append_value(data);
                             new_builder.finish_band()?;
                             continue;
                         };
@@ -407,7 +409,8 @@ pub(crate) fn extract_slice(
 ) -> Result<Vec<u8>> {
     let shape = band.shape();
     let elem_size = band.data_type().byte_size() as u64;
-    let data = band.contiguous_data()?;
+    let ndb = band.nd_buffer()?;
+    let data = ndb.as_contiguous()?;
 
     let outer_count: u64 = shape[..dim_idx].iter().product();
     let inner_size: u64 = shape[dim_idx + 1..].iter().product::<u64>() * elem_size;
@@ -552,15 +555,17 @@ mod tests {
         let band0 = raster.band(0).unwrap();
         assert_eq!(band0.dim_names(), vec!["y", "x"]);
         assert_eq!(band0.shape(), &[2, 3]);
-        let band0_data = band0.contiguous_data().unwrap();
-        assert_eq!(band0_data.as_ref(), &(0u8..6).collect::<Vec<u8>>()[..]);
+        let band0_ndb = band0.nd_buffer().unwrap();
+        let band0_data = band0_ndb.as_contiguous().unwrap();
+        assert_eq!(band0_data, &(0u8..6).collect::<Vec<u8>>()[..]);
 
         // Band 1 had `time` — sliced to time=1: 2-D [2, 3], bytes 6..12.
         let band1 = raster.band(1).unwrap();
         assert_eq!(band1.dim_names(), vec!["y", "x"]);
         assert_eq!(band1.shape(), &[2, 3]);
-        let band1_data = band1.contiguous_data().unwrap();
-        assert_eq!(band1_data.as_ref(), &(6u8..12).collect::<Vec<u8>>()[..]);
+        let band1_ndb = band1.nd_buffer().unwrap();
+        let band1_data = band1_ndb.as_contiguous().unwrap();
+        assert_eq!(band1_data, &(6u8..12).collect::<Vec<u8>>()[..]);
     }
 
     #[test]
@@ -747,9 +752,10 @@ mod tests {
         assert_eq!(band.shape(), &[4, 5]);
 
         // Data should be time slice 1: bytes 20..40 of original
-        let data = band.contiguous_data().unwrap();
+        let ndb = band.nd_buffer().unwrap();
+        let data = ndb.as_contiguous().unwrap();
         let expected: Vec<u8> = (20..40).collect();
-        assert_eq!(data.as_ref(), &expected[..]);
+        assert_eq!(data, &expected[..]);
     }
 
     #[test]
@@ -790,9 +796,10 @@ mod tests {
         assert_eq!(band.shape(), &[2, 4, 5]);
 
         // Data should be first 2 time slices: bytes 0..40
-        let data = band.contiguous_data().unwrap();
+        let ndb = band.nd_buffer().unwrap();
+        let data = ndb.as_contiguous().unwrap();
         let expected: Vec<u8> = (0..40).collect();
-        assert_eq!(data.as_ref(), &expected[..]);
+        assert_eq!(data, &expected[..]);
     }
 
     #[test]

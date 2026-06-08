@@ -34,7 +34,8 @@ use sedona_schema::raster::{BandDataType, StorageType};
 
 use crate::gdal_common::{
     band_data_type_to_gdal, bytes_to_f64, convert_gdal_err, normalize_outdb_source_path,
-    open_gdal_dataset, raster_ref_to_gdal_empty, raster_ref_to_gdal_mem, ToGdalGeoTransform,
+    open_gdal_dataset, raster_ref_to_gdal_empty, raster_ref_to_gdal_mem,
+    set_band_nodata_from_bytes, ToGdalGeoTransform,
 };
 
 /// A GDAL dataset constructed from a `RasterRef`.
@@ -187,7 +188,7 @@ impl GDALDatasetCache {
         })
     }
 
-    fn get_or_create_outdb_source(
+    pub(crate) fn get_or_create_outdb_source(
         &self,
         gdal: &Gdal,
         path: &str,
@@ -260,7 +261,7 @@ impl GDALDatasetCache {
         for i in 1..=num_bands {
             let band = bands.band(i).map_err(|e| arrow_datafusion_err!(e))?;
 
-            if !band.is_2d() {
+            if !band.is_spatial_2d() {
                 return exec_err!(
                     "GDAL backend requires 2-dim bands; got dim_names={:?}",
                     band.dim_names()
@@ -281,32 +282,7 @@ impl GDALDatasetCache {
             let vrt_band = vrt.rasterband(i).map_err(convert_gdal_err)?;
 
             if let Some(nodata_bytes) = band_metadata.nodata_value() {
-                match band_type {
-                    BandDataType::UInt64 => {
-                        let nodata_bytes: [u8; 8] = nodata_bytes.try_into().map_err(|_| {
-                            exec_datafusion_err!("Invalid nodata byte length for UInt64")
-                        })?;
-                        let nodata = u64::from_le_bytes(nodata_bytes);
-                        vrt_band
-                            .set_no_data_value_u64(Some(nodata))
-                            .map_err(convert_gdal_err)?;
-                    }
-                    BandDataType::Int64 => {
-                        let nodata_bytes: [u8; 8] = nodata_bytes.try_into().map_err(|_| {
-                            exec_datafusion_err!("Invalid nodata byte length for Int64")
-                        })?;
-                        let nodata = i64::from_le_bytes(nodata_bytes);
-                        vrt_band
-                            .set_no_data_value_i64(Some(nodata))
-                            .map_err(convert_gdal_err)?;
-                    }
-                    _ => {
-                        let nodata = bytes_to_f64(nodata_bytes, &band_type)?;
-                        vrt_band
-                            .set_no_data_value(nodata)
-                            .map_err(convert_gdal_err)?;
-                    }
-                }
+                set_band_nodata_from_bytes(&vrt_band, Some(nodata_bytes))?;
             }
 
             match band_metadata.storage_type()? {

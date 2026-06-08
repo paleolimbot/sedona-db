@@ -28,7 +28,7 @@ use datafusion::logical_expr::SortExpr;
 use datafusion::prelude::{DataFrame, SessionContext};
 use datafusion_common::{Column, DataFusionError, ParamValues};
 use datafusion_execution::TaskContextProvider;
-use datafusion_expr::{ExplainFormat, ExplainOption, Expr};
+use datafusion_expr::{ExplainFormat, ExplainOption, Expr, JoinType};
 use datafusion_ffi::table_provider::FFI_TableProvider;
 use futures::lock::Mutex;
 use futures::TryStreamExt;
@@ -43,7 +43,7 @@ use tokio::runtime::Runtime;
 
 use crate::context::InternalContext;
 use crate::error::PySedonaError;
-use crate::expr::PyExpr;
+use crate::expr::{PyExpr, PySortExpr};
 use crate::import_from::{import_arrow_scalar, import_arrow_schema};
 use crate::reader::PySedonaStreamReader;
 use crate::runtime::wait_for_future;
@@ -98,6 +98,52 @@ impl InternalDataFrame {
         Ok(names)
     }
 
+    fn qualified_column_expr(&self, py: Python<'_>, key: PyObject) -> Result<PyExpr, PyErr> {
+        let num_fields = self.inner.schema().fields().len();
+        let all_names = || self.inner.schema().field_names();
+
+        let index = if let Ok(i) = key.extract::<isize>(py) {
+            // Handle negative indices (Python-style)
+            let resolved = if i < 0 { (num_fields as isize) + i } else { i };
+            if resolved < 0 || resolved >= num_fields as isize {
+                return Err(pyo3::exceptions::PyIndexError::new_err(format!(
+                    "Column index out of range (schema has {num_fields} columns)"
+                )));
+            }
+            resolved as usize
+        } else if let Ok(name) = key.extract::<String>(py) {
+            self.inner
+                .schema()
+                .fields()
+                .iter()
+                .position(|f| f.name() == &name)
+                .ok_or_else(|| {
+                    pyo3::exceptions::PyKeyError::new_err(format!(
+                        "Column '{}' not found. Available columns: {:?}",
+                        name,
+                        all_names()
+                    ))
+                })?
+        } else {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "Column key must be an integer index or string name",
+            ));
+        };
+
+        let (relation, field) = self.inner.schema().qualified_field(index);
+        let expr = Expr::Column(Column {
+            relation: relation.cloned(),
+            name: field.name().to_string(),
+            spans: Default::default(),
+        });
+        Ok(PyExpr::new(expr))
+    }
+
+    fn alias(&self, alias: &str) -> Result<InternalDataFrame, PySedonaError> {
+        let inner = self.inner.clone().alias(alias)?;
+        Ok(InternalDataFrame::new(inner, self.runtime.clone()))
+    }
+
     fn limit(
         &self,
         limit: Option<usize>,
@@ -120,6 +166,123 @@ impl InternalDataFrame {
     fn select(&self, exprs: Vec<PyExpr>) -> Result<InternalDataFrame, PySedonaError> {
         let exprs: Vec<Expr> = exprs.into_iter().map(|e| e.inner).collect();
         let inner = self.inner.clone().select(exprs)?;
+        Ok(InternalDataFrame::new(inner, self.runtime.clone()))
+    }
+
+    /// Filter rows by one or more boolean expressions, producing a new
+    /// lazy `DataFrame`.
+    ///
+    /// The Python side guarantees `exprs` is non-empty and that every
+    /// element is an `Expr` (no strings, no Literals — those rejections
+    /// happen at the Python boundary so the error message can point at
+    /// the right alternative). Multiple predicates are combined into a
+    /// single composed `Expr` using DataFusion's `conjunction` helper,
+    /// which yields one conjunction node for the optimizer to reason
+    /// about rather than stacked filter nodes. Column-validity errors
+    /// surface at plan-build time from DataFusion, matching the
+    /// behavior of `select`.
+    fn filter(&self, exprs: Vec<PyExpr>) -> Result<InternalDataFrame, PySedonaError> {
+        // `conjunction` returns None only for an empty iterator; the
+        // `else` arm doubles as defense-in-depth against an empty
+        // predicate list slipping past the Python-side guard.
+        if let Some(combined) =
+            datafusion_expr::utils::conjunction(exprs.into_iter().map(|e| e.inner))
+        {
+            let inner = self.inner.clone().filter(combined)?;
+            Ok(InternalDataFrame::new(inner, self.runtime.clone()))
+        } else {
+            Err(PySedonaError::SedonaPython(
+                "filter() requires at least one predicate".to_string(),
+            ))
+        }
+    }
+
+    /// Sort rows by the given `SortExpr` keys.
+    ///
+    /// Each key in `sort_exprs` carries its own direction and null
+    /// placement, constructed Python-side via `Expr.asc()`, `Expr.desc()`,
+    /// or `sedonadb.expr.sort_expr(...)`. The Python wrapper auto-promotes
+    /// bare column-name strings and plain `Expr` values to ascending
+    /// `SortExpr` with `nulls_first=false` before they reach this method,
+    /// so we just need to unwrap and pass through.
+    fn sort(&self, sort_exprs: Vec<PySortExpr>) -> Result<InternalDataFrame, PySedonaError> {
+        if sort_exprs.is_empty() {
+            return Err(PySedonaError::SedonaPython(
+                "sort() requires at least one sort key".to_string(),
+            ));
+        }
+        let sort_exprs: Vec<SortExpr> = sort_exprs.into_iter().map(|s| s.inner).collect();
+        let inner = self.inner.clone().sort(sort_exprs)?;
+        Ok(InternalDataFrame::new(inner, self.runtime.clone()))
+    }
+
+    /// Drop the named columns, producing a new lazy `DataFrame`.
+    ///
+    /// The Python side guarantees `cols` is non-empty and that every
+    /// element is a string. DataFusion's `drop_columns` accepts `&[&str]`,
+    /// so we materialize a slice of borrowed string references and hand
+    /// it off; the plan-build step raises a `SchemaError` if any name
+    /// doesn't resolve to a column, and that error already includes the
+    /// list of valid field names for the user.
+    fn drop_columns(&self, cols: Vec<String>) -> Result<InternalDataFrame, PySedonaError> {
+        if cols.is_empty() {
+            return Err(PySedonaError::SedonaPython(
+                "drop() requires at least one column name".to_string(),
+            ));
+        }
+        let borrowed: Vec<&str> = cols.iter().map(String::as_str).collect();
+        let inner = self.inner.clone().drop_columns(&borrowed)?;
+        Ok(InternalDataFrame::new(inner, self.runtime.clone()))
+    }
+
+    /// Aggregate the rows of the DataFrame, optionally partitioned by
+    /// `group_exprs`. Both inputs are `Vec<PyExpr>` so the same Rust
+    /// method serves global aggregation (`group_exprs` empty, called
+    /// from `DataFrame.agg`) and grouped aggregation.
+    ///
+    /// The Python side guarantees `agg_exprs` is non-empty and that
+    /// every entry is an `Expr` (vs. a string or other type). It does
+    /// not verify that each entry is an aggregate-shaped expression —
+    /// e.g. `col("x")` would pass the Python `isinstance` check but is
+    /// not a valid aggregate. DataFusion's plan-build catches that case
+    /// with a clear error, so we don't reimplement the check here.
+    fn aggregate(
+        &self,
+        group_exprs: Vec<PyExpr>,
+        agg_exprs: Vec<PyExpr>,
+    ) -> Result<InternalDataFrame, PySedonaError> {
+        let group_exprs: Vec<Expr> = group_exprs.into_iter().map(|e| e.inner).collect();
+        let agg_exprs: Vec<Expr> = agg_exprs.into_iter().map(|e| e.inner).collect();
+        let inner = self.inner.clone().aggregate(group_exprs, agg_exprs)?;
+        Ok(InternalDataFrame::new(inner, self.runtime.clone()))
+    }
+
+    fn join_on(
+        &self,
+        right: &InternalDataFrame,
+        predicates: Vec<PyExpr>,
+        how: &str,
+    ) -> Result<InternalDataFrame, PySedonaError> {
+        let join_type = match how {
+            "inner" => JoinType::Inner,
+            "left" => JoinType::Left,
+            "right" => JoinType::Right,
+            "outer" => JoinType::Full,
+            "left_semi" => JoinType::LeftSemi,
+            "left_anti" => JoinType::LeftAnti,
+            "right_semi" => JoinType::RightSemi,
+            "right_anti" => JoinType::RightAnti,
+            other => {
+                return Err(PySedonaError::SedonaPython(format!(
+                    "Unsupported join type '{other}'"
+                )))
+            }
+        };
+        let on_exprs: Vec<Expr> = predicates.into_iter().map(|p| p.inner).collect();
+        let inner = self
+            .inner
+            .clone()
+            .join_on(right.inner.clone(), join_type, on_exprs)?;
         Ok(InternalDataFrame::new(inner, self.runtime.clone()))
     }
 

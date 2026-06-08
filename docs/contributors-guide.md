@@ -255,6 +255,14 @@ You can later shut it down with
 docker compose down
 ```
 
+You can open a shell into the running PostgreSQL server with
+
+```shell
+docker compose exec postgis psql -U postgres
+```
+
+...which is useful for interactively checking expected behaviour when adding new functions to SedonaDB.
+
 To run the actual Python tests, you can use pytest.
 
 e.g Run all of the tests
@@ -324,6 +332,44 @@ All previous saved benchmark runs can be cleared with:
 ```shell
 rm -rf target/criterion
 ```
+
+## Implementation conventions
+
+### Scalar SQL functions
+
+For scalar SQL functions with arguments that can be either scalar or array
+values, use the executor helpers in
+`rust/sedona-functions/src/executor.rs` instead of manually branching on scalar
+and array arguments. For non-geometry arguments, cast the argument once, convert
+it to an array with `executor.num_iterations()`, iterate it in lockstep with the
+geometry executor, and handle nulls in the row loop:
+
+```rust
+let arg1 = args[1]
+    .cast_to(&DataType::Float64, None)?
+    .to_array(executor.num_iterations())?;
+let arg1_array = as_float64_array(&arg1)?;
+let mut arg1_iter = arg1_array.iter();
+
+executor.execute_wkb_void(|maybe_wkb| {
+    match (maybe_wkb, arg1_iter.next().unwrap()) {
+        (Some(wkb), Some(arg1)) => {
+            invoke_scalar(&wkb, arg1, &mut builder)?;
+            builder.append_value([]);
+        }
+        _ => builder.append_null(),
+    }
+
+    Ok(())
+})?;
+```
+
+Avoid `unwrap()` and `expect()` for user or data failures in runtime paths. Use
+DataFusion errors for those cases, and reserve panics for local invariants like
+iterator lengths that were already fixed with `to_array(executor.num_iterations())`.
+
+When a scalar function accepts both scalar and array arguments, add
+`ScalarUdfTester` coverage for both paths and for null handling.
 
 ## Documentation
 
@@ -410,3 +456,25 @@ This illustrates a few ways in which arguments can be defined:
 
 The build system for function documentation is a work in progress, so be sure to ask
 if you run into problems or have any questions about the syntax!
+
+## Publishing the GPU Docker image
+
+The GPU image built from `docker/sedonadb-gpu.dockerfile` is published to Docker Hub as
+[`apache/sedona`](https://hub.docker.com/r/apache/sedona/tags) under the `sedonadb-latest` tag.
+Publishing requires push access to the `apache` organization, so run `docker login` with an
+authorized account first. The image is multi-architecture (`linux/amd64` and `linux/arm64`), so
+you also need a Buildx builder that can target multiple platforms — create one once per machine
+with `docker buildx create --use`.
+
+To build and push the image, run the helper script from the repository root:
+
+```shell
+docker/build.sh release apache/sedona:sedonadb-latest
+```
+
+The `release` mode builds both CPU architectures and pushes the result straight to the registry. A
+final argument overrides the CUDA target (the default is `75;86;89`, a fat binary covering Turing,
+Ampere, and Ada Lovelace GPUs such as the T4, A10G, and L4). Because each CPU architecture compiles
+CUDA, Rust, and vcpkg dependencies for every CUDA target, this is best run on native `amd64` and
+`arm64` hardware (such as CI runners): building the non-native architecture locally falls back to
+QEMU emulation and is very slow.

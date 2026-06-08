@@ -120,8 +120,9 @@ impl SedonaScalarKernel for RsDimToBand {
                                     None,
                                     None,
                                 )?;
-                                let data = band.contiguous_data()?;
-                                new_builder.band_data_writer().append_value(&data);
+                                let ndb = band.nd_buffer()?;
+                                let data = ndb.as_contiguous()?;
+                                new_builder.band_data_writer().append_value(data);
                                 new_builder.finish_band()?;
                             }
                             Some(dim_idx) => {
@@ -295,8 +296,9 @@ impl SedonaScalarKernel for RsBandToDim {
                     let mut concat_data = Vec::new();
                     for i in 0..num_bands {
                         let band = raster.band(i).map_err(|e| arrow_datafusion_err!(e))?;
-                        let data = band.contiguous_data()?;
-                        concat_data.extend_from_slice(&data);
+                        let ndb = band.nd_buffer()?;
+                        let data = ndb.as_contiguous()?;
+                        concat_data.extend_from_slice(data);
                     }
 
                     let nodata = ref_nodata.as_deref();
@@ -445,10 +447,11 @@ mod tests {
             assert_eq!(band.dim_names(), vec!["y", "x"]);
             assert_eq!(band.shape(), &[2, 2]);
 
-            let data = band.contiguous_data().unwrap();
+            let ndb = band.nd_buffer().unwrap();
+            let data = ndb.as_contiguous().unwrap();
             let offset = b * 4;
             let expected: Vec<u8> = (offset..offset + 4).map(|i| i as u8).collect();
-            assert_eq!(data.as_ref(), &expected[..]);
+            assert_eq!(data, &expected[..]);
         }
 
         // Verify band names
@@ -514,9 +517,10 @@ mod tests {
         assert_eq!(band.shape(), &[3, 2, 2]);
 
         // Data should be concatenation of all 3 bands
-        let data = band.contiguous_data().unwrap();
+        let ndb = band.nd_buffer().unwrap();
+        let data = ndb.as_contiguous().unwrap();
         let expected: Vec<u8> = (0..12).map(|i| i as u8).collect();
-        assert_eq!(data.as_ref(), &expected[..]);
+        assert_eq!(data, &expected[..]);
     }
 
     #[test]
@@ -721,14 +725,13 @@ mod tests {
     fn round_trip_dimtoband_bandtodim() {
         // Start with 1 band [time=3, y=2, x=2]
         let rasters = build_3d_raster_sequential(3, 2, 2);
-        let raster_array_in = RasterStructArray::new(&rasters);
-        let raster_in = raster_array_in.get(0).unwrap();
-        let original_data = raster_in
-            .band(0)
-            .unwrap()
-            .contiguous_data()
-            .unwrap()
-            .to_vec();
+        let original_data = {
+            let raster_array_in = RasterStructArray::new(&rasters);
+            let raster_in = raster_array_in.get(0).unwrap();
+            let band_in = raster_in.band(0).unwrap();
+            let ndb_in = band_in.nd_buffer().unwrap();
+            ndb_in.as_contiguous().unwrap().to_vec()
+        };
 
         // DimToBand: 1 band [time=3, y=2, x=2] -> 3 bands [y=2, x=2]
         let kernel = RsDimToBand {};
@@ -762,7 +765,8 @@ mod tests {
         let band_out = raster_out.band(0).unwrap();
         assert_eq!(band_out.dim_names(), vec!["time", "y", "x"]);
         assert_eq!(band_out.shape(), &[3, 2, 2]);
-        let round_trip_data = band_out.contiguous_data().unwrap();
-        assert_eq!(round_trip_data.as_ref(), &original_data[..]);
+        let round_trip_ndb = band_out.nd_buffer().unwrap();
+        let round_trip_data = round_trip_ndb.as_contiguous().unwrap();
+        assert_eq!(round_trip_data, &original_data[..]);
     }
 }

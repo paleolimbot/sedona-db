@@ -26,7 +26,7 @@
 import pyarrow as pa
 import pytest
 
-from sedonadb.expr import Expr, col
+from sedonadb.expr import Expr, SortExpr, col, sort_expr
 
 
 def test_col_returns_expr():
@@ -124,6 +124,59 @@ def test_expr_init_rejects_wrong_type():
         Expr("not an internal expr")
     with pytest.raises(TypeError, match="InternalExpr"):
         Expr(42)
+
+
+# --- Sort expressions --------------------------------------------------------
+
+
+def test_expr_asc_default_returns_sort_expr():
+    s = col("x").asc()
+    assert isinstance(s, SortExpr)
+    assert repr(s) == "SortExpr(x ASC NULLS LAST)"
+
+
+def test_expr_desc_default_returns_sort_expr():
+    s = col("x").desc()
+    assert isinstance(s, SortExpr)
+    assert repr(s) == "SortExpr(x DESC NULLS LAST)"
+
+
+def test_expr_asc_nulls_first():
+    s = col("x").asc(nulls_first=True)
+    assert repr(s) == "SortExpr(x ASC NULLS FIRST)"
+
+
+def test_expr_desc_nulls_first():
+    s = col("x").desc(nulls_first=True)
+    assert repr(s) == "SortExpr(x DESC NULLS FIRST)"
+
+
+def test_sort_expr_factory_default():
+    s = sort_expr(col("x"))
+    assert isinstance(s, SortExpr)
+    assert repr(s) == "SortExpr(x ASC NULLS LAST)"
+
+
+def test_sort_expr_factory_explicit_options():
+    s = sort_expr(col("x"), asc=False, nulls_first=True)
+    assert repr(s) == "SortExpr(x DESC NULLS FIRST)"
+
+
+def test_sort_expr_factory_rejects_non_expr():
+    with pytest.raises(TypeError, match="Expr"):
+        sort_expr("x")
+
+
+def test_sort_expr_init_rejects_wrong_type():
+    with pytest.raises(TypeError, match="InternalSortExpr"):
+        SortExpr("not a sort expr")
+
+
+def test_sort_expr_over_compound_expression():
+    # `.asc()` / `.desc()` on a composed Expr should propagate the
+    # rendered Display all the way through.
+    s = (col("x") + col("y")).desc()
+    assert repr(s) == "SortExpr(x + y DESC NULLS LAST)"
 
 
 # --- Binary operators --------------------------------------------------------
@@ -228,3 +281,58 @@ def test_bool_raises_for_not():
 def test_len_raises():
     with pytest.raises(TypeError, match="Expr has no length"):
         len(col("x"))
+
+
+def test_expr_funcs(con):
+    e = con.col("foofy").funcs.sqrt()
+    assert isinstance(e, Expr)
+    assert repr(e) == "Expr(sqrt(foofy))"
+
+
+def test_contextless_expr():
+    e = col("foofy")
+
+    with pytest.raises(ValueError, match="Can't pipe Expr"):
+        e.funcs
+
+
+def test_ctx_propagation(con):
+    e = con.col("foofy")
+    assert e._ctx is con
+
+    assert e.alias("bar")._ctx is con
+    assert e.cast(pa.int32())._ctx is con
+    assert e.is_null()._ctx is con
+    assert e.is_not_null()._ctx is con
+    assert e.isin([1, 2])._ctx is con
+    assert e.negate()._ctx is con
+
+    assert (e + 1)._ctx is con
+    assert (e - 1)._ctx is con
+    assert (e * 2)._ctx is con
+    assert (e / 2)._ctx is con
+    assert (-e)._ctx is con
+
+    assert (1 + e)._ctx is con
+    assert (1 - e)._ctx is con
+    assert (2 * e)._ctx is con
+    assert (2 / e)._ctx is con
+
+    assert (e == 0)._ctx is con
+    assert (e != 0)._ctx is con
+    assert (e < 0)._ctx is con
+    assert (e <= 0)._ctx is con
+    assert (e > 0)._ctx is con
+    assert (e >= 0)._ctx is con
+
+    assert (e & e)._ctx is con
+    assert (e | e)._ctx is con
+    assert (~e)._ctx is con
+
+    assert con.col("geom").funcs.st_area()._ctx is con
+    assert ((e + 1) * 2).is_null().alias("check")._ctx is con
+
+    bare_expr = col("y")
+    assert bare_expr._ctx is None
+    assert (e + bare_expr)._ctx is con
+    assert (bare_expr + e)._ctx is con
