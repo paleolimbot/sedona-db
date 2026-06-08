@@ -413,10 +413,6 @@ mod tests {
         builder.finish().unwrap()
     }
 
-    // -----------------------------------------------------------------------
-    // RS_DimToBand
-    // -----------------------------------------------------------------------
-
     #[test]
     fn dimtoband_3d_to_bands() {
         let udf: ScalarUDF = rs_dimtoband_udf().into();
@@ -483,10 +479,6 @@ mod tests {
         let raster_array = RasterStructArray::new(result_struct);
         assert!(raster_array.is_null(0));
     }
-
-    // -----------------------------------------------------------------------
-    // RS_BandToDim
-    // -----------------------------------------------------------------------
 
     #[test]
     fn bandtodim_bands_to_3d() {
@@ -710,10 +702,6 @@ mod tests {
         let raster_array = RasterStructArray::new(result_struct);
         assert!(raster_array.is_null(0));
     }
-
-    // -----------------------------------------------------------------------
-    // Round-trip: DimToBand -> BandToDim
-    // -----------------------------------------------------------------------
 
     #[test]
     fn round_trip_dimtoband_bandtodim() {
