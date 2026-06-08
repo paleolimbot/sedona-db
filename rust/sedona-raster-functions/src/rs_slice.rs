@@ -22,6 +22,7 @@ use datafusion_common::cast::{as_int64_array, as_string_array};
 use datafusion_common::error::Result;
 use datafusion_common::{arrow_datafusion_err, exec_err};
 use datafusion_expr::{ColumnarValue, Volatility};
+use sedona_common::sedona_internal_datafusion_err;
 use sedona_expr::scalar_udf::{SedonaScalarKernel, SedonaScalarUDF};
 use sedona_raster::builder::RasterBuilder;
 use sedona_raster::traits::{BandRef, RasterRef};
@@ -29,6 +30,7 @@ use sedona_schema::datatypes::SedonaType;
 use sedona_schema::matchers::ArgMatcher;
 
 use crate::executor::RasterExecutor;
+use crate::rs_ensure_loaded::NEEDS_PIXELS_METADATA_KEY;
 
 /// RS_Slice(raster, dim_name, index) -> Raster
 ///
@@ -40,6 +42,7 @@ pub fn rs_slice_udf() -> SedonaScalarUDF {
         vec![Arc::new(RsSlice {})],
         Volatility::Immutable,
     )
+    .with_metadata(NEEDS_PIXELS_METADATA_KEY, "true")
 }
 
 #[derive(Debug)]
@@ -95,7 +98,9 @@ impl SedonaScalarKernel for RsSlice {
                     let idx = idx as u64;
                     validate_not_spatial(raster, name, "RS_Slice")?;
 
-                    let t: [f64; 6] = raster.transform().try_into().unwrap();
+                    let t: [f64; 6] = raster.transform().try_into().map_err(|_| {
+                        sedona_internal_datafusion_err!("raster transform is not 6 elements")
+                    })?;
                     let spatial_dims = raster.spatial_dims();
                     new_builder.start_raster_nd(&t, &spatial_dims, raster.spatial_shape(), raster.crs())?;
 
@@ -112,11 +117,10 @@ impl SedonaScalarKernel for RsSlice {
                         // without the indexed dim are left alone.
                         let Some(dim_idx) = band.dim_index(name) else {
                             let dim_names = band.dim_names();
-                            let dim_name_refs: Vec<&str> = dim_names.to_vec();
                             let band_name = raster.band_name(band_idx);
                             new_builder.start_band_nd(
                                 band_name,
-                                &dim_name_refs,
+                                &dim_names,
                                 band.shape(),
                                 band.data_type(),
                                 band.nodata(),
@@ -156,11 +160,9 @@ impl SedonaScalarKernel for RsSlice {
                             extract_slice(band.as_ref(), dim_idx, idx, 1)?;
 
                         let band_name = raster.band_name(band_idx);
-                        let new_dim_name_refs: Vec<&str> =
-                            new_dim_names.to_vec();
                         new_builder.start_band_nd(
                             band_name,
-                            &new_dim_name_refs,
+                            &new_dim_names,
                             &new_shape,
                             band.data_type(),
                             band.nodata(),
@@ -191,6 +193,7 @@ pub fn rs_slicerange_udf() -> SedonaScalarUDF {
         vec![Arc::new(RsSliceRange {})],
         Volatility::Immutable,
     )
+    .with_metadata(NEEDS_PIXELS_METADATA_KEY, "true")
 }
 
 #[derive(Debug)]
@@ -265,7 +268,9 @@ impl SedonaScalarKernel for RsSliceRange {
                         );
                     }
 
-                    let t: [f64; 6] = raster.transform().try_into().unwrap();
+                    let t: [f64; 6] = raster.transform().try_into().map_err(|_| {
+                        sedona_internal_datafusion_err!("raster transform is not 6 elements")
+                    })?;
                     let spatial_dims = raster.spatial_dims();
                     new_builder.start_raster_nd(&t, &spatial_dims, raster.spatial_shape(), raster.crs())?;
 
@@ -281,11 +286,10 @@ impl SedonaScalarKernel for RsSliceRange {
                         // RS_Slice and RS_DimToBand.
                         let Some(dim_idx) = band.dim_index(name) else {
                             let dim_names = band.dim_names();
-                            let dim_name_refs: Vec<&str> = dim_names.to_vec();
                             let band_name = raster.band_name(band_idx);
                             new_builder.start_band_nd(
                                 band_name,
-                                &dim_name_refs,
+                                &dim_names,
                                 band.shape(),
                                 band.data_type(),
                                 band.nodata(),
@@ -309,7 +313,6 @@ impl SedonaScalarKernel for RsSliceRange {
 
                         let range_len = end_val - start_val;
                         let dim_names = band.dim_names();
-                        let dim_name_refs: Vec<&str> = dim_names.to_vec();
                         let mut new_shape: Vec<u64> = shape.to_vec();
                         new_shape[dim_idx] = range_len;
 
@@ -319,7 +322,7 @@ impl SedonaScalarKernel for RsSliceRange {
                         let band_name = raster.band_name(band_idx);
                         new_builder.start_band_nd(
                             band_name,
-                            &dim_name_refs,
+                            &dim_names,
                             &new_shape,
                             band.data_type(),
                             band.nodata(),

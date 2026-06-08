@@ -22,6 +22,7 @@ use datafusion_common::cast::as_string_array;
 use datafusion_common::error::Result;
 use datafusion_common::{arrow_datafusion_err, exec_err};
 use datafusion_expr::{ColumnarValue, Volatility};
+use sedona_common::sedona_internal_datafusion_err;
 use sedona_expr::scalar_udf::{SedonaScalarKernel, SedonaScalarUDF};
 use sedona_raster::builder::RasterBuilder;
 use sedona_raster::traits::RasterRef;
@@ -29,6 +30,7 @@ use sedona_schema::datatypes::SedonaType;
 use sedona_schema::matchers::ArgMatcher;
 
 use crate::executor::RasterExecutor;
+use crate::rs_ensure_loaded::NEEDS_PIXELS_METADATA_KEY;
 use crate::rs_slice::{extract_slice, require_any_band_has_dim};
 
 /// RS_DimToBand(raster, dim_name) -> Raster
@@ -43,6 +45,7 @@ pub fn rs_dimtoband_udf() -> SedonaScalarUDF {
         vec![Arc::new(RsDimToBand {})],
         Volatility::Immutable,
     )
+    .with_metadata(NEEDS_PIXELS_METADATA_KEY, "true")
 }
 
 #[derive(Debug)]
@@ -86,7 +89,9 @@ impl SedonaScalarKernel for RsDimToBand {
 
                     require_any_band_has_dim(raster, name, "RS_DimToBand")?;
 
-                    let t: [f64; 6] = raster.transform().try_into().unwrap();
+                    let t: [f64; 6] = raster.transform().try_into().map_err(|_| {
+                        sedona_internal_datafusion_err!("raster transform is not 6 elements")
+                    })?;
                     let spatial_dims = raster.spatial_dims();
                     new_builder.start_raster_nd(
                         &t,
@@ -105,11 +110,10 @@ impl SedonaScalarKernel for RsDimToBand {
                             None => {
                                 // Band doesn't have this dimension -- pass through
                                 let dim_names = band.dim_names();
-                                let dim_name_refs: Vec<&str> = dim_names.to_vec();
                                 let band_name = raster.band_name(band_idx);
                                 new_builder.start_band_nd(
                                     band_name,
-                                    &dim_name_refs,
+                                    &dim_names,
                                     band.shape(),
                                     band.data_type(),
                                     band.nodata(),
@@ -146,10 +150,9 @@ impl SedonaScalarKernel for RsDimToBand {
 
                                     let new_band_name =
                                         orig_band_name.map(|n| format!("{n}_{name}_{idx}"));
-                                    let new_dim_name_refs: Vec<&str> = new_dim_names.to_vec();
                                     new_builder.start_band_nd(
                                         new_band_name.as_deref(),
-                                        &new_dim_name_refs,
+                                        &new_dim_names,
                                         &new_shape,
                                         band.data_type(),
                                         band.nodata(),
@@ -184,6 +187,7 @@ pub fn rs_bandtodim_udf() -> SedonaScalarUDF {
         vec![Arc::new(RsBandToDim {})],
         Volatility::Immutable,
     )
+    .with_metadata(NEEDS_PIXELS_METADATA_KEY, "true")
 }
 
 #[derive(Debug)]
@@ -295,7 +299,9 @@ impl SedonaScalarKernel for RsBandToDim {
 
                     let nodata = ref_nodata.as_deref();
 
-                    let t: [f64; 6] = raster.transform().try_into().unwrap();
+                    let t: [f64; 6] = raster.transform().try_into().map_err(|_| {
+                        sedona_internal_datafusion_err!("raster transform is not 6 elements")
+                    })?;
                     let spatial_dims = raster.spatial_dims();
                     new_builder.start_raster_nd(
                         &t,
