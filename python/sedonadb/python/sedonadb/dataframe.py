@@ -1429,6 +1429,18 @@ class DataFrame:
 
         return width
 
+    def _ensure_aliased(self, src: Any) -> "DataFrame":
+        return self.alias(_default_alias_for_obj(src))
+
+
+def _default_alias_for_obj(obj: Any) -> str:
+    if isinstance(obj, str):
+        return obj
+    elif isinstance(obj, Path):
+        return str(obj)
+
+    return f"{type(obj).__name__}_{id(obj)}"
+
 
 def _create_data_frame(ctx, obj, schema) -> DataFrame:
     """Create a DataFrame (internal)
@@ -1455,7 +1467,7 @@ def _create_data_frame(ctx, obj, schema) -> DataFrame:
     # __datafusion_table_provider__ or __arrow_c_stream__. For objects implementing
     # __arrow_c_stream__, this currently will only work for a single scan (i.e.,
     # the returned data frame can't be previewed before the query is computed).
-    return _scan_default(ctx, obj, schema)
+    return _scan_default(ctx, obj, schema)._ensure_aliased(obj)
 
 
 def _scan_default(ctx, obj, schema):

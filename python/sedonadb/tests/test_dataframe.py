@@ -32,7 +32,11 @@ def test_dataframe_from_dataframe(con):
     # DataFrame from DataFrame on the same context with no schema
     # should be just a Python reference
     df = con.sql("SELECT ST_Point(0, 1) as geom")
-    assert con.create_data_frame(df) is df
+    new_df = con.create_data_frame(df)
+    assert new_df is df
+
+    # Alias should not change
+    assert repr(df.geom) == repr(new_df.geom)
 
     # On a separate context the table should still be collected the same
     # but should be a separate Python reference. This also has the effect
@@ -41,6 +45,9 @@ def test_dataframe_from_dataframe(con):
     new_df = new_con.create_data_frame(df)
     assert new_df is not df
     pd.testing.assert_frame_equal(df.to_pandas(), new_df.to_pandas())
+
+    # Alias changes
+    assert repr(new_df.geom) != repr(df.geom)
 
 
 def test_dataframe_from_table(con):
