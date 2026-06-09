@@ -95,7 +95,6 @@ impl SedonaScalarKernel for RsSlice {
                             "RS_Slice: index must be non-negative, got {idx}"
                         );
                     }
-                    let idx = idx as u64;
                     validate_not_spatial(raster, name, "RS_Slice")?;
 
                     let t: [f64; 6] = raster.transform().try_into().map_err(|_| {
@@ -149,7 +148,7 @@ impl SedonaScalarKernel for RsSlice {
                             .filter(|&(i, _)| i != dim_idx)
                             .map(|(_, n)| n)
                             .collect();
-                        let new_shape: Vec<u64> = shape
+                        let new_shape: Vec<i64> = shape
                             .iter()
                             .enumerate()
                             .filter(|&(i, _)| i != dim_idx)
@@ -258,8 +257,6 @@ impl SedonaScalarKernel for RsSliceRange {
                             "RS_SliceRange: end must be non-negative, got {end_val}"
                         );
                     }
-                    let start_val = start_val as u64;
-                    let end_val = end_val as u64;
                     validate_not_spatial(raster, name, "RS_SliceRange")?;
 
                     if start_val >= end_val {
@@ -313,7 +310,7 @@ impl SedonaScalarKernel for RsSliceRange {
 
                         let range_len = end_val - start_val;
                         let dim_names = band.dim_names();
-                        let mut new_shape: Vec<u64> = shape.to_vec();
+                        let mut new_shape: Vec<i64> = shape.to_vec();
                         new_shape[dim_idx] = range_len;
 
                         let sliced_data =
@@ -395,16 +392,16 @@ pub(crate) fn validate_not_spatial(
 pub(crate) fn extract_slice(
     band: &dyn BandRef,
     dim_idx: usize,
-    start: u64,
-    count: u64,
+    start: i64,
+    count: i64,
 ) -> Result<Vec<u8>> {
     let shape = band.shape();
-    let elem_size = band.data_type().byte_size() as u64;
+    let elem_size = band.data_type().byte_size() as i64;
     let ndb = band.nd_buffer()?;
     let data = ndb.as_contiguous()?;
 
-    let outer_count: u64 = shape[..dim_idx].iter().product();
-    let inner_size: u64 = shape[dim_idx + 1..].iter().product::<u64>() * elem_size;
+    let outer_count: i64 = shape[..dim_idx].iter().product();
+    let inner_size: i64 = shape[dim_idx + 1..].iter().product::<i64>() * elem_size;
     let stride = shape[dim_idx] * inner_size;
     let copy_size = (count * inner_size) as usize;
     let offset_within_stride = start * inner_size;
@@ -452,7 +449,7 @@ mod tests {
             .start_band_nd(
                 None,
                 &["time", "y", "x"],
-                &[time, height, width],
+                &[time as i64, height as i64, width as i64],
                 BandDataType::UInt8,
                 None,
                 None,

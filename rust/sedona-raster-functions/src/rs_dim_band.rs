@@ -134,7 +134,7 @@ impl SedonaScalarKernel for RsDimToBand {
                                     .filter(|&(i, _)| i != dim_idx)
                                     .map(|(_, n)| n)
                                     .collect();
-                                let new_shape: Vec<u64> = band
+                                let new_shape: Vec<i64> = band
                                     .shape()
                                     .iter()
                                     .enumerate()
@@ -280,8 +280,8 @@ impl SedonaScalarKernel for RsBandToDim {
                     new_dim_names.push(name);
                     new_dim_names.extend(ref_dim_names.iter());
 
-                    let mut new_shape: Vec<u64> = Vec::with_capacity(ref_shape.len() + 1);
-                    new_shape.push(num_bands as u64);
+                    let mut new_shape: Vec<i64> = Vec::with_capacity(ref_shape.len() + 1);
+                    new_shape.push(num_bands as i64);
                     new_shape.extend_from_slice(&ref_shape);
 
                     let mut concat_data = Vec::new();
@@ -358,7 +358,7 @@ mod tests {
             .start_band_nd(
                 Some("temp"),
                 &["time", "y", "x"],
-                &[time, height, width],
+                &[time as i64, height as i64, width as i64],
                 BandDataType::UInt8,
                 None,
                 None,
@@ -392,7 +392,7 @@ mod tests {
                 .start_band_nd(
                     None,
                     &["y", "x"],
-                    &[height, width],
+                    &[height as i64, width as i64],
                     BandDataType::UInt8,
                     None,
                     None,

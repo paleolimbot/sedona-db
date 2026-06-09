@@ -349,7 +349,7 @@ impl SedonaScalarKernel for RsDimSize {
                             );
                         }
                     }
-                    builder.append_value(first_size as i64);
+                    builder.append_value(first_size);
                     Ok(())
                 }
             }
@@ -408,7 +408,7 @@ impl SedonaScalarKernel for RsDimSizeWithBand {
                         .band((band_index - 1) as usize)
                         .map_err(|e| arrow_datafusion_err!(e))?;
                     match band.dim_size(name) {
-                        Some(s) => builder.append_value(s as i64),
+                        Some(s) => builder.append_value(s),
                         None => builder.append_null(),
                     }
                     Ok(())
@@ -460,7 +460,7 @@ impl SedonaScalarKernel for RsShape {
                 let shape =
                     check_band_agreement(raster, "RS_Shape", "shape", |b| b.shape().to_vec())?;
                 for &s in &shape {
-                    list_builder.values().append_value(s as i64);
+                    list_builder.values().append_value(s);
                 }
                 list_builder.append(true);
                 Ok(())
@@ -511,7 +511,7 @@ impl SedonaScalarKernel for RsShapeWithBand {
                         .band((band_index - 1) as usize)
                         .map_err(|e| arrow_datafusion_err!(e))?;
                     for &s in band.shape() {
-                        list_builder.values().append_value(s as i64);
+                        list_builder.values().append_value(s);
                     }
                     list_builder.append(true);
                     Ok(())
@@ -564,7 +564,7 @@ mod tests {
             .start_band_nd(
                 None,
                 &["time", "y", "x"],
-                &[time, height, width],
+                &[time as i64, height as i64, width as i64],
                 BandDataType::Float32,
                 None,
                 None,
