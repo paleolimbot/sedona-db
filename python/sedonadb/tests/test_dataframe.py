@@ -600,3 +600,43 @@ def test_len_error(con):
         ValueError, match=r"Can't compute len\(\) of a lazy SedonaDB DataFrame"
     ):
         len(con.sql("SELECT 1 as one"))
+
+
+def test_default_alias_for_obj():
+    from sedonadb.dataframe import _default_alias_for_obj
+
+    # String with path - extracts basename + hex id suffix
+    s = "/path/to/file.parquet"
+    assert _default_alias_for_obj(s) == f"file.parquet_{id(s):x}"
+
+    s = "s3://bucket/data.parquet"
+    assert _default_alias_for_obj(s) == f"data.parquet_{id(s):x}"
+
+    s = "relative/path/data.csv"
+    assert _default_alias_for_obj(s) == f"data.csv_{id(s):x}"
+
+    # String without path component - returns original + hex id suffix
+    s = "simple_name"
+    assert _default_alias_for_obj(s) == f"simple_name_{id(s):x}"
+
+    s = ""
+    alias = _default_alias_for_obj(s)
+    # Empty basename, falls back to original (empty) + hex id
+    assert alias == f"_{id(s):x}"
+
+    # Path object - extracts name + hex id suffix
+    p = Path("/path/to/file.parquet")
+    assert _default_alias_for_obj(p) == f"file.parquet_{id(p):x}"
+
+    p = Path("relative/data.csv")
+    assert _default_alias_for_obj(p) == f"data.csv_{id(p):x}"
+
+    # Path with empty name (root path) - falls back to type-based
+    root_path = Path("/")
+    alias = _default_alias_for_obj(root_path)
+    assert alias == f"posixpath_{id(root_path):x}"
+
+    # Other types - returns lowercase type name + hex id
+    obj = [1, 2, 3]
+    alias = _default_alias_for_obj(obj)
+    assert alias == f"list_{id(obj):x}"

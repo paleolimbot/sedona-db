@@ -278,6 +278,7 @@ class SedonaContext:
         if isinstance(table_paths, (str, Path)):
             table_paths_list = [str(table_paths)]
         else:
+            table_paths = list(table_paths)
             table_paths_list = [str(path) for path in table_paths]
 
         if options is None:
@@ -369,6 +370,7 @@ class SedonaContext:
         if isinstance(table_paths, (str, Path)):
             table_paths_list = [str(table_paths)]
         else:
+            table_paths = list(table_paths)
             table_paths_list = [str(path) for path in table_paths]
 
         spec = PyogrioFormatSpec(extension)
@@ -430,8 +432,9 @@ class SedonaContext:
             >>> sd.read_format(spec, "file:///path/to/foo.zarr").show()  # doctest: +SKIP
         """
         if isinstance(table_paths, (str, Path)):
-            table_paths = [str(table_paths)]
+            table_paths_list = [str(table_paths)]
         else:
+            table_paths = list(table_paths)
             table_paths_list = [str(path) for path in table_paths]
 
         if isinstance(partitioning, str):

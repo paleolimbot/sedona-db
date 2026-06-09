@@ -1434,12 +1434,23 @@ class DataFrame:
 
 
 def _default_alias_for_obj(obj: Any) -> str:
+    hex_id = f"{id(obj):x}"
     if isinstance(obj, str):
-        return obj
+        try:
+            basename = Path(obj).name
+            if basename:
+                return f"{basename}_{hex_id}"
+        except Exception:
+            pass
+        return f"{obj}_{hex_id}"
     elif isinstance(obj, Path):
-        return str(obj)
+        try:
+            if obj.name:
+                return f"{obj.name}_{hex_id}"
+        except Exception:
+            pass
 
-    return f"{type(obj).__name__}_{id(obj)}"
+    return f"{type(obj).__name__.lower()}_{hex_id}"
 
 
 def _create_data_frame(ctx, obj, schema) -> DataFrame:
