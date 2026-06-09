@@ -538,7 +538,17 @@ mod tests {
     fn build_2d_raster(width: u64, height: u64) -> StructArray {
         let mut builder = RasterBuilder::new(1);
         builder
-            .start_raster_2d(width, height, 0.0, 0.0, 1.0, -1.0, 0.0, 0.0, None)
+            .start_raster_2d(
+                width as i64,
+                height as i64,
+                0.0,
+                0.0,
+                1.0,
+                -1.0,
+                0.0,
+                0.0,
+                None,
+            )
             .unwrap();
         builder.start_band_2d(BandDataType::Float32, None).unwrap();
         let data = vec![0u8; (width * height * 4) as usize];
