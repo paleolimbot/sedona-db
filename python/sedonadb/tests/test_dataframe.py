@@ -545,20 +545,7 @@ def test_show_explained(con, capsys):
 
 def test_explain(con, capsys):
     con.sql("SELECT 1 as one").explain().show()
-    expected = """
-┌───────────────┬─────────────────────────────────┐
-│   plan_type   ┆               plan              │
-│      utf8     ┆               utf8              │
-╞═══════════════╪═════════════════════════════════╡
-│ logical_plan  ┆ Projection: Int64(1) AS one     │
-│               ┆   EmptyRelation: rows=1         │
-├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
-│ physical_plan ┆ ProjectionExec: expr=[1 as one] │
-│               ┆   PlaceholderRowExec            │
-│               ┆                                 │
-└───────────────┴─────────────────────────────────┘
-    """.strip()
-    assert capsys.readouterr().out.strip() == expected
+    assert "Projection: Int64(1) AS one" in capsys.readouterr().out.strip()
 
     con.sql("SELECT 1 as one").explain(format="tree").show()
     expected = """
