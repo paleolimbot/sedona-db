@@ -51,7 +51,7 @@ def test_read_parquet(con, geoarrow_data):
     assert len(tab) == 244
 
     # Check that we still have an alias based on the input object
-    assert "map_" in repr(df.geometry)
+    assert "list_" in repr(df.geometry)
 
 
 @pytest.mark.parametrize("name", ["water-junc", "water-point"])
