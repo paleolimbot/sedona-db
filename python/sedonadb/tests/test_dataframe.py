@@ -66,6 +66,9 @@ def test_dataframe_from_table(con):
     # ...and ensure we can collect again
     assert df.to_arrow_table() == tab
 
+    # Should be aliased with 'table'
+    assert 'table_' in repr(df.geom)
+
 
 def test_dataframe_from_pandas(con):
     pd_df = pd.DataFrame({"col1": [1, 2, 3]})
@@ -77,6 +80,9 @@ def test_dataframe_from_pandas(con):
 
     # ...and ensure we can collect again
     pd.testing.assert_frame_equal(df.to_pandas(), pd_df)
+
+    # Should be aliased with 'dataframe'
+    assert 'dataframe_' in repr(df.col1)
 
 
 def test_dataframe_from_geopandas(con):

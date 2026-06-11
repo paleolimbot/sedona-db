@@ -1471,7 +1471,7 @@ def _create_data_frame(ctx, obj, schema) -> DataFrame:
     # This includes geopandas/pandas DataFrames, pyarrow tables, and Polars tables.
     type_name = _qualified_type_name(obj)
     if type_name in SPECIAL_CASED_SCANS:
-        return SPECIAL_CASED_SCANS[type_name](ctx, obj, schema)
+        return SPECIAL_CASED_SCANS[type_name](ctx, obj, schema)._ensure_aliased(obj)
 
     # The default implementation handles objects that implement
     # __datafusion_table_provider__ or __arrow_c_stream__. For objects implementing
