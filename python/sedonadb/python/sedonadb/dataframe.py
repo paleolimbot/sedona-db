@@ -1384,8 +1384,7 @@ class DataFrame:
 
         Examples:
 
-            >>> import sedonadb
-            >>> con = sedonadb.connect()
+            >>> con = sedona.db.connect()
             >>> df = con.sql("SELECT 1 as one")
             >>> df.explain().show()
             ┌───────────────┬─────────────────────────────────┐
@@ -1400,7 +1399,7 @@ class DataFrame:
             │               ┆                                 │
             └───────────────┴─────────────────────────────────┘
         """
-        return DataFrame(self._ctx, self._impl.explain(type, format))
+        return DataFrame(self._ctx, self._impl.unwrap_alias().explain(type, format))
 
     def __repr__(self) -> str:
         if self._ctx.options.interactive:

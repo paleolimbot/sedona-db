@@ -157,6 +157,22 @@ impl InternalDataFrame {
         }
     }
 
+    fn unwrap_alias(&self) -> Result<InternalDataFrame, PySedonaError> {
+        let (state, plan) = self.inner.clone().into_parts();
+
+        if let LogicalPlan::SubqueryAlias(sqa) = plan {
+            Ok(InternalDataFrame::new(
+                DataFrame::new(state, Arc::unwrap_or_clone(sqa.input)),
+                self.runtime.clone(),
+            ))
+        } else {
+            Ok(InternalDataFrame::new(
+                DataFrame::new(state, plan),
+                self.runtime.clone(),
+            ))
+        }
+    }
+
     fn limit(
         &self,
         limit: Option<usize>,
