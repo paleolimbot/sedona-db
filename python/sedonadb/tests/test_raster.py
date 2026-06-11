@@ -41,6 +41,14 @@ def test_raster_accessors(con):
 
     b = r.bands[0]
     assert b.name is None
-    assert b.shape == [32, 64]
-    assert b.source_shape == [32, 64]
+    assert b.shape == (32, 64)
+    assert b.source_shape == (32, 64)
     assert b.outdb_uri is None
+    assert b.data_type == "uint8"
+
+    arr = b.to_numpy()
+    assert arr.shape == b.shape
+    assert arr[0, 0] == 127
+
+    for i, b in enumerate(r.bands):
+        assert b.data[1, 1] == i + 1

@@ -15,11 +15,42 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING, Tuple
 import geoarrow.types as gat
 import pyarrow as pa
 
+if TYPE_CHECKING:
+    import numpy as np
+
 EXTENSION_NAME = "sedona.raster"
+
+# Band data type IDs (matches sedona-schema BandDataType enum discriminants)
+BAND_DATA_TYPES = {
+    1: "UInt8",
+    2: "UInt16",
+    3: "Int16",
+    4: "UInt32",
+    5: "Int32",
+    6: "Float32",
+    7: "Float64",
+    8: "UInt64",
+    9: "Int64",
+    10: "Int8",
+}
+
+# Python struct module format characters for band data types
+BAND_DATA_TYPE_STRUCT_CHARS = {
+    1: "B",
+    2: "H",
+    3: "h",
+    4: "I",
+    5: "i",
+    6: "f",
+    7: "d",
+    8: "Q",
+    9: "q",
+    10: "b",
+}
 
 
 class Raster:
@@ -66,7 +97,7 @@ class Band:
         return self._py_field("name")
 
     @property
-    def shape(self) -> List[int]:
+    def shape(self) -> Tuple[int, ...]:
         views = self._py_field("view")
         if views:
             raise NotImplementedError("Lazy views are not yet supported")
@@ -74,16 +105,39 @@ class Band:
         return self.source_shape
 
     @property
-    def source_shape(self) -> List[int]:
-        return self._py_field("source_shape")
+    def source_shape(self) -> Tuple[int, ...]:
+        return tuple(self._py_field("source_shape"))
 
     @property
     def outdb_uri(self) -> Optional[str]:
         return self._py_field("outdb_uri")
 
     @property
-    def data(self):
-        pass
+    def data_type(self) -> str:
+        type_id = self._py_field("data_type")
+        return BAND_DATA_TYPES[type_id].lower()
+
+    @property
+    def source_data(self) -> memoryview:
+        view_scalar = self._array.field("data")[0]
+        return memoryview(view_scalar.as_buffer())
+
+    @property
+    def data(self) -> memoryview:
+        # When views are supported, we would need to calculate the striding
+        # to export a zero copy view.
+        views = self._py_field("view")
+        if views:
+            raise NotImplementedError("Lazy views are not yet supported")
+
+        buffer_type_id = self._py_field("data_type")
+        buffer_type_char = BAND_DATA_TYPE_STRUCT_CHARS[buffer_type_id]
+        return self.source_data.cast(buffer_type_char, self.shape)
+
+    def to_numpy(self) -> "np.ndarray":
+        import numpy as np
+
+        return np.array(self.data)
 
 
 class RasterScalar(pa.ExtensionScalar):
