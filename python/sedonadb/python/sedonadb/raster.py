@@ -54,50 +54,65 @@ BAND_DATA_TYPE_STRUCT_CHARS = {
 
 
 class Raster:
+    """Python representation of a sedona.raster scalar value."""
+
     def __init__(self, array, i=0):
+        """Create a Raster from an Arrow array at index i."""
         if isinstance(array, pa.ExtensionArray):
             array = array.storage
 
         self._array = pa.array(array.slice(i, i + 1))
 
     def _py_field(self, k):
+        """Extract a field value as a Python object."""
         return self._array.field(k)[0].as_py()
 
     @property
     def crs(self) -> gat.Crs:
+        """The coordinate reference system of this raster."""
         return gat.type_spec(crs=self._py_field("crs")).crs
 
     @property
     def width(self) -> int:
+        """The width of this raster in pixels."""
         return self._py_field("spatial_shape")[0]
 
     @property
     def height(self) -> int:
+        """The height of this raster in pixels."""
         return self._py_field("spatial_shape")[1]
 
     @property
     def transform(self) -> List[float]:
+        """The affine transform coefficients for this raster."""
         return self._py_field("transform")
 
     @property
     def bands(self) -> List["Band"]:
+        """The list of bands in this raster."""
         bands_array = self._array.field("bands").flatten()
         return [Band(bands_array, i) for i in range(len(bands_array))]
 
 
 class Band:
+    """Python representation of a raster band."""
+
     def __init__(self, array, i=0):
+        """Create a Band from an Arrow array at index i."""
         self._array = pa.array(array.slice(i, i + 1))
 
     def _py_field(self, k):
+        """Extract a field value as a Python object."""
         return self._array.field(k)[0].as_py()
 
     @property
     def name(self) -> Optional[str]:
+        """The name of this band, if any."""
         return self._py_field("name")
 
     @property
     def shape(self) -> Tuple[int, ...]:
+        """The shape of this band's data after applying any views."""
         views = self._py_field("view")
         if views:
             raise NotImplementedError("Lazy views are not yet supported")
@@ -106,24 +121,29 @@ class Band:
 
     @property
     def source_shape(self) -> Tuple[int, ...]:
+        """The shape of this band's source data."""
         return tuple(self._py_field("source_shape"))
 
     @property
     def outdb_uri(self) -> Optional[str]:
+        """The URI for out-of-database storage, if any."""
         return self._py_field("outdb_uri")
 
     @property
     def data_type(self) -> str:
+        """The pixel data type name (e.g., 'uint8', 'float32')."""
         type_id = self._py_field("data_type")
         return BAND_DATA_TYPES[type_id].lower()
 
     @property
     def source_data(self) -> memoryview:
+        """The raw source data buffer as a memoryview."""
         view_scalar = self._array.field("data")[0]
         return memoryview(view_scalar.as_buffer())
 
     @property
     def data(self) -> memoryview:
+        """The band data as a typed, shaped memoryview."""
         # When views are supported, we would need to calculate the striding
         # to export a zero copy view.
         views = self._py_field("view")
@@ -135,6 +155,7 @@ class Band:
         return self.source_data.cast(buffer_type_char, self.shape)
 
     def to_numpy(self) -> "np.ndarray":
+        """Convert this band's data to a numpy array."""
         import numpy as np
 
         return np.array(self.data)
