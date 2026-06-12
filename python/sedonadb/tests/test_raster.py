@@ -34,10 +34,12 @@ def test_raster_accessors(con):
     tab = t.to_arrow_table()
     r: Raster = tab["raster"][0].as_py()
 
+    assert r.crs.to_json_dict()["id"] == {"authority": "OGC", "code": "CRS84"}
     assert r.width == 64
     assert r.height == 32
     assert len(r.transform) == 6
     assert len(r.bands) == 3
+    assert repr(r) == "<Raster 64x32, 3 band(s)>"
 
     b = r.bands[0]
     assert b.name is None
@@ -45,6 +47,7 @@ def test_raster_accessors(con):
     assert b.source_shape == (32, 64)
     assert b.outdb_uri is None
     assert b.data_type == "uint8"
+    assert repr(b) == "<Band uint8 32x64>"
 
     arr = b.to_numpy()
     assert arr.shape == b.shape
@@ -52,3 +55,15 @@ def test_raster_accessors(con):
 
     for i, b in enumerate(r.bands):
         assert b.data[1, 1] == i + 1
+
+
+def test_raster_to_lit(con):
+    t = con.sql("SELECT RS_Example() as raster")
+    tab = t.to_arrow_table()
+    r = tab["raster"][0].as_py()
+
+    t2 = con.sql(
+        "SELECT RS_Width($1) AS w, RS_Height($1) AS h", params=(r,)
+    ).to_pandas()
+    assert t2.iloc[0, 0] == r.width
+    assert t2.iloc[0, 1] == r.height

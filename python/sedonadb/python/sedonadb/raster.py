@@ -93,6 +93,16 @@ class Raster:
         bands_array = self._array.field("bands").flatten()
         return [Band(bands_array, i) for i in range(len(bands_array))]
 
+    def __repr__(self) -> str:
+        """Return a string representation of this raster."""
+        return f"<Raster {self.width}x{self.height}, {len(self.bands)} band(s)>"
+
+    def __arrow_c_array__(self, requested_schema=None):
+        """Implement the array protocol so this works with lit()"""
+        extension_type = RasterType(self._array.type)
+        extension_array = extension_type.wrap_array(self._array)
+        return extension_array.__arrow_c_array__(requested_schema=requested_schema)
+
 
 class Band:
     """Python representation of a raster band."""
@@ -144,6 +154,9 @@ class Band:
     @property
     def data(self) -> memoryview:
         """The band data as a typed, shaped memoryview."""
+        if self.outdb_uri is not None:
+            raise ValueError("Can't extract buffer from a reference to external data.")
+
         # When views are supported, we would need to calculate the striding
         # to export a zero copy view.
         views = self._py_field("view")
@@ -159,6 +172,11 @@ class Band:
         import numpy as np
 
         return np.array(self.data)
+
+    def __repr__(self) -> str:
+        """Return a string representation of this band."""
+        name_part = f" {self.name!r}" if self.name else ""
+        return f"<Band{name_part} {self.data_type} {'x'.join(map(str, self.shape))}>"
 
 
 class RasterScalar(pa.ExtensionScalar):
