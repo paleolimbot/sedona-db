@@ -528,158 +528,51 @@ mod tests {
     use super::*;
     use arrow_array::{Array, Int32Array, ListArray, StringArray, StructArray};
     use datafusion_expr::ScalarUDF;
-    use sedona_raster::builder::RasterBuilder;
     use sedona_schema::datatypes::RASTER;
-    use sedona_schema::raster::BandDataType;
+    use sedona_testing::raster_spec::RasterSpec;
     use sedona_testing::rasters::generate_test_rasters;
     use sedona_testing::testers::ScalarUdfTester;
 
-    /// Build a single-row 2D raster StructArray.
+    /// Build a single-row 2D raster StructArray (one zero-filled Float32 band).
     fn build_2d_raster(width: u64, height: u64) -> StructArray {
-        let mut builder = RasterBuilder::new(1);
-        builder
-            .start_raster_2d(
-                width as i64,
-                height as i64,
-                0.0,
-                0.0,
-                1.0,
-                -1.0,
-                0.0,
-                0.0,
-                None,
-            )
-            .unwrap();
-        builder.start_band_2d(BandDataType::Float32, None).unwrap();
-        let data = vec![0u8; (width * height * 4) as usize];
-        builder.band_data_writer().append_value(&data);
-        builder.finish_band().unwrap();
-        builder.finish_raster().unwrap();
-        builder.finish().unwrap()
+        let pixels = (width * height) as usize;
+        RasterSpec::d2(width as i64, height as i64)
+            .crs(None)
+            .band_values(&vec![0.0f32; pixels])
+            .build()
     }
 
-    /// Build a single-row 3D raster StructArray with shape [time, height, width].
+    /// Build a single-row 3D raster StructArray with shape [time, height, width]
+    /// (one zero-filled Float32 band).
     fn build_3d_raster(time: u64, height: u64, width: u64) -> StructArray {
-        let mut builder = RasterBuilder::new(1);
-        let transform = [0.0, 1.0, 0.0, 0.0, 0.0, -1.0];
-        builder
-            .start_raster_nd(
-                &transform,
-                &["x", "y"],
-                &[width as i64, height as i64],
-                None,
-            )
-            .unwrap();
-        builder
-            .start_band_nd(
-                None,
-                &["time", "y", "x"],
-                &[time as i64, height as i64, width as i64],
-                BandDataType::Float32,
-                None,
-                None,
-                None,
-            )
-            .unwrap();
-        let data = vec![0u8; (time * height * width * 4) as usize];
-        builder.band_data_writer().append_value(&data);
-        builder.finish_band().unwrap();
-        builder.finish_raster().unwrap();
-        builder.finish().unwrap()
+        let pixels = (time * height * width) as usize;
+        RasterSpec::nd(
+            &["time", "y", "x"],
+            &[time as i64, height as i64, width as i64],
+        )
+        .crs(None)
+        .band_values(&vec![0.0f32; pixels])
+        .build()
     }
 
     /// Build a raster where two bands both carry a `time` dimension but
     /// disagree on its size. Used to exercise the "filtered bands disagree"
     /// error path in `RS_DimSize`.
     fn build_conflicting_time_size_raster() -> StructArray {
-        let mut builder = RasterBuilder::new(1);
-        let transform = [0.0, 1.0, 0.0, 0.0, 0.0, -1.0];
-        builder
-            .start_raster_nd(&transform, &["x", "y"], &[5, 4], None)
-            .unwrap();
-
-        // Band 0: time=3
-        builder
-            .start_band_nd(
-                None,
-                &["time", "y", "x"],
-                &[3, 4, 5],
-                BandDataType::Float32,
-                None,
-                None,
-                None,
-            )
-            .unwrap();
-        builder
-            .band_data_writer()
-            .append_value(vec![0u8; 3 * 4 * 5 * 4]);
-        builder.finish_band().unwrap();
-
-        // Band 1: time=7 (disagrees with band 0)
-        builder
-            .start_band_nd(
-                None,
-                &["time", "y", "x"],
-                &[7, 4, 5],
-                BandDataType::Float32,
-                None,
-                None,
-                None,
-            )
-            .unwrap();
-        builder
-            .band_data_writer()
-            .append_value(vec![0u8; 7 * 4 * 5 * 4]);
-        builder.finish_band().unwrap();
-
-        builder.finish_raster().unwrap();
-        builder.finish().unwrap()
+        RasterSpec::nd(&["time", "y", "x"], &[3, 4, 5])
+            .crs(None)
+            .band_values(&[0.0f32; 3 * 4 * 5])
+            .band_values_nd(&["time", "y", "x"], &[7, 4, 5], &[0.0f32; 7 * 4 * 5])
+            .build()
     }
 
     /// Build a raster with two bands that have different dimensionality.
     fn build_mixed_dim_raster() -> StructArray {
-        let mut builder = RasterBuilder::new(1);
-        let transform = [0.0, 1.0, 0.0, 0.0, 0.0, -1.0];
-        builder
-            .start_raster_nd(&transform, &["x", "y"], &[5, 4], None)
-            .unwrap();
-
-        // Band 0: 2D [4, 5]
-        builder
-            .start_band_nd(
-                None,
-                &["y", "x"],
-                &[4, 5],
-                BandDataType::Float32,
-                None,
-                None,
-                None,
-            )
-            .unwrap();
-        builder
-            .band_data_writer()
-            .append_value(vec![0u8; 4 * 5 * 4]);
-        builder.finish_band().unwrap();
-
-        // Band 1: 3D [3, 4, 5]
-        builder
-            .start_band_nd(
-                None,
-                &["time", "y", "x"],
-                &[3, 4, 5],
-                BandDataType::Float32,
-                None,
-                None,
-                None,
-            )
-            .unwrap();
-        builder
-            .band_data_writer()
-            .append_value(vec![0u8; 3 * 4 * 5 * 4]);
-        builder.finish_band().unwrap();
-
-        builder.finish_raster().unwrap();
-        builder.finish().unwrap()
+        RasterSpec::nd(&["time", "y", "x"], &[3, 4, 5])
+            .crs(None)
+            .band_values_nd(&["y", "x"], &[4, 5], &[0.0f32; 4 * 5])
+            .band_values_nd(&["time", "y", "x"], &[3, 4, 5], &[0.0f32; 3 * 4 * 5])
+            .build()
     }
 
     #[test]

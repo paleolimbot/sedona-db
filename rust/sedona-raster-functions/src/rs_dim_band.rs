@@ -338,74 +338,34 @@ mod tests {
     use sedona_raster::traits::RasterRef;
     use sedona_schema::datatypes::RASTER;
     use sedona_schema::raster::BandDataType;
+    use sedona_testing::raster_spec::RasterSpec;
     use sedona_testing::rasters::generate_test_rasters;
     use sedona_testing::testers::ScalarUdfTester;
 
     /// Build a single-row 3D raster with 1 band, shape [time, y, x],
     /// and sequential UInt8 data.
     fn build_3d_raster_sequential(time: u64, height: u64, width: u64) -> StructArray {
-        let mut builder = RasterBuilder::new(1);
-        let transform = [0.0, 1.0, 0.0, 0.0, 0.0, -1.0];
-        builder
-            .start_raster_nd(
-                &transform,
-                &["x", "y"],
-                &[width as i64, height as i64],
-                None,
-            )
-            .unwrap();
-        builder
-            .start_band_nd(
-                Some("temp"),
-                &["time", "y", "x"],
-                &[time as i64, height as i64, width as i64],
-                BandDataType::UInt8,
-                None,
-                None,
-                None,
-            )
-            .unwrap();
-        let total = (time * height * width) as usize;
-        let data: Vec<u8> = (0..total).map(|i| i as u8).collect();
-        builder.band_data_writer().append_value(&data);
-        builder.finish_band().unwrap();
-        builder.finish_raster().unwrap();
-        builder.finish().unwrap()
+        RasterSpec::nd(
+            &["time", "y", "x"],
+            &[time as i64, height as i64, width as i64],
+        )
+        .crs(None)
+        .band(BandDataType::UInt8)
+        .name("temp")
+        .build()
     }
 
     /// Build a single-row 2D raster with N bands, each [y, x], with
     /// sequential data starting at `band_idx * y * x`.
     fn build_multi_band_2d(num_bands: usize, height: u64, width: u64) -> StructArray {
-        let mut builder = RasterBuilder::new(1);
-        let transform = [0.0, 1.0, 0.0, 0.0, 0.0, -1.0];
-        builder
-            .start_raster_nd(
-                &transform,
-                &["x", "y"],
-                &[width as i64, height as i64],
-                None,
-            )
-            .unwrap();
         let pixels = (height * width) as usize;
+        let mut spec = RasterSpec::d2(width as i64, height as i64).crs(None);
         for b in 0..num_bands {
-            builder
-                .start_band_nd(
-                    None,
-                    &["y", "x"],
-                    &[height as i64, width as i64],
-                    BandDataType::UInt8,
-                    None,
-                    None,
-                    None,
-                )
-                .unwrap();
             let offset = b * pixels;
             let data: Vec<u8> = (offset..offset + pixels).map(|i| i as u8).collect();
-            builder.band_data_writer().append_value(&data);
-            builder.finish_band().unwrap();
+            spec = spec.band_values(&data);
         }
-        builder.finish_raster().unwrap();
-        builder.finish().unwrap()
+        spec.build()
     }
 
     #[test]

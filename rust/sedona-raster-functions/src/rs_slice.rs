@@ -425,43 +425,23 @@ mod tests {
     use datafusion_common::ScalarValue;
     use datafusion_expr::ScalarUDF;
     use sedona_raster::array::RasterStructArray;
-    use sedona_raster::builder::RasterBuilder;
     use sedona_raster::traits::RasterRef;
     use sedona_schema::datatypes::RASTER;
     use sedona_schema::raster::BandDataType;
+    use sedona_testing::raster_spec::RasterSpec;
     use sedona_testing::rasters::generate_test_rasters;
     use sedona_testing::testers::ScalarUdfTester;
 
     /// Build a single-row 3D raster with shape [time, height, width] and
     /// sequential UInt8 data so we can verify slicing correctness.
     fn build_3d_raster_sequential(time: u64, height: u64, width: u64) -> StructArray {
-        let mut builder = RasterBuilder::new(1);
-        let transform = [0.0, 1.0, 0.0, 0.0, 0.0, -1.0];
-        builder
-            .start_raster_nd(
-                &transform,
-                &["x", "y"],
-                &[width as i64, height as i64],
-                None,
-            )
-            .unwrap();
-        builder
-            .start_band_nd(
-                None,
-                &["time", "y", "x"],
-                &[time as i64, height as i64, width as i64],
-                BandDataType::UInt8,
-                None,
-                None,
-                None,
-            )
-            .unwrap();
-        let total = (time * height * width) as usize;
-        let data: Vec<u8> = (0..total).map(|i| i as u8).collect();
-        builder.band_data_writer().append_value(&data);
-        builder.finish_band().unwrap();
-        builder.finish_raster().unwrap();
-        builder.finish().unwrap()
+        RasterSpec::nd(
+            &["time", "y", "x"],
+            &[time as i64, height as i64, width as i64],
+        )
+        .crs(None)
+        .band(BandDataType::UInt8)
+        .build()
     }
 
     /// Build a single-row raster with two bands of different
@@ -469,45 +449,11 @@ mod tests {
     /// Band 0: 2D `[y=2, x=3]`, UInt8 sequential 0..6.
     /// Band 1: 3D `[time=3, y=2, x=3]`, UInt8 sequential 0..18.
     fn build_mixed_dim_raster() -> StructArray {
-        let mut builder = RasterBuilder::new(1);
-        let transform = [0.0, 1.0, 0.0, 0.0, 0.0, -1.0];
-        builder
-            .start_raster_nd(&transform, &["x", "y"], &[3i64, 2], None)
-            .unwrap();
-        // Band 0: 2D, no `time` axis.
-        builder
-            .start_band_nd(
-                None,
-                &["y", "x"],
-                &[2, 3],
-                BandDataType::UInt8,
-                None,
-                None,
-                None,
-            )
-            .unwrap();
-        builder
-            .band_data_writer()
-            .append_value((0u8..6).collect::<Vec<u8>>());
-        builder.finish_band().unwrap();
-        // Band 1: 3D with `time`.
-        builder
-            .start_band_nd(
-                None,
-                &["time", "y", "x"],
-                &[3, 2, 3],
-                BandDataType::UInt8,
-                None,
-                None,
-                None,
-            )
-            .unwrap();
-        builder
-            .band_data_writer()
-            .append_value((0u8..18).collect::<Vec<u8>>());
-        builder.finish_band().unwrap();
-        builder.finish_raster().unwrap();
-        builder.finish().unwrap()
+        RasterSpec::nd(&["time", "y", "x"], &[3, 2, 3])
+            .crs(None)
+            .band_nd(&["y", "x"], &[2, 3], BandDataType::UInt8)
+            .band(BandDataType::UInt8)
+            .build()
     }
 
     #[test]
