@@ -526,25 +526,24 @@ impl SedonaScalarKernel for RsShapeWithBand {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arrow_array::{Array, Int32Array, ListArray, StringArray, StructArray};
+    use arrow_array::{Array, Int32Array};
     use datafusion_expr::ScalarUDF;
     use sedona_schema::datatypes::RASTER;
-    use sedona_testing::raster_spec::RasterSpec;
+    use sedona_testing::raster_spec::{list_i64_row, list_utf8_row, RasterSpec};
     use sedona_testing::rasters::generate_test_rasters;
     use sedona_testing::testers::ScalarUdfTester;
 
-    /// Build a single-row 2D raster StructArray (one zero-filled Float32 band).
-    fn build_2d_raster(width: u64, height: u64) -> StructArray {
+    /// Build a single-row 2D raster spec (one zero-filled Float32 band).
+    fn build_2d_raster(width: u64, height: u64) -> RasterSpec {
         let pixels = (width * height) as usize;
         RasterSpec::d2(width as i64, height as i64)
             .crs(None)
             .band_values(&vec![0.0f32; pixels])
-            .build()
     }
 
-    /// Build a single-row 3D raster StructArray with shape [time, height, width]
+    /// Build a single-row 3D raster spec with shape [time, height, width]
     /// (one zero-filled Float32 band).
-    fn build_3d_raster(time: u64, height: u64, width: u64) -> StructArray {
+    fn build_3d_raster(time: u64, height: u64, width: u64) -> RasterSpec {
         let pixels = (time * height * width) as usize;
         RasterSpec::nd(
             &["time", "y", "x"],
@@ -552,27 +551,24 @@ mod tests {
         )
         .crs(None)
         .band_values(&vec![0.0f32; pixels])
-        .build()
     }
 
     /// Build a raster where two bands both carry a `time` dimension but
     /// disagree on its size. Used to exercise the "filtered bands disagree"
     /// error path in `RS_DimSize`.
-    fn build_conflicting_time_size_raster() -> StructArray {
+    fn build_conflicting_time_size_raster() -> RasterSpec {
         RasterSpec::nd(&["time", "y", "x"], &[3, 4, 5])
             .crs(None)
             .band_values(&[0.0f32; 3 * 4 * 5])
             .band_values_nd(&["time", "y", "x"], &[7, 4, 5], &[0.0f32; 7 * 4 * 5])
-            .build()
     }
 
     /// Build a raster with two bands that have different dimensionality.
-    fn build_mixed_dim_raster() -> StructArray {
+    fn build_mixed_dim_raster() -> RasterSpec {
         RasterSpec::nd(&["time", "y", "x"], &[3, 4, 5])
             .crs(None)
             .band_values_nd(&["y", "x"], &[4, 5], &[0.0f32; 4 * 5])
             .band_values_nd(&["time", "y", "x"], &[3, 4, 5], &[0.0f32; 3 * 4 * 5])
-            .build()
     }
 
     #[test]
@@ -581,13 +577,8 @@ mod tests {
         let tester = ScalarUdfTester::new(udf, vec![RASTER]);
         tester.assert_return_type(DataType::Int32);
 
-        let rasters = build_2d_raster(4, 5);
-        let result = tester.invoke_array(Arc::new(rasters)).unwrap();
-        let arr = result
-            .as_any()
-            .downcast_ref::<Int32Array>()
-            .expect("Expected Int32Array");
-        assert_eq!(arr.value(0), 2);
+        let result = tester.invoke_raster_scalar(&build_2d_raster(4, 5)).unwrap();
+        tester.assert_scalar_result_equals(result, 2_i32);
     }
 
     #[test]
@@ -595,13 +586,10 @@ mod tests {
         let udf: ScalarUDF = rs_numdimensions_udf().into();
         let tester = ScalarUdfTester::new(udf, vec![RASTER]);
 
-        let rasters = build_3d_raster(3, 4, 5);
-        let result = tester.invoke_array(Arc::new(rasters)).unwrap();
-        let arr = result
-            .as_any()
-            .downcast_ref::<Int32Array>()
-            .expect("Expected Int32Array");
-        assert_eq!(arr.value(0), 3);
+        let result = tester
+            .invoke_raster_scalar(&build_3d_raster(3, 4, 5))
+            .unwrap();
+        tester.assert_scalar_result_equals(result, 3_i32);
     }
 
     #[test]
@@ -609,9 +597,8 @@ mod tests {
         let udf: ScalarUDF = rs_numdimensions_udf().into();
         let tester = ScalarUdfTester::new(udf, vec![RASTER, SedonaType::Arrow(DataType::Int32)]);
 
-        let rasters = build_3d_raster(3, 4, 5);
         let result = tester
-            .invoke_array_scalar(Arc::new(rasters), 1_i32)
+            .invoke_raster_array_scalar(vec![Some(build_3d_raster(3, 4, 5))], 1_i32)
             .unwrap();
         let arr = result
             .as_any()
@@ -635,8 +622,7 @@ mod tests {
         let udf: ScalarUDF = rs_numdimensions_udf().into();
         let tester = ScalarUdfTester::new(udf, vec![RASTER]);
 
-        let rasters = build_mixed_dim_raster();
-        let result = tester.invoke_array(Arc::new(rasters));
+        let result = tester.invoke_raster_array(vec![Some(build_mixed_dim_raster())]);
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
         assert!(
@@ -651,20 +637,13 @@ mod tests {
         let tester = ScalarUdfTester::new(udf, vec![RASTER]);
         tester.assert_return_type(list_utf8_type());
 
-        let rasters = build_2d_raster(4, 5);
-        let result = tester.invoke_array(Arc::new(rasters)).unwrap();
-        let list_arr = result
-            .as_any()
-            .downcast_ref::<ListArray>()
-            .expect("Expected ListArray");
-        let values = list_arr.value(0);
-        let str_arr = values
-            .as_any()
-            .downcast_ref::<StringArray>()
-            .expect("Expected StringArray");
-        assert_eq!(str_arr.len(), 2);
-        assert_eq!(str_arr.value(0), "y");
-        assert_eq!(str_arr.value(1), "x");
+        let result = tester
+            .invoke_raster_array(vec![Some(build_2d_raster(4, 5))])
+            .unwrap();
+        assert_eq!(
+            list_utf8_row(&result, 0),
+            Some(vec!["y".to_string(), "x".to_string()])
+        );
     }
 
     #[test]
@@ -672,21 +651,13 @@ mod tests {
         let udf: ScalarUDF = rs_dimnames_udf().into();
         let tester = ScalarUdfTester::new(udf, vec![RASTER]);
 
-        let rasters = build_3d_raster(3, 4, 5);
-        let result = tester.invoke_array(Arc::new(rasters)).unwrap();
-        let list_arr = result
-            .as_any()
-            .downcast_ref::<ListArray>()
-            .expect("Expected ListArray");
-        let values = list_arr.value(0);
-        let str_arr = values
-            .as_any()
-            .downcast_ref::<StringArray>()
-            .expect("Expected StringArray");
-        assert_eq!(str_arr.len(), 3);
-        assert_eq!(str_arr.value(0), "time");
-        assert_eq!(str_arr.value(1), "y");
-        assert_eq!(str_arr.value(2), "x");
+        let result = tester
+            .invoke_raster_array(vec![Some(build_3d_raster(3, 4, 5))])
+            .unwrap();
+        assert_eq!(
+            list_utf8_row(&result, 0),
+            Some(vec!["time".to_string(), "y".to_string(), "x".to_string()])
+        );
     }
 
     #[test]
@@ -704,8 +675,7 @@ mod tests {
         let udf: ScalarUDF = rs_dimnames_udf().into();
         let tester = ScalarUdfTester::new(udf, vec![RASTER]);
 
-        let rasters = build_mixed_dim_raster();
-        let result = tester.invoke_array(Arc::new(rasters));
+        let result = tester.invoke_raster_array(vec![Some(build_mixed_dim_raster())]);
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
         assert!(
@@ -719,8 +689,9 @@ mod tests {
         let udf: ScalarUDF = rs_dimsize_udf().into();
         let tester = ScalarUdfTester::new(udf, vec![RASTER, SedonaType::Arrow(DataType::Utf8)]);
 
-        let rasters = build_2d_raster(5, 4);
-        let result = tester.invoke_array_scalar(Arc::new(rasters), "x").unwrap();
+        let result = tester
+            .invoke_raster_array_scalar(vec![Some(build_2d_raster(5, 4))], "x")
+            .unwrap();
         let arr = result
             .as_any()
             .downcast_ref::<arrow_array::Int64Array>()
@@ -733,9 +704,8 @@ mod tests {
         let udf: ScalarUDF = rs_dimsize_udf().into();
         let tester = ScalarUdfTester::new(udf, vec![RASTER, SedonaType::Arrow(DataType::Utf8)]);
 
-        let rasters = build_3d_raster(3, 4, 5);
         let result = tester
-            .invoke_array_scalar(Arc::new(rasters), "time")
+            .invoke_raster_array_scalar(vec![Some(build_3d_raster(3, 4, 5))], "time")
             .unwrap();
         let arr = result
             .as_any()
@@ -752,8 +722,8 @@ mod tests {
         let udf: ScalarUDF = rs_dimsize_udf().into();
         let tester = ScalarUdfTester::new(udf, vec![RASTER, SedonaType::Arrow(DataType::Utf8)]);
 
-        let rasters = build_2d_raster(4, 5);
-        let result = tester.invoke_array_scalar(Arc::new(rasters), "nonexistent");
+        let result =
+            tester.invoke_raster_array_scalar(vec![Some(build_2d_raster(4, 5))], "nonexistent");
         let err = result.unwrap_err().to_string();
         assert!(
             err.contains("no band has dimension 'nonexistent'"),
@@ -773,9 +743,8 @@ mod tests {
             ],
         );
 
-        let rasters = build_3d_raster(3, 4, 5);
         let result = tester
-            .invoke_array_scalar_scalar(Arc::new(rasters), "time", 1_i32)
+            .invoke_array_scalar_scalar(Arc::new(build_3d_raster(3, 4, 5).build()), "time", 1_i32)
             .unwrap();
         let arr = result
             .as_any()
@@ -802,8 +771,8 @@ mod tests {
         let udf: ScalarUDF = rs_dimsize_udf().into();
         let tester = ScalarUdfTester::new(udf, vec![RASTER, SedonaType::Arrow(DataType::Utf8)]);
 
-        let rasters = build_conflicting_time_size_raster();
-        let result = tester.invoke_array_scalar(Arc::new(rasters), "time");
+        let result = tester
+            .invoke_raster_array_scalar(vec![Some(build_conflicting_time_size_raster())], "time");
         let err = result.unwrap_err().to_string();
         assert!(
             err.contains("bands have different sizes for dimension 'time'"),
@@ -823,9 +792,8 @@ mod tests {
         // build_mixed_dim_raster: band 0 is 2D (no `time`), band 1 is 3D
         // with `time=3`. RS_DimSize(raster, 'time') reports the size from
         // band 1.
-        let rasters = build_mixed_dim_raster();
         let result = tester
-            .invoke_array_scalar(Arc::new(rasters), "time")
+            .invoke_raster_array_scalar(vec![Some(build_mixed_dim_raster())], "time")
             .unwrap();
         let arr = result
             .as_any()
@@ -840,20 +808,11 @@ mod tests {
         let tester = ScalarUdfTester::new(udf, vec![RASTER]);
         tester.assert_return_type(list_int64_type());
 
-        let rasters = build_2d_raster(5, 4);
-        let result = tester.invoke_array(Arc::new(rasters)).unwrap();
-        let list_arr = result
-            .as_any()
-            .downcast_ref::<ListArray>()
-            .expect("Expected ListArray");
-        let values = list_arr.value(0);
-        let int_arr = values
-            .as_any()
-            .downcast_ref::<arrow_array::Int64Array>()
-            .expect("Expected Int64Array");
-        assert_eq!(int_arr.len(), 2);
-        assert_eq!(int_arr.value(0), 4); // height
-        assert_eq!(int_arr.value(1), 5); // width
+        let result = tester
+            .invoke_raster_array(vec![Some(build_2d_raster(5, 4))])
+            .unwrap();
+        // [height, width]
+        assert_eq!(list_i64_row(&result, 0), Some(vec![4, 5]));
     }
 
     #[test]
@@ -861,21 +820,11 @@ mod tests {
         let udf: ScalarUDF = rs_shape_udf().into();
         let tester = ScalarUdfTester::new(udf, vec![RASTER]);
 
-        let rasters = build_3d_raster(3, 4, 5);
-        let result = tester.invoke_array(Arc::new(rasters)).unwrap();
-        let list_arr = result
-            .as_any()
-            .downcast_ref::<ListArray>()
-            .expect("Expected ListArray");
-        let values = list_arr.value(0);
-        let int_arr = values
-            .as_any()
-            .downcast_ref::<arrow_array::Int64Array>()
-            .expect("Expected Int64Array");
-        assert_eq!(int_arr.len(), 3);
-        assert_eq!(int_arr.value(0), 3); // time
-        assert_eq!(int_arr.value(1), 4); // height
-        assert_eq!(int_arr.value(2), 5); // width
+        let result = tester
+            .invoke_raster_array(vec![Some(build_3d_raster(3, 4, 5))])
+            .unwrap();
+        // [time, height, width]
+        assert_eq!(list_i64_row(&result, 0), Some(vec![3, 4, 5]));
     }
 
     #[test]
@@ -893,8 +842,7 @@ mod tests {
         let udf: ScalarUDF = rs_shape_udf().into();
         let tester = ScalarUdfTester::new(udf, vec![RASTER]);
 
-        let rasters = build_mixed_dim_raster();
-        let result = tester.invoke_array(Arc::new(rasters));
+        let result = tester.invoke_raster_array(vec![Some(build_mixed_dim_raster())]);
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
         assert!(
