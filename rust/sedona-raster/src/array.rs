@@ -24,7 +24,6 @@ use datafusion_common::cast::{
     as_binary_array, as_binary_view_array, as_float64_array, as_int64_array, as_list_array,
     as_string_array, as_string_view_array, as_struct_array, as_uint32_array,
 };
-use datafusion_common::DataFusionError;
 
 use crate::traits::{BandRef, Bands, NdBuffer, RasterRef};
 use crate::view_entries::ViewEntry;
@@ -411,58 +410,45 @@ impl<'a> RasterStructArray<'a> {
     /// Returns an error if the array doesn't have the expected raster schema.
     #[inline]
     pub fn try_new(raster_array: &'a StructArray) -> Result<Self, ArrowError> {
-        // Helper to convert DataFusionError to ArrowError
-        fn to_arrow_err(e: DataFusionError) -> ArrowError {
-            match e {
-                DataFusionError::ArrowError(arrow_err, _) => *arrow_err,
-                other => ArrowError::InvalidArgumentError(other.to_string()),
-            }
+        if raster_array.fields().len() != raster_indices::FIELD_COUNT {
+            return Err(ArrowError::SchemaError(
+                "Unexpected column count for raster array".to_string(),
+            ));
         }
 
         // Top-level fields
-        let crs_array =
-            as_string_view_array(raster_array.column(raster_indices::CRS)).map_err(to_arrow_err)?;
-        let transform_list =
-            as_list_array(raster_array.column(raster_indices::TRANSFORM)).map_err(to_arrow_err)?;
-        let transform_values = as_float64_array(transform_list.values()).map_err(to_arrow_err)?;
-        let spatial_dims_list = as_list_array(raster_array.column(raster_indices::SPATIAL_DIMS))
-            .map_err(to_arrow_err)?;
-        let spatial_dims_values =
-            as_string_view_array(spatial_dims_list.values()).map_err(to_arrow_err)?;
-        let spatial_shape_list = as_list_array(raster_array.column(raster_indices::SPATIAL_SHAPE))
-            .map_err(to_arrow_err)?;
-        let spatial_shape_values =
-            as_int64_array(spatial_shape_list.values()).map_err(to_arrow_err)?;
+        let crs_array = as_string_view_array(raster_array.column(raster_indices::CRS))?;
+        let transform_list = as_list_array(raster_array.column(raster_indices::TRANSFORM))?;
+        let transform_values = as_float64_array(transform_list.values())?;
+        let spatial_dims_list = as_list_array(raster_array.column(raster_indices::SPATIAL_DIMS))?;
+        let spatial_dims_values = as_string_view_array(spatial_dims_list.values())?;
+        let spatial_shape_list = as_list_array(raster_array.column(raster_indices::SPATIAL_SHAPE))?;
+        let spatial_shape_values = as_int64_array(spatial_shape_list.values())?;
 
         // Bands list and nested struct
-        let bands_list =
-            as_list_array(raster_array.column(raster_indices::BANDS)).map_err(to_arrow_err)?;
-        let bands_struct = as_struct_array(bands_list.values()).map_err(to_arrow_err)?;
+        let bands_list = as_list_array(raster_array.column(raster_indices::BANDS))?;
+        let bands_struct = as_struct_array(bands_list.values())?;
+
+        if bands_struct.fields().len() != band_indices::FIELD_COUNT {
+            return Err(ArrowError::SchemaError(
+                "Unexpected column count for band array".to_string(),
+            ));
+        }
 
         // Band-level fields
-        let band_name_array =
-            as_string_array(bands_struct.column(band_indices::NAME)).map_err(to_arrow_err)?;
-        let band_dim_names_list =
-            as_list_array(bands_struct.column(band_indices::DIM_NAMES)).map_err(to_arrow_err)?;
-        let band_dim_names_values =
-            as_string_array(band_dim_names_list.values()).map_err(to_arrow_err)?;
+        let band_name_array = as_string_array(bands_struct.column(band_indices::NAME))?;
+        let band_dim_names_list = as_list_array(bands_struct.column(band_indices::DIM_NAMES))?;
+        let band_dim_names_values = as_string_array(band_dim_names_list.values())?;
         let band_source_shape_list =
-            as_list_array(bands_struct.column(band_indices::SOURCE_SHAPE)).map_err(to_arrow_err)?;
-        let band_source_shape_values =
-            as_int64_array(band_source_shape_list.values()).map_err(to_arrow_err)?;
-        let band_datatype_array =
-            as_uint32_array(bands_struct.column(band_indices::DATA_TYPE)).map_err(to_arrow_err)?;
-        let band_nodata_array =
-            as_binary_array(bands_struct.column(band_indices::NODATA)).map_err(to_arrow_err)?;
-        let band_view_list =
-            as_list_array(bands_struct.column(band_indices::VIEW)).map_err(to_arrow_err)?;
-        let band_outdb_uri_array =
-            as_string_array(bands_struct.column(band_indices::OUTDB_URI)).map_err(to_arrow_err)?;
+            as_list_array(bands_struct.column(band_indices::SOURCE_SHAPE))?;
+        let band_source_shape_values = as_int64_array(band_source_shape_list.values())?;
+        let band_datatype_array = as_uint32_array(bands_struct.column(band_indices::DATA_TYPE))?;
+        let band_nodata_array = as_binary_array(bands_struct.column(band_indices::NODATA))?;
+        let band_view_list = as_list_array(bands_struct.column(band_indices::VIEW))?;
+        let band_outdb_uri_array = as_string_array(bands_struct.column(band_indices::OUTDB_URI))?;
         let band_outdb_format_array =
-            as_string_view_array(bands_struct.column(band_indices::OUTDB_FORMAT))
-                .map_err(to_arrow_err)?;
-        let band_data_array =
-            as_binary_view_array(bands_struct.column(band_indices::DATA)).map_err(to_arrow_err)?;
+            as_string_view_array(bands_struct.column(band_indices::OUTDB_FORMAT))?;
+        let band_data_array = as_binary_view_array(bands_struct.column(band_indices::DATA))?;
 
         Ok(Self {
             raster_array,
