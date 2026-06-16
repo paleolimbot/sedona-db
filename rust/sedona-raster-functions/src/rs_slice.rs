@@ -531,7 +531,7 @@ mod tests {
             .unwrap();
 
         let result_struct = result.as_any().downcast_ref::<StructArray>().unwrap();
-        let raster_array = RasterStructArray::new(result_struct);
+        let raster_array = RasterStructArray::try_new(result_struct).unwrap();
         let raster = raster_array.get(0).unwrap();
         assert_eq!(raster.num_bands(), 2);
 
@@ -602,7 +602,7 @@ mod tests {
             .as_any()
             .downcast_ref::<StructArray>()
             .unwrap();
-        let raster_array = RasterStructArray::new(result_struct);
+        let raster_array = RasterStructArray::try_new(result_struct).unwrap();
         let raster = raster_array.get(0).unwrap();
         assert_eq!(raster.num_bands(), 2);
 
@@ -726,7 +726,7 @@ mod tests {
             .unwrap();
 
         let result_struct = result.as_any().downcast_ref::<StructArray>().unwrap();
-        let raster_array = RasterStructArray::new(result_struct);
+        let raster_array = RasterStructArray::try_new(result_struct).unwrap();
         let raster = raster_array.get(0).unwrap();
 
         // Should now be 2D: [y=4, x=5]
@@ -770,7 +770,7 @@ mod tests {
             .as_any()
             .downcast_ref::<StructArray>()
             .unwrap();
-        let raster_array = RasterStructArray::new(result_struct);
+        let raster_array = RasterStructArray::try_new(result_struct).unwrap();
         let raster = raster_array.get(0).unwrap();
 
         // Should still be 3D: [time=2, y=4, x=5]
@@ -859,7 +859,7 @@ mod tests {
             .unwrap();
 
         let result_struct = result.as_any().downcast_ref::<StructArray>().unwrap();
-        let raster_array = RasterStructArray::new(result_struct);
+        let raster_array = RasterStructArray::try_new(result_struct).unwrap();
         assert!(raster_array.is_null(0));
     }
 }

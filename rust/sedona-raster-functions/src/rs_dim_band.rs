@@ -420,7 +420,7 @@ mod tests {
             .unwrap();
 
         let result_struct = result.as_any().downcast_ref::<StructArray>().unwrap();
-        let raster_array = RasterStructArray::new(result_struct);
+        let raster_array = RasterStructArray::try_new(result_struct).unwrap();
         let raster = raster_array.get(0).unwrap();
 
         // Should have 3 bands, each 2D [y=2, x=2]
@@ -471,7 +471,7 @@ mod tests {
             .unwrap();
 
         let result_struct = result.as_any().downcast_ref::<StructArray>().unwrap();
-        let raster_array = RasterStructArray::new(result_struct);
+        let raster_array = RasterStructArray::try_new(result_struct).unwrap();
         assert!(raster_array.is_null(0));
     }
 
@@ -487,7 +487,7 @@ mod tests {
             .unwrap();
 
         let result_struct = result.as_any().downcast_ref::<StructArray>().unwrap();
-        let raster_array = RasterStructArray::new(result_struct);
+        let raster_array = RasterStructArray::try_new(result_struct).unwrap();
         let raster = raster_array.get(0).unwrap();
 
         // Should be 1 band with shape [newdim=3, y=2, x=2]
@@ -694,7 +694,7 @@ mod tests {
             .unwrap();
 
         let result_struct = result.as_any().downcast_ref::<StructArray>().unwrap();
-        let raster_array = RasterStructArray::new(result_struct);
+        let raster_array = RasterStructArray::try_new(result_struct).unwrap();
         assert!(raster_array.is_null(0));
     }
 
@@ -703,7 +703,7 @@ mod tests {
         // Start with 1 band [time=3, y=2, x=2]
         let rasters = build_3d_raster_sequential(3, 2, 2);
         let original_data = {
-            let raster_array_in = RasterStructArray::new(&rasters);
+            let raster_array_in = RasterStructArray::try_new(&rasters).unwrap();
             let raster_in = raster_array_in.get(0).unwrap();
             let band_in = raster_in.band(0).unwrap();
             let ndb_in = band_in.nd_buffer().unwrap();
@@ -735,7 +735,7 @@ mod tests {
             _ => panic!("Expected array"),
         };
         let final_struct = final_array.as_any().downcast_ref::<StructArray>().unwrap();
-        let raster_array_out = RasterStructArray::new(final_struct);
+        let raster_array_out = RasterStructArray::try_new(final_struct).unwrap();
         let raster_out = raster_array_out.get(0).unwrap();
 
         // Verify shape and data match
