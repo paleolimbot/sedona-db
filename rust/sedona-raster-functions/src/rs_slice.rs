@@ -425,10 +425,9 @@ mod tests {
     use datafusion_common::ScalarValue;
     use datafusion_expr::ScalarUDF;
     use sedona_raster::array::RasterStructArray;
-    use sedona_raster::traits::RasterRef;
     use sedona_schema::datatypes::RASTER;
     use sedona_schema::raster::BandDataType;
-    use sedona_testing::raster_spec::RasterSpec;
+    use sedona_testing::raster_spec::{assert_rasters_equal, RasterSpec};
     use sedona_testing::rasters::generate_test_rasters;
     use sedona_testing::testers::ScalarUdfTester;
 
@@ -476,26 +475,13 @@ mod tests {
             .invoke_array_scalar_scalar(Arc::new(rasters), "time", 1_i64)
             .unwrap();
 
-        let result_struct = result.as_any().downcast_ref::<StructArray>().unwrap();
-        let raster_array = RasterStructArray::try_new(result_struct).unwrap();
-        let raster = raster_array.get(0).unwrap();
-        assert_eq!(raster.num_bands(), 2);
-
-        // Band 0 had no `time` axis — passes through unchanged: 2-D [2, 3].
-        let band0 = raster.band(0).unwrap();
-        assert_eq!(band0.dim_names(), vec!["y", "x"]);
-        assert_eq!(band0.shape(), &[2, 3]);
-        let band0_ndb = band0.nd_buffer().unwrap();
-        let band0_data = band0_ndb.as_contiguous().unwrap();
-        assert_eq!(band0_data, &(0u8..6).collect::<Vec<u8>>()[..]);
-
-        // Band 1 had `time` — sliced to time=1: 2-D [2, 3], bytes 6..12.
-        let band1 = raster.band(1).unwrap();
-        assert_eq!(band1.dim_names(), vec!["y", "x"]);
-        assert_eq!(band1.shape(), &[2, 3]);
-        let band1_ndb = band1.nd_buffer().unwrap();
-        let band1_data = band1_ndb.as_contiguous().unwrap();
-        assert_eq!(band1_data, &(6u8..12).collect::<Vec<u8>>()[..]);
+        // Band 0 (no `time`) passes through unchanged: 2-D [2, 3], bytes 0..6.
+        // Band 1 sliced to time=1: 2-D [2, 3], bytes 6..12.
+        let expected = RasterSpec::nd(&["time", "y", "x"], &[3, 2, 3])
+            .crs(None)
+            .band_values_nd(&["y", "x"], &[2, 3], &(0u8..6).collect::<Vec<u8>>())
+            .band_values_nd(&["y", "x"], &[2, 3], &(6u8..12).collect::<Vec<u8>>());
+        assert_rasters_equal(&result, &[Some(expected)]);
     }
 
     #[test]
@@ -540,26 +526,22 @@ mod tests {
             ColumnarValue::Scalar(ScalarValue::Int64(Some(3))),
         ];
         let result = kernel.invoke_batch(&arg_types, &args).unwrap();
-        let result_struct = match result {
+        let result = match result {
             ColumnarValue::Array(arr) => arr,
             _ => panic!("Expected array result"),
         };
-        let result_struct = result_struct
-            .as_any()
-            .downcast_ref::<StructArray>()
-            .unwrap();
-        let raster_array = RasterStructArray::try_new(result_struct).unwrap();
-        let raster = raster_array.get(0).unwrap();
-        assert_eq!(raster.num_bands(), 2);
 
-        // Band 0 had no `time` — passes through unchanged.
-        let band0 = raster.band(0).unwrap();
-        assert_eq!(band0.shape(), &[2, 3]);
-
-        // Band 1 had `time` — narrowed to [1, 3): 2 time steps, shape [2, 2, 3].
-        let band1 = raster.band(1).unwrap();
-        assert_eq!(band1.dim_names(), vec!["time", "y", "x"]);
-        assert_eq!(band1.shape(), &[2, 2, 3]);
+        // Band 0 (no `time`) passes through unchanged: 2-D [2, 3], bytes 0..6.
+        // Band 1 narrowed to [1, 3): [time=2, y=2, x=3], bytes 6..18.
+        let expected = RasterSpec::nd(&["time", "y", "x"], &[3, 2, 3])
+            .crs(None)
+            .band_values_nd(&["y", "x"], &[2, 3], &(0u8..6).collect::<Vec<u8>>())
+            .band_values_nd(
+                &["time", "y", "x"],
+                &[2, 2, 3],
+                &(6u8..18).collect::<Vec<u8>>(),
+            );
+        assert_rasters_equal(&result, &[Some(expected)]);
     }
 
     #[test]
@@ -671,21 +653,11 @@ mod tests {
             .invoke_array_scalar_scalar(Arc::new(rasters), "time", 1_i64)
             .unwrap();
 
-        let result_struct = result.as_any().downcast_ref::<StructArray>().unwrap();
-        let raster_array = RasterStructArray::try_new(result_struct).unwrap();
-        let raster = raster_array.get(0).unwrap();
-
-        // Should now be 2D: [y=4, x=5]
-        let band = raster.band(0).unwrap();
-        assert_eq!(band.ndim(), 2);
-        assert_eq!(band.dim_names(), vec!["y", "x"]);
-        assert_eq!(band.shape(), &[4, 5]);
-
-        // Data should be time slice 1: bytes 20..40 of original
-        let ndb = band.nd_buffer().unwrap();
-        let data = ndb.as_contiguous().unwrap();
-        let expected: Vec<u8> = (20..40).collect();
-        assert_eq!(data, &expected[..]);
+        // 2-D [y=4, x=5] carrying time slice 1: bytes 20..40 of the original.
+        let expected = RasterSpec::nd(&["time", "y", "x"], &[3, 4, 5])
+            .crs(None)
+            .band_values_nd(&["y", "x"], &[4, 5], &(20u8..40).collect::<Vec<u8>>());
+        assert_rasters_equal(&result, &[Some(expected)]);
     }
 
     #[test]
@@ -707,29 +679,16 @@ mod tests {
             ColumnarValue::Scalar(ScalarValue::Int64(Some(2))),
         ];
         let result = kernel.invoke_batch(&arg_types, &args).unwrap();
-
-        let result_struct = match result {
+        let result = match result {
             ColumnarValue::Array(arr) => arr,
             _ => panic!("Expected array result"),
         };
-        let result_struct = result_struct
-            .as_any()
-            .downcast_ref::<StructArray>()
-            .unwrap();
-        let raster_array = RasterStructArray::try_new(result_struct).unwrap();
-        let raster = raster_array.get(0).unwrap();
 
-        // Should still be 3D: [time=2, y=4, x=5]
-        let band = raster.band(0).unwrap();
-        assert_eq!(band.ndim(), 3);
-        assert_eq!(band.dim_names(), vec!["time", "y", "x"]);
-        assert_eq!(band.shape(), &[2, 4, 5]);
-
-        // Data should be first 2 time slices: bytes 0..40
-        let ndb = band.nd_buffer().unwrap();
-        let data = ndb.as_contiguous().unwrap();
-        let expected: Vec<u8> = (0..40).collect();
-        assert_eq!(data, &expected[..]);
+        // Still 3-D [time=2, y=4, x=5]: the first 2 time slices, bytes 0..40.
+        let expected = RasterSpec::nd(&["time", "y", "x"], &[2, 4, 5])
+            .crs(None)
+            .band_values(&(0u8..40).collect::<Vec<u8>>());
+        assert_rasters_equal(&result, &[Some(expected)]);
     }
 
     #[test]

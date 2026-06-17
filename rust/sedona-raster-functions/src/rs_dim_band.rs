@@ -338,7 +338,7 @@ mod tests {
     use sedona_raster::traits::RasterRef;
     use sedona_schema::datatypes::RASTER;
     use sedona_schema::raster::BandDataType;
-    use sedona_testing::raster_spec::RasterSpec;
+    use sedona_testing::raster_spec::{assert_rasters_equal, RasterSpec};
     use sedona_testing::rasters::generate_test_rasters;
     use sedona_testing::testers::ScalarUdfTester;
 
@@ -379,27 +379,19 @@ mod tests {
             .invoke_array_scalar(Arc::new(rasters), "time")
             .unwrap();
 
+        // 3 bands, each 2-D [y=2, x=2], carrying the time slices of the
+        // original 0..12 sequential data.
+        let expected = RasterSpec::nd(&["time", "y", "x"], &[3, 2, 2])
+            .crs(None)
+            .band_values_nd(&["y", "x"], &[2, 2], &[0u8, 1, 2, 3])
+            .band_values_nd(&["y", "x"], &[2, 2], &[4u8, 5, 6, 7])
+            .band_values_nd(&["y", "x"], &[2, 2], &[8u8, 9, 10, 11]);
+        assert_rasters_equal(&result, &[Some(expected)]);
+
+        // Band names aren't compared by assert_rasters_equal.
         let result_struct = result.as_any().downcast_ref::<StructArray>().unwrap();
         let raster_array = RasterStructArray::try_new(result_struct).unwrap();
         let raster = raster_array.get(0).unwrap();
-
-        // Should have 3 bands, each 2D [y=2, x=2]
-        assert_eq!(raster.num_bands(), 3);
-
-        for b in 0..3 {
-            let band = raster.band(b).unwrap();
-            assert_eq!(band.ndim(), 2);
-            assert_eq!(band.dim_names(), vec!["y", "x"]);
-            assert_eq!(band.shape(), &[2, 2]);
-
-            let ndb = band.nd_buffer().unwrap();
-            let data = ndb.as_contiguous().unwrap();
-            let offset = b * 4;
-            let expected: Vec<u8> = (offset..offset + 4).map(|i| i as u8).collect();
-            assert_eq!(data, &expected[..]);
-        }
-
-        // Verify band names
         assert_eq!(raster.band_name(0), Some("temp_time_0"));
         assert_eq!(raster.band_name(1), Some("temp_time_1"));
         assert_eq!(raster.band_name(2), Some("temp_time_2"));
@@ -446,22 +438,11 @@ mod tests {
             .invoke_array_scalar(Arc::new(rasters), "newdim")
             .unwrap();
 
-        let result_struct = result.as_any().downcast_ref::<StructArray>().unwrap();
-        let raster_array = RasterStructArray::try_new(result_struct).unwrap();
-        let raster = raster_array.get(0).unwrap();
-
-        // Should be 1 band with shape [newdim=3, y=2, x=2]
-        assert_eq!(raster.num_bands(), 1);
-        let band = raster.band(0).unwrap();
-        assert_eq!(band.ndim(), 3);
-        assert_eq!(band.dim_names(), vec!["newdim", "y", "x"]);
-        assert_eq!(band.shape(), &[3, 2, 2]);
-
-        // Data should be concatenation of all 3 bands
-        let ndb = band.nd_buffer().unwrap();
-        let data = ndb.as_contiguous().unwrap();
-        let expected: Vec<u8> = (0..12).map(|i| i as u8).collect();
-        assert_eq!(data, &expected[..]);
+        // 1 band [newdim=3, y=2, x=2] concatenating the 3 input bands' data.
+        let expected = RasterSpec::nd(&["newdim", "y", "x"], &[3, 2, 2])
+            .crs(None)
+            .band_values(&(0u8..12).collect::<Vec<u8>>());
+        assert_rasters_equal(&result, &[Some(expected)]);
     }
 
     #[test]
@@ -662,13 +643,6 @@ mod tests {
     fn round_trip_dimtoband_bandtodim() {
         // Start with 1 band [time=3, y=2, x=2]
         let rasters = build_3d_raster_sequential(3, 2, 2);
-        let original_data = {
-            let raster_array_in = RasterStructArray::try_new(&rasters).unwrap();
-            let raster_in = raster_array_in.get(0).unwrap();
-            let band_in = raster_in.band(0).unwrap();
-            let ndb_in = band_in.nd_buffer().unwrap();
-            ndb_in.as_contiguous().unwrap().to_vec()
-        };
 
         // DimToBand: 1 band [time=3, y=2, x=2] -> 3 bands [y=2, x=2]
         let kernel = RsDimToBand {};
@@ -694,16 +668,12 @@ mod tests {
             ColumnarValue::Array(arr) => arr,
             _ => panic!("Expected array"),
         };
-        let final_struct = final_array.as_any().downcast_ref::<StructArray>().unwrap();
-        let raster_array_out = RasterStructArray::try_new(final_struct).unwrap();
-        let raster_out = raster_array_out.get(0).unwrap();
 
-        // Verify shape and data match
-        let band_out = raster_out.band(0).unwrap();
-        assert_eq!(band_out.dim_names(), vec!["time", "y", "x"]);
-        assert_eq!(band_out.shape(), &[3, 2, 2]);
-        let round_trip_ndb = band_out.nd_buffer().unwrap();
-        let round_trip_data = round_trip_ndb.as_contiguous().unwrap();
-        assert_eq!(round_trip_data, &original_data[..]);
+        // Round-trip restores the original [time=3, y=2, x=2] band with its
+        // 0..12 sequential data (band name aside, which BandToDim drops).
+        let expected = RasterSpec::nd(&["time", "y", "x"], &[3, 2, 2])
+            .crs(None)
+            .band_values(&(0u8..12).collect::<Vec<u8>>());
+        assert_rasters_equal(&final_array, &[Some(expected)]);
     }
 }
