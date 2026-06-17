@@ -17,7 +17,7 @@
 
 use std::sync::Arc;
 
-use arrow_array::builder::{Int32Builder, Int64Builder, ListBuilder, StringBuilder};
+use arrow_array::builder::{Int32Builder, Int64Builder, ListBuilder, StringViewBuilder};
 use arrow_schema::DataType;
 use datafusion_common::cast::{as_int32_array, as_string_view_array};
 use datafusion_common::error::Result;
@@ -67,10 +67,10 @@ fn check_band_agreement<T: PartialEq + std::fmt::Debug>(
     Ok(value)
 }
 
-fn list_utf8_type() -> DataType {
+fn list_utf8view_type() -> DataType {
     DataType::List(Arc::new(arrow_schema::Field::new(
         "item",
-        DataType::Utf8,
+        DataType::Utf8View,
         true,
     )))
 }
@@ -185,7 +185,7 @@ impl SedonaScalarKernel for RsNumDimensionsWithBand {
     }
 }
 
-/// RS_DimNames(raster [, band]) -> List<Utf8>
+/// RS_DimNames(raster [, band]) -> List<Utf8View>
 ///
 /// Returns the dimension names of the raster (or a specific band).
 pub fn rs_dimnames_udf() -> SedonaScalarUDF {
@@ -203,7 +203,7 @@ impl SedonaScalarKernel for RsDimNames {
     fn return_type(&self, args: &[SedonaType]) -> Result<Option<SedonaType>> {
         let matcher = ArgMatcher::new(
             vec![ArgMatcher::is_raster()],
-            SedonaType::Arrow(list_utf8_type()),
+            SedonaType::Arrow(list_utf8view_type()),
         );
         matcher.match_args(args)
     }
@@ -214,7 +214,7 @@ impl SedonaScalarKernel for RsDimNames {
         args: &[ColumnarValue],
     ) -> Result<ColumnarValue> {
         let executor = RasterExecutor::new(arg_types, args);
-        let mut list_builder = ListBuilder::new(StringBuilder::new());
+        let mut list_builder = ListBuilder::new(StringViewBuilder::new());
 
         executor.execute_raster_void(|_i, raster_opt| match raster_opt {
             None => {
@@ -247,7 +247,7 @@ impl SedonaScalarKernel for RsDimNamesWithBand {
     fn return_type(&self, args: &[SedonaType]) -> Result<Option<SedonaType>> {
         let matcher = ArgMatcher::new(
             vec![ArgMatcher::is_raster(), ArgMatcher::is_integer()],
-            SedonaType::Arrow(list_utf8_type()),
+            SedonaType::Arrow(list_utf8view_type()),
         );
         matcher.match_args(args)
     }
@@ -262,7 +262,7 @@ impl SedonaScalarKernel for RsDimNamesWithBand {
         let band_index_array = band_index_array.into_array(executor.num_iterations())?;
         let band_index_array = as_int32_array(&band_index_array)?;
 
-        let mut list_builder = ListBuilder::new(StringBuilder::new());
+        let mut list_builder = ListBuilder::new(StringViewBuilder::new());
         let mut band_index_iter = band_index_array.iter();
         executor.execute_raster_void(|_, raster_opt| {
             let band_index = band_index_iter.next().unwrap().unwrap_or(1);
@@ -646,7 +646,7 @@ mod tests {
     fn dimnames_2d() {
         let udf: ScalarUDF = rs_dimnames_udf().into();
         let tester = ScalarUdfTester::new(udf, vec![RASTER]);
-        tester.assert_return_type(list_utf8_type());
+        tester.assert_return_type(list_utf8view_type());
 
         let result = tester
             .invoke_raster_array(vec![Some(build_2d_raster(4, 5))])
