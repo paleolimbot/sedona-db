@@ -161,23 +161,26 @@ impl SedonaScalarKernel for RsNumDimensionsWithBand {
         let mut builder = Int32Builder::with_capacity(executor.num_iterations());
         let mut band_index_iter = band_index_array.iter();
         executor.execute_raster_void(|_, raster_opt| {
-            let band_index = band_index_iter.next().unwrap().unwrap_or(1);
+            let band_index = band_index_iter.next().unwrap();
             match raster_opt {
                 None => {
                     builder.append_null();
                     Ok(())
                 }
-                Some(raster) => {
-                    if band_index < 1 || band_index > raster.num_bands() as i32 {
-                        builder.append_null();
-                        return Ok(());
+                // A null or out-of-range band index yields a null result.
+                Some(raster) => match band_index {
+                    Some(bi) if bi >= 1 && bi <= raster.num_bands() as i32 => {
+                        let band = raster
+                            .band((bi - 1) as usize)
+                            .map_err(|e| arrow_datafusion_err!(e))?;
+                        builder.append_value(band.ndim() as i32);
+                        Ok(())
                     }
-                    let band = raster
-                        .band((band_index - 1) as usize)
-                        .map_err(|e| arrow_datafusion_err!(e))?;
-                    builder.append_value(band.ndim() as i32);
-                    Ok(())
-                }
+                    _ => {
+                        builder.append_null();
+                        Ok(())
+                    }
+                },
             }
         })?;
 
@@ -269,26 +272,29 @@ impl SedonaScalarKernel for RsDimNamesWithBand {
             ListBuilder::new(StringViewBuilder::new().with_deduplicate_strings());
         let mut band_index_iter = band_index_array.iter();
         executor.execute_raster_void(|_, raster_opt| {
-            let band_index = band_index_iter.next().unwrap().unwrap_or(1);
+            let band_index = band_index_iter.next().unwrap();
             match raster_opt {
                 None => {
                     list_builder.append_null();
                     Ok(())
                 }
-                Some(raster) => {
-                    if band_index < 1 || band_index > raster.num_bands() as i32 {
+                // A null or out-of-range band index yields a null result.
+                Some(raster) => match band_index {
+                    Some(bi) if bi >= 1 && bi <= raster.num_bands() as i32 => {
+                        let band = raster
+                            .band((bi - 1) as usize)
+                            .map_err(|e| arrow_datafusion_err!(e))?;
+                        for name in band.dim_names() {
+                            list_builder.values().append_value(name);
+                        }
+                        list_builder.append(true);
+                        Ok(())
+                    }
+                    _ => {
                         list_builder.append_null();
-                        return Ok(());
+                        Ok(())
                     }
-                    let band = raster
-                        .band((band_index - 1) as usize)
-                        .map_err(|e| arrow_datafusion_err!(e))?;
-                    for name in band.dim_names() {
-                        list_builder.values().append_value(name);
-                    }
-                    list_builder.append(true);
-                    Ok(())
-                }
+                },
             }
         })?;
 
@@ -343,17 +349,17 @@ impl SedonaScalarKernel for RsDimSize {
                     // Pass-through for bands that don't carry the named
                     // dimension: filter to bands that have it, then require
                     // those to agree on the size. If no band has the dim at
-                    // all, error explicitly — `check_band_agreement` on the
-                    // raw `Option<u64>` extractor would silently return NULL
-                    // and a mixed Some/None set would report a misleading
-                    // "different dimension sizes" error.
+                    // all, return null (the dimension simply isn't present);
+                    // bands that *do* have it but disagree on the size is a
+                    // genuine conflict and still errors.
                     let mut iter = (0..raster.num_bands()).filter_map(|i| {
                         let band = raster.band(i).ok()?;
                         let size = band.dim_size(name)?;
                         Some((i, size))
                     });
                     let Some((first_idx, first_size)) = iter.next() else {
-                        return exec_err!("RS_DimSize: no band has dimension '{name}'");
+                        builder.append_null();
+                        return Ok(());
                     };
                     for (other_idx, other_size) in iter {
                         if other_size != first_size {
@@ -408,26 +414,30 @@ impl SedonaScalarKernel for RsDimSizeWithBand {
         let mut band_index_iter = band_index_array.iter();
         executor.execute_raster_void(|_, raster_opt| {
             let dim_name = dim_name_iter.next().unwrap();
-            let band_index = band_index_iter.next().unwrap().unwrap_or(1);
+            let band_index = band_index_iter.next().unwrap();
             match (raster_opt, dim_name) {
                 (None, _) | (_, None) => {
                     builder.append_null();
                     Ok(())
                 }
-                (Some(raster), Some(name)) => {
-                    if band_index < 1 || band_index > raster.num_bands() as i32 {
+                // A null or out-of-range band index (or a dimension absent from
+                // the band) yields a null result.
+                (Some(raster), Some(name)) => match band_index {
+                    Some(bi) if bi >= 1 && bi <= raster.num_bands() as i32 => {
+                        let band = raster
+                            .band((bi - 1) as usize)
+                            .map_err(|e| arrow_datafusion_err!(e))?;
+                        match band.dim_size(name) {
+                            Some(s) => builder.append_value(s),
+                            None => builder.append_null(),
+                        }
+                        Ok(())
+                    }
+                    _ => {
                         builder.append_null();
-                        return Ok(());
+                        Ok(())
                     }
-                    let band = raster
-                        .band((band_index - 1) as usize)
-                        .map_err(|e| arrow_datafusion_err!(e))?;
-                    match band.dim_size(name) {
-                        Some(s) => builder.append_value(s),
-                        None => builder.append_null(),
-                    }
-                    Ok(())
-                }
+                },
             }
         })?;
 
@@ -511,26 +521,29 @@ impl SedonaScalarKernel for RsShapeWithBand {
         let mut list_builder = ListBuilder::new(Int64Builder::new());
         let mut band_index_iter = band_index_array.iter();
         executor.execute_raster_void(|_, raster_opt| {
-            let band_index = band_index_iter.next().unwrap().unwrap_or(1);
+            let band_index = band_index_iter.next().unwrap();
             match raster_opt {
                 None => {
                     list_builder.append_null();
                     Ok(())
                 }
-                Some(raster) => {
-                    if band_index < 1 || band_index > raster.num_bands() as i32 {
+                // A null or out-of-range band index yields a null result.
+                Some(raster) => match band_index {
+                    Some(bi) if bi >= 1 && bi <= raster.num_bands() as i32 => {
+                        let band = raster
+                            .band((bi - 1) as usize)
+                            .map_err(|e| arrow_datafusion_err!(e))?;
+                        for &s in band.shape() {
+                            list_builder.values().append_value(s);
+                        }
+                        list_builder.append(true);
+                        Ok(())
+                    }
+                    _ => {
                         list_builder.append_null();
-                        return Ok(());
+                        Ok(())
                     }
-                    let band = raster
-                        .band((band_index - 1) as usize)
-                        .map_err(|e| arrow_datafusion_err!(e))?;
-                    for &s in band.shape() {
-                        list_builder.values().append_value(s);
-                    }
-                    list_builder.append(true);
-                    Ok(())
-                }
+                },
             }
         })?;
 
@@ -542,6 +555,7 @@ impl SedonaScalarKernel for RsShapeWithBand {
 mod tests {
     use super::*;
     use arrow_array::{Array, Int32Array};
+    use datafusion_common::ScalarValue;
     use datafusion_expr::ScalarUDF;
     use sedona_schema::datatypes::RASTER;
     use sedona_testing::raster_spec::{list_i64_row, list_utf8_row, RasterSpec};
@@ -730,20 +744,46 @@ mod tests {
     }
 
     #[test]
-    fn dimsize_nonexistent_errors_when_no_band_has_dim() {
-        // RS_DimSize on a dim that no band carries surfaces an explicit
-        // error rather than silently returning NULL. Catches typo'd dim
-        // names.
+    fn dimsize_nonexistent_dim_returns_null() {
+        // RS_DimSize on a dim that no band carries returns NULL — the
+        // dimension simply isn't present (not an error).
         let udf: ScalarUDF = rs_dimsize_udf().into();
         let tester = ScalarUdfTester::new(udf, vec![RASTER, SedonaType::Arrow(DataType::Utf8)]);
 
-        let result =
-            tester.invoke_raster_array_scalar(vec![Some(build_2d_raster(4, 5))], "nonexistent");
-        let err = result.unwrap_err().to_string();
-        assert!(
-            err.contains("no band has dimension 'nonexistent'"),
-            "Unexpected error: {err}"
+        let result = tester
+            .invoke_raster_array_scalar(vec![Some(build_2d_raster(4, 5))], "nonexistent")
+            .unwrap();
+        assert!(result.is_null(0));
+    }
+
+    #[test]
+    fn with_band_null_index_returns_null() {
+        // A null band index yields a null result (it does not default to
+        // band 1).
+        let tester = ScalarUdfTester::new(
+            rs_numdimensions_udf().into(),
+            vec![RASTER, SedonaType::Arrow(DataType::Int32)],
         );
+        let result = tester
+            .invoke_raster_array_scalar(
+                vec![Some(build_3d_raster(3, 4, 5))],
+                ScalarValue::Int32(None),
+            )
+            .unwrap();
+        assert!(result.is_null(0));
+    }
+
+    #[test]
+    fn with_band_out_of_range_index_returns_null() {
+        // An out-of-range band index yields a null result.
+        let tester = ScalarUdfTester::new(
+            rs_numdimensions_udf().into(),
+            vec![RASTER, SedonaType::Arrow(DataType::Int32)],
+        );
+        let result = tester
+            .invoke_raster_array_scalar(vec![Some(build_3d_raster(3, 4, 5))], 99_i32)
+            .unwrap();
+        assert!(result.is_null(0));
     }
 
     #[test]
