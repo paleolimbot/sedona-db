@@ -47,8 +47,19 @@ fn check_band_agreement<T: PartialEq + std::fmt::Debug>(
         if let Ok(band) = raster.band(i) {
             let other = extractor(band.as_ref());
             if other != value {
+                // Name the two offending bands (with their outdb URIs, when
+                // present) and their differing values to aid debugging.
+                let band0_label = match raster.band_outdb_uri(0) {
+                    Some(uri) => format!("band 0 [{uri}]"),
+                    None => "band 0".to_string(),
+                };
+                let band_i_label = match raster.band_outdb_uri(i) {
+                    Some(uri) => format!("band {i} [{uri}]"),
+                    None => format!("band {i}"),
+                };
                 return exec_err!(
-                    "{func_name}: bands have different {property_name} — specify a band index"
+                    "{func_name}: bands have different {property_name} — specify a band index. \
+                     {band0_label} has {value:?} but {band_i_label} has {other:?}"
                 );
             }
         }
