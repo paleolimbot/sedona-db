@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 use arrow_array::builder::{Int32Builder, Int64Builder, ListBuilder, StringBuilder};
 use arrow_schema::DataType;
-use datafusion_common::cast::{as_int32_array, as_string_array};
+use datafusion_common::cast::{as_int32_array, as_string_view_array};
 use datafusion_common::error::Result;
 use datafusion_common::{arrow_datafusion_err, exec_err};
 use datafusion_expr::{ColumnarValue, Volatility};
@@ -311,9 +311,9 @@ impl SedonaScalarKernel for RsDimSize {
         args: &[ColumnarValue],
     ) -> Result<ColumnarValue> {
         let executor = RasterExecutor::new(arg_types, args);
-        let dim_name_array = args[1].clone().cast_to(&DataType::Utf8, None)?;
+        let dim_name_array = args[1].clone().cast_to(&DataType::Utf8View, None)?;
         let dim_name_array = dim_name_array.into_array(executor.num_iterations())?;
-        let dim_name_array = as_string_array(&dim_name_array)?;
+        let dim_name_array = as_string_view_array(&dim_name_array)?;
 
         let mut builder = Int64Builder::with_capacity(executor.num_iterations());
         let mut dim_name_iter = dim_name_array.iter();
@@ -381,9 +381,9 @@ impl SedonaScalarKernel for RsDimSizeWithBand {
         args: &[ColumnarValue],
     ) -> Result<ColumnarValue> {
         let executor = RasterExecutor::new(arg_types, args);
-        let dim_name_array = args[1].clone().cast_to(&DataType::Utf8, None)?;
+        let dim_name_array = args[1].clone().cast_to(&DataType::Utf8View, None)?;
         let dim_name_array = dim_name_array.into_array(executor.num_iterations())?;
-        let dim_name_array = as_string_array(&dim_name_array)?;
+        let dim_name_array = as_string_view_array(&dim_name_array)?;
         let band_index_array = args[2].clone().cast_to(&DataType::Int32, None)?;
         let band_index_array = band_index_array.into_array(executor.num_iterations())?;
         let band_index_array = as_int32_array(&band_index_array)?;
