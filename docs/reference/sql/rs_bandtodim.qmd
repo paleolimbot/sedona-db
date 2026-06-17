@@ -27,6 +27,10 @@ kernels:
       description: Name for the new dimension (e.g., 'time', 'band').
 ---
 
+::: callout-warning
+**Experimental.** This function is experimental; its behavior may change without notice.
+:::
+
 ## Description
 
 Collapses all bands in a raster into a single band by introducing a new

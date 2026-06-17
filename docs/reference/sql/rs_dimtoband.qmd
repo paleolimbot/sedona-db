@@ -27,6 +27,10 @@ kernels:
       description: Name of the dimension to promote (e.g., 'wavelength', 'time').
 ---
 
+::: callout-warning
+**Experimental.** This function is experimental; its behavior may change without notice.
+:::
+
 ## Description
 
 Promotes a named non-spatial dimension into separate bands. Each index along

@@ -33,8 +33,12 @@ kernels:
       description: Name of the dimension to query.
     - name: band
       type: int
-      description: Band index (1-based). Defaults to 1 if not specified.
+      description: Band index (1-based). A null or out-of-range index returns null.
 ---
+
+::: callout-warning
+**Experimental.** This function is experimental; its behavior may change without notice.
+:::
 
 ## Description
 

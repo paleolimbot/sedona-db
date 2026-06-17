@@ -33,6 +33,10 @@ kernels:
       description: End index (exclusive).
 ---
 
+::: callout-warning
+**Experimental.** This function is experimental; its behavior may change without notice.
+:::
+
 ## Description
 
 Narrows a named non-spatial dimension to the half-open range `[start, end)`
@@ -61,10 +65,8 @@ dimension entirely.
 
 ## Examples
 
-```
--- Extract time steps 0 through 4 from a [time=12, y, x] raster
-SELECT RS_SliceRange(raster, 'time', 0, 5);
-
--- Extract a range of pressure levels
-SELECT RS_SliceRange(raster, 'pressure', 2, 8);
+```sql
+-- Create a 'band' dimension from RS_Example()'s bands, then narrow it to the
+-- half-open range [0, 2), keeping the dimension with reduced size.
+SELECT RS_SliceRange(RS_BandToDim(RS_Example(), 'band'), 'band', 0, 2);
 ```

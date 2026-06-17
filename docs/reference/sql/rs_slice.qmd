@@ -30,6 +30,10 @@ kernels:
       description: Zero-based index along the dimension.
 ---
 
+::: callout-warning
+**Experimental.** This function is experimental; its behavior may change without notice.
+:::
+
 ## Description
 
 Extracts a single slice along a named non-spatial dimension, removing that
@@ -62,10 +66,8 @@ while keeping the dimension.
 
 ## Examples
 
-```
--- Extract time step 5 from a [time=12, y, x] raster
-SELECT RS_Slice(raster, 'time', 5);
-
--- Extract the first pressure level
-SELECT RS_Slice(raster, 'pressure', 0);
+```sql
+-- RS_Example() is 2-D, so first create a non-spatial 'band' dimension with
+-- RS_BandToDim, then select one index along it (dropping the dimension).
+SELECT RS_Slice(RS_BandToDim(RS_Example(), 'band'), 'band', 0);
 ```
