@@ -383,9 +383,9 @@ mod tests {
         // original 0..12 sequential data.
         let expected = RasterSpec::nd(&["time", "y", "x"], &[3, 2, 2])
             .crs(None)
-            .band_values_nd(&["y", "x"], &[2, 2], &[0u8, 1, 2, 3])
-            .band_values_nd(&["y", "x"], &[2, 2], &[4u8, 5, 6, 7])
-            .band_values_nd(&["y", "x"], &[2, 2], &[8u8, 9, 10, 11]);
+            .band_values_nd(&["y", "x"], &[2, 2], &(0u8..4).collect::<Vec<u8>>())
+            .band_values_nd(&["y", "x"], &[2, 2], &(4u8..8).collect::<Vec<u8>>())
+            .band_values_nd(&["y", "x"], &[2, 2], &(8u8..12).collect::<Vec<u8>>());
         assert_rasters_equal(&result, &[Some(expected)]);
 
         // Band names aren't compared by assert_rasters_equal.
