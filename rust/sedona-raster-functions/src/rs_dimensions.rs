@@ -214,7 +214,10 @@ impl SedonaScalarKernel for RsDimNames {
         args: &[ColumnarValue],
     ) -> Result<ColumnarValue> {
         let executor = RasterExecutor::new(arg_types, args);
-        let mut list_builder = ListBuilder::new(StringViewBuilder::new());
+        // Dedup the view buffer: short names inline regardless, but a long dim
+        // name repeated across many rows is then stored once.
+        let mut list_builder =
+            ListBuilder::new(StringViewBuilder::new().with_deduplicate_strings());
 
         executor.execute_raster_void(|_i, raster_opt| match raster_opt {
             None => {
@@ -262,7 +265,8 @@ impl SedonaScalarKernel for RsDimNamesWithBand {
         let band_index_array = band_index_array.into_array(executor.num_iterations())?;
         let band_index_array = as_int32_array(&band_index_array)?;
 
-        let mut list_builder = ListBuilder::new(StringViewBuilder::new());
+        let mut list_builder =
+            ListBuilder::new(StringViewBuilder::new().with_deduplicate_strings());
         let mut band_index_iter = band_index_array.iter();
         executor.execute_raster_void(|_, raster_opt| {
             let band_index = band_index_iter.next().unwrap().unwrap_or(1);
