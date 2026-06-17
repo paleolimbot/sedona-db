@@ -49,15 +49,8 @@ The inverse operation is [RS_BandToDim](rs_bandtodim.qmd).
 
 ## Examples
 
-```
--- Promote wavelength into separate bands for band math
-SELECT RS_DimToBand(raster, 'wavelength');
-
--- Compute NDVI from specific wavelength bands
-SELECT RS_NormalizedDifference(
-  RS_DimToBand(raster, 'wavelength'), 77, 54
-);
-
--- Promote time steps into bands
-SELECT RS_DimToBand(raster, 'time');
+```sql
+-- Promote a dimension into separate bands. RS_BandToDim first turns
+-- RS_Example()'s bands into a 'band' dimension, which RS_DimToBand reverses.
+SELECT RS_DimToBand(RS_BandToDim(RS_Example(), 'band'), 'band');
 ```

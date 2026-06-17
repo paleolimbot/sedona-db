@@ -52,13 +52,14 @@ N-dimensional chunk for export to formats like Zarr.
 
 ## Examples
 
+```sql
+-- Collapse RS_Example()'s bands into a single band carrying a new 'band'
+-- dimension, e.g. [y, x] bands become one [band, y, x] band.
+SELECT RS_BandToDim(RS_Example(), 'band');
 ```
--- Collapse 3 RGB bands [y, x] into 1 band [band=3, y, x]
-SELECT RS_BandToDim(raster, 'band');
 
--- Collapse time-step bands back into a time dimension
-SELECT RS_BandToDim(raster, 'time');
-
--- Round-trip: split then recombine
-SELECT RS_BandToDim(RS_DimToBand(raster, 'time'), 'time');
+```sql
+-- The inverse RS_DimToBand recovers the original bands, so the round-trip
+-- returns to the starting layout.
+SELECT RS_DimToBand(RS_BandToDim(RS_Example(), 'band'), 'band');
 ```
