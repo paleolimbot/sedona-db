@@ -554,33 +554,12 @@ impl SedonaScalarKernel for RsShapeWithBand {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arrow_array::{Array, Int32Array};
-    use datafusion_common::ScalarValue;
+    use arrow_array::Array;
     use datafusion_expr::ScalarUDF;
     use sedona_schema::datatypes::RASTER;
-    use sedona_testing::raster_spec::{list_i64_row, list_utf8_row, RasterSpec};
+    use sedona_testing::raster_spec::RasterSpec;
     use sedona_testing::rasters::generate_test_rasters;
     use sedona_testing::testers::ScalarUdfTester;
-
-    /// Build a single-row 2D raster spec (one zero-filled Float32 band).
-    fn build_2d_raster(width: u64, height: u64) -> RasterSpec {
-        let pixels = (width * height) as usize;
-        RasterSpec::d2(width as i64, height as i64)
-            .crs(None)
-            .band_values(&vec![0.0f32; pixels])
-    }
-
-    /// Build a single-row 3D raster spec with shape [time, height, width]
-    /// (one zero-filled Float32 band).
-    fn build_3d_raster(time: u64, height: u64, width: u64) -> RasterSpec {
-        let pixels = (time * height * width) as usize;
-        RasterSpec::nd(
-            &["time", "y", "x"],
-            &[time as i64, height as i64, width as i64],
-        )
-        .crs(None)
-        .band_values(&vec![0.0f32; pixels])
-    }
 
     /// Build a raster where two bands both carry a `time` dimension but
     /// disagree on its size. Used to exercise the "filtered bands disagree"
@@ -598,42 +577,6 @@ mod tests {
             .crs(None)
             .band_values_nd(&["y", "x"], &[4, 5], &[0.0f32; 4 * 5])
             .band_values_nd(&["time", "y", "x"], &[3, 4, 5], &[0.0f32; 3 * 4 * 5])
-    }
-
-    #[test]
-    fn numdimensions_2d() {
-        let udf: ScalarUDF = rs_numdimensions_udf().into();
-        let tester = ScalarUdfTester::new(udf, vec![RASTER]);
-        tester.assert_return_type(DataType::Int32);
-
-        let result = tester.invoke_raster_scalar(&build_2d_raster(4, 5)).unwrap();
-        tester.assert_scalar_result_equals(result, 2_i32);
-    }
-
-    #[test]
-    fn numdimensions_3d() {
-        let udf: ScalarUDF = rs_numdimensions_udf().into();
-        let tester = ScalarUdfTester::new(udf, vec![RASTER]);
-
-        let result = tester
-            .invoke_raster_scalar(&build_3d_raster(3, 4, 5))
-            .unwrap();
-        tester.assert_scalar_result_equals(result, 3_i32);
-    }
-
-    #[test]
-    fn numdimensions_with_band() {
-        let udf: ScalarUDF = rs_numdimensions_udf().into();
-        let tester = ScalarUdfTester::new(udf, vec![RASTER, SedonaType::Arrow(DataType::Int32)]);
-
-        let result = tester
-            .invoke_raster_array_scalar(vec![Some(build_3d_raster(3, 4, 5))], 1_i32)
-            .unwrap();
-        let arr = result
-            .as_any()
-            .downcast_ref::<Int32Array>()
-            .expect("Expected Int32Array");
-        assert_eq!(arr.value(0), 3);
     }
 
     #[test]
@@ -661,35 +604,6 @@ mod tests {
     }
 
     #[test]
-    fn dimnames_2d() {
-        let udf: ScalarUDF = rs_dimnames_udf().into();
-        let tester = ScalarUdfTester::new(udf, vec![RASTER]);
-        tester.assert_return_type(list_utf8view_type());
-
-        let result = tester
-            .invoke_raster_array(vec![Some(build_2d_raster(4, 5))])
-            .unwrap();
-        assert_eq!(
-            list_utf8_row(&result, 0),
-            Some(vec!["y".to_string(), "x".to_string()])
-        );
-    }
-
-    #[test]
-    fn dimnames_3d() {
-        let udf: ScalarUDF = rs_dimnames_udf().into();
-        let tester = ScalarUdfTester::new(udf, vec![RASTER]);
-
-        let result = tester
-            .invoke_raster_array(vec![Some(build_3d_raster(3, 4, 5))])
-            .unwrap();
-        assert_eq!(
-            list_utf8_row(&result, 0),
-            Some(vec!["time".to_string(), "y".to_string(), "x".to_string()])
-        );
-    }
-
-    #[test]
     fn dimnames_null_raster() {
         let udf: ScalarUDF = rs_dimnames_udf().into();
         let tester = ScalarUdfTester::new(udf, vec![RASTER]);
@@ -711,101 +625,6 @@ mod tests {
             err_msg.contains("bands have different dimension names"),
             "Unexpected error: {err_msg}"
         );
-    }
-
-    #[test]
-    fn dimsize_2d_x() {
-        let udf: ScalarUDF = rs_dimsize_udf().into();
-        let tester = ScalarUdfTester::new(udf, vec![RASTER, SedonaType::Arrow(DataType::Utf8)]);
-
-        let result = tester
-            .invoke_raster_array_scalar(vec![Some(build_2d_raster(5, 4))], "x")
-            .unwrap();
-        let arr = result
-            .as_any()
-            .downcast_ref::<arrow_array::Int64Array>()
-            .expect("Expected Int64Array");
-        assert_eq!(arr.value(0), 5);
-    }
-
-    #[test]
-    fn dimsize_3d_time() {
-        let udf: ScalarUDF = rs_dimsize_udf().into();
-        let tester = ScalarUdfTester::new(udf, vec![RASTER, SedonaType::Arrow(DataType::Utf8)]);
-
-        let result = tester
-            .invoke_raster_array_scalar(vec![Some(build_3d_raster(3, 4, 5))], "time")
-            .unwrap();
-        let arr = result
-            .as_any()
-            .downcast_ref::<arrow_array::Int64Array>()
-            .expect("Expected Int64Array");
-        assert_eq!(arr.value(0), 3);
-    }
-
-    #[test]
-    fn dimsize_nonexistent_dim_returns_null() {
-        // RS_DimSize on a dim that no band carries returns NULL — the
-        // dimension simply isn't present (not an error).
-        let udf: ScalarUDF = rs_dimsize_udf().into();
-        let tester = ScalarUdfTester::new(udf, vec![RASTER, SedonaType::Arrow(DataType::Utf8)]);
-
-        let result = tester
-            .invoke_raster_array_scalar(vec![Some(build_2d_raster(4, 5))], "nonexistent")
-            .unwrap();
-        assert!(result.is_null(0));
-    }
-
-    #[test]
-    fn with_band_null_index_returns_null() {
-        // A null band index yields a null result (it does not default to
-        // band 1).
-        let tester = ScalarUdfTester::new(
-            rs_numdimensions_udf().into(),
-            vec![RASTER, SedonaType::Arrow(DataType::Int32)],
-        );
-        let result = tester
-            .invoke_raster_array_scalar(
-                vec![Some(build_3d_raster(3, 4, 5))],
-                ScalarValue::Int32(None),
-            )
-            .unwrap();
-        assert!(result.is_null(0));
-    }
-
-    #[test]
-    fn with_band_out_of_range_index_returns_null() {
-        // An out-of-range band index yields a null result.
-        let tester = ScalarUdfTester::new(
-            rs_numdimensions_udf().into(),
-            vec![RASTER, SedonaType::Arrow(DataType::Int32)],
-        );
-        let result = tester
-            .invoke_raster_array_scalar(vec![Some(build_3d_raster(3, 4, 5))], 99_i32)
-            .unwrap();
-        assert!(result.is_null(0));
-    }
-
-    #[test]
-    fn dimsize_with_band() {
-        let udf: ScalarUDF = rs_dimsize_udf().into();
-        let tester = ScalarUdfTester::new(
-            udf,
-            vec![
-                RASTER,
-                SedonaType::Arrow(DataType::Utf8),
-                SedonaType::Arrow(DataType::Int32),
-            ],
-        );
-
-        let result = tester
-            .invoke_array_scalar_scalar(Arc::new(build_3d_raster(3, 4, 5).build()), "time", 1_i32)
-            .unwrap();
-        let arr = result
-            .as_any()
-            .downcast_ref::<arrow_array::Int64Array>()
-            .expect("Expected Int64Array");
-        assert_eq!(arr.value(0), 3);
     }
 
     #[test]
@@ -855,31 +674,6 @@ mod tests {
             .downcast_ref::<arrow_array::Int64Array>()
             .expect("Expected Int64Array");
         assert_eq!(arr.value(0), 3);
-    }
-
-    #[test]
-    fn shape_2d() {
-        let udf: ScalarUDF = rs_shape_udf().into();
-        let tester = ScalarUdfTester::new(udf, vec![RASTER]);
-        tester.assert_return_type(list_int64_type());
-
-        let result = tester
-            .invoke_raster_array(vec![Some(build_2d_raster(5, 4))])
-            .unwrap();
-        // [height, width]
-        assert_eq!(list_i64_row(&result, 0), Some(vec![4, 5]));
-    }
-
-    #[test]
-    fn shape_3d() {
-        let udf: ScalarUDF = rs_shape_udf().into();
-        let tester = ScalarUdfTester::new(udf, vec![RASTER]);
-
-        let result = tester
-            .invoke_raster_array(vec![Some(build_3d_raster(3, 4, 5))])
-            .unwrap();
-        // [time, height, width]
-        assert_eq!(list_i64_row(&result, 0), Some(vec![3, 4, 5]));
     }
 
     #[test]

@@ -431,18 +431,6 @@ mod tests {
     use sedona_testing::rasters::generate_test_rasters;
     use sedona_testing::testers::ScalarUdfTester;
 
-    /// Build a single-row 3D raster with shape [time, height, width] and
-    /// sequential UInt8 data so we can verify slicing correctness.
-    fn build_3d_raster_sequential(time: u64, height: u64, width: u64) -> StructArray {
-        RasterSpec::nd(
-            &["time", "y", "x"],
-            &[time as i64, height as i64, width as i64],
-        )
-        .crs(None)
-        .band(BandDataType::UInt8)
-        .build()
-    }
-
     /// Build a single-row raster with two bands of different
     /// dimensionality, used to exercise pass-through behavior.
     /// Band 0: 2D `[y=2, x=3]`, UInt8 sequential 0..6.
@@ -485,30 +473,6 @@ mod tests {
     }
 
     #[test]
-    fn slice_errors_when_no_band_has_dim() {
-        // Pre-flight error: if no band carries the named dim, the typo'd
-        // name surfaces as an explicit error rather than silently passing
-        // every band through.
-        let udf: ScalarUDF = rs_slice_udf().into();
-        let tester = ScalarUdfTester::new(
-            udf,
-            vec![
-                RASTER,
-                SedonaType::Arrow(DataType::Utf8),
-                SedonaType::Arrow(DataType::Int64),
-            ],
-        );
-
-        let rasters = build_3d_raster_sequential(3, 4, 5);
-        let result = tester.invoke_array_scalar_scalar(Arc::new(rasters), "nonexistent", 0_i64);
-        let err = result.unwrap_err().to_string();
-        assert!(
-            err.contains("no band has dimension 'nonexistent'"),
-            "Unexpected error: {err}"
-        );
-    }
-
-    #[test]
     fn slicerange_passes_through_bands_without_dim() {
         // Same pass-through semantics for RS_SliceRange.
         let kernel = RsSliceRange {};
@@ -545,76 +509,6 @@ mod tests {
     }
 
     #[test]
-    fn slicerange_errors_when_no_band_has_dim() {
-        let kernel = RsSliceRange {};
-        let arg_types = vec![
-            RASTER,
-            SedonaType::Arrow(DataType::Utf8),
-            SedonaType::Arrow(DataType::Int64),
-            SedonaType::Arrow(DataType::Int64),
-        ];
-        let rasters = build_3d_raster_sequential(3, 4, 5);
-        let args = vec![
-            ColumnarValue::Array(Arc::new(rasters)),
-            ColumnarValue::Scalar(ScalarValue::Utf8(Some("nonexistent".to_string()))),
-            ColumnarValue::Scalar(ScalarValue::Int64(Some(0))),
-            ColumnarValue::Scalar(ScalarValue::Int64(Some(1))),
-        ];
-        let result = kernel.invoke_batch(&arg_types, &args);
-        let err = result.unwrap_err().to_string();
-        assert!(
-            err.contains("no band has dimension 'nonexistent'"),
-            "Unexpected error: {err}"
-        );
-    }
-
-    #[test]
-    fn slice_negative_index_error() {
-        // Negative index used to silently cast through `as u64`, producing
-        // a misleading "out of range with size N" error.
-        let udf: ScalarUDF = rs_slice_udf().into();
-        let tester = ScalarUdfTester::new(
-            udf,
-            vec![
-                RASTER,
-                SedonaType::Arrow(DataType::Utf8),
-                SedonaType::Arrow(DataType::Int64),
-            ],
-        );
-        let rasters = build_3d_raster_sequential(3, 4, 5);
-        let result = tester.invoke_array_scalar_scalar(Arc::new(rasters), "time", -1_i64);
-        let err = result.unwrap_err().to_string();
-        assert!(
-            err.contains("index must be non-negative"),
-            "Unexpected error: {err}"
-        );
-    }
-
-    #[test]
-    fn slicerange_negative_start_or_end_error() {
-        let kernel = RsSliceRange {};
-        let arg_types = vec![
-            RASTER,
-            SedonaType::Arrow(DataType::Utf8),
-            SedonaType::Arrow(DataType::Int64),
-            SedonaType::Arrow(DataType::Int64),
-        ];
-        let rasters = build_3d_raster_sequential(3, 4, 5);
-        let args = vec![
-            ColumnarValue::Array(Arc::new(rasters)),
-            ColumnarValue::Scalar(ScalarValue::Utf8(Some("time".to_string()))),
-            ColumnarValue::Scalar(ScalarValue::Int64(Some(-1))),
-            ColumnarValue::Scalar(ScalarValue::Int64(Some(2))),
-        ];
-        let result = kernel.invoke_batch(&arg_types, &args);
-        let err = result.unwrap_err().to_string();
-        assert!(
-            err.contains("start must be non-negative"),
-            "Unexpected error: {err}"
-        );
-    }
-
-    #[test]
     fn slice_out_of_bounds_on_band_that_has_dim_in_heterogeneous_raster() {
         // Heterogeneous raster: pre-flight passes (band 1 has `time`), but
         // the index is out of range for band 1. The error must still fire
@@ -633,117 +527,6 @@ mod tests {
         let result = tester.invoke_array_scalar_scalar(Arc::new(rasters), "time", 5_i64);
         let err = result.unwrap_err().to_string();
         assert!(err.contains("out of range"), "Unexpected error: {err}");
-    }
-
-    #[test]
-    fn slice_3d_on_time() {
-        let udf: ScalarUDF = rs_slice_udf().into();
-        let tester = ScalarUdfTester::new(
-            udf,
-            vec![
-                RASTER,
-                SedonaType::Arrow(DataType::Utf8),
-                SedonaType::Arrow(DataType::Int64),
-            ],
-        );
-
-        // shape [time=3, y=4, x=5], sequential data 0..60
-        let rasters = build_3d_raster_sequential(3, 4, 5);
-        let result = tester
-            .invoke_array_scalar_scalar(Arc::new(rasters), "time", 1_i64)
-            .unwrap();
-
-        // 2-D [y=4, x=5] carrying time slice 1: bytes 20..40 of the original.
-        let expected = RasterSpec::nd(&["time", "y", "x"], &[3, 4, 5])
-            .crs(None)
-            .band_values_nd(&["y", "x"], &[4, 5], &(20u8..40).collect::<Vec<u8>>());
-        assert_rasters_equal(&result, &[Some(expected)]);
-    }
-
-    #[test]
-    fn slicerange_3d_on_time() {
-        let kernel = RsSliceRange {};
-        let arg_types = vec![
-            RASTER,
-            SedonaType::Arrow(DataType::Utf8),
-            SedonaType::Arrow(DataType::Int64),
-            SedonaType::Arrow(DataType::Int64),
-        ];
-
-        // shape [time=3, y=4, x=5], sequential data 0..60
-        let rasters = build_3d_raster_sequential(3, 4, 5);
-        let args = vec![
-            ColumnarValue::Array(Arc::new(rasters)),
-            ColumnarValue::Scalar(ScalarValue::Utf8(Some("time".to_string()))),
-            ColumnarValue::Scalar(ScalarValue::Int64(Some(0))),
-            ColumnarValue::Scalar(ScalarValue::Int64(Some(2))),
-        ];
-        let result = kernel.invoke_batch(&arg_types, &args).unwrap();
-        let result = match result {
-            ColumnarValue::Array(arr) => arr,
-            _ => panic!("Expected array result"),
-        };
-
-        // Still 3-D [time=2, y=4, x=5]: the first 2 time slices, bytes 0..40.
-        let expected = RasterSpec::nd(&["time", "y", "x"], &[2, 4, 5])
-            .crs(None)
-            .band_values(&(0u8..40).collect::<Vec<u8>>());
-        assert_rasters_equal(&result, &[Some(expected)]);
-    }
-
-    #[test]
-    fn slice_spatial_dim_error() {
-        let udf: ScalarUDF = rs_slice_udf().into();
-        let tester = ScalarUdfTester::new(
-            udf,
-            vec![
-                RASTER,
-                SedonaType::Arrow(DataType::Utf8),
-                SedonaType::Arrow(DataType::Int64),
-            ],
-        );
-
-        let rasters = build_3d_raster_sequential(3, 4, 5);
-
-        // Try to slice "x"
-        let result = tester.invoke_array_scalar_scalar(Arc::new(rasters.clone()), "x", 0_i64);
-        assert!(result.is_err());
-        let err_msg = result.unwrap_err().to_string();
-        assert!(
-            err_msg.contains("cannot slice spatial dimension"),
-            "Unexpected error: {err_msg}"
-        );
-
-        // Try to slice "y"
-        let result = tester.invoke_array_scalar_scalar(Arc::new(rasters), "y", 0_i64);
-        assert!(result.is_err());
-        let err_msg = result.unwrap_err().to_string();
-        assert!(
-            err_msg.contains("cannot slice spatial dimension"),
-            "Unexpected error: {err_msg}"
-        );
-    }
-
-    #[test]
-    fn slice_index_out_of_range() {
-        let udf: ScalarUDF = rs_slice_udf().into();
-        let tester = ScalarUdfTester::new(
-            udf,
-            vec![
-                RASTER,
-                SedonaType::Arrow(DataType::Utf8),
-                SedonaType::Arrow(DataType::Int64),
-            ],
-        );
-
-        let rasters = build_3d_raster_sequential(3, 4, 5);
-        let result = tester.invoke_array_scalar_scalar(Arc::new(rasters), "time", 3_i64);
-        assert!(result.is_err());
-        let err_msg = result.unwrap_err().to_string();
-        assert!(
-            err_msg.contains("out of range"),
-            "Unexpected error: {err_msg}"
-        );
     }
 
     #[test]

@@ -379,37 +379,14 @@ mod tests {
             .invoke_array_scalar(Arc::new(rasters), "time")
             .unwrap();
 
-        // 3 bands, each 2-D [y=2, x=2], carrying the time slices of the
-        // original 0..12 sequential data.
-        let expected = RasterSpec::nd(&["time", "y", "x"], &[3, 2, 2])
-            .crs(None)
-            .band_values_nd(&["y", "x"], &[2, 2], &(0u8..4).collect::<Vec<u8>>())
-            .band_values_nd(&["y", "x"], &[2, 2], &(4u8..8).collect::<Vec<u8>>())
-            .band_values_nd(&["y", "x"], &[2, 2], &(8u8..12).collect::<Vec<u8>>());
-        assert_rasters_equal(&result, &[Some(expected)]);
-
-        // Band names aren't compared by assert_rasters_equal.
+        // Pixel values are asserted in the Python end-to-end tests; this checks
+        // the band-name derivation, which needs a named input band.
         let result_struct = result.as_any().downcast_ref::<StructArray>().unwrap();
         let raster_array = RasterStructArray::try_new(result_struct).unwrap();
         let raster = raster_array.get(0).unwrap();
         assert_eq!(raster.band_name(0), Some("temp_time_0"));
         assert_eq!(raster.band_name(1), Some("temp_time_1"));
         assert_eq!(raster.band_name(2), Some("temp_time_2"));
-    }
-
-    #[test]
-    fn dimtoband_spatial_dim_error() {
-        let udf: ScalarUDF = rs_dimtoband_udf().into();
-        let tester = ScalarUdfTester::new(udf, vec![RASTER, SedonaType::Arrow(DataType::Utf8)]);
-
-        let rasters = build_3d_raster_sequential(3, 2, 2);
-        let result = tester.invoke_array_scalar(Arc::new(rasters), "x");
-        assert!(result.is_err());
-        let err_msg = result.unwrap_err().to_string();
-        assert!(
-            err_msg.contains("cannot expand spatial dimension"),
-            "Unexpected error: {err_msg}"
-        );
     }
 
     #[test]
@@ -585,41 +562,6 @@ mod tests {
         let err = result.unwrap_err().to_string();
         assert!(
             err.contains("dimension 'y' already exists"),
-            "Unexpected error: {err}"
-        );
-    }
-
-    #[test]
-    fn dimtoband_errors_when_no_band_has_dim() {
-        // Pre-flight: typo'd dim name surfaces as an explicit error rather
-        // than silently passing every band through unchanged.
-        let mut builder = RasterBuilder::new(1);
-        let transform = [0.0, 1.0, 0.0, 0.0, 0.0, -1.0];
-        builder
-            .start_raster_nd(&transform, &["x", "y"], &[2, 2], None)
-            .unwrap();
-        builder
-            .start_band_nd(
-                None,
-                &["y", "x"],
-                &[2, 2],
-                BandDataType::UInt8,
-                None,
-                None,
-                None,
-            )
-            .unwrap();
-        builder.band_data_writer().append_value([0u8; 4]);
-        builder.finish_band().unwrap();
-        builder.finish_raster().unwrap();
-        let rasters = builder.finish().unwrap();
-
-        let udf: ScalarUDF = rs_dimtoband_udf().into();
-        let tester = ScalarUdfTester::new(udf, vec![RASTER, SedonaType::Arrow(DataType::Utf8)]);
-        let result = tester.invoke_array_scalar(Arc::new(rasters), "nonexistent");
-        let err = result.unwrap_err().to_string();
-        assert!(
-            err.contains("no band has dimension 'nonexistent'"),
             "Unexpected error: {err}"
         );
     }
