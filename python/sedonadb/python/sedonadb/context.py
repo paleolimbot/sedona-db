@@ -978,22 +978,66 @@ def _configure_gdal_rasterio():
     configure_gdal(shared_library=_find_gdal_in_package("rasterio"))
 
 
-def _configure_gdal_conda():
-    conda_prefix = os.environ.get("CONDA_PREFIX")
-    if not conda_prefix:
-        raise ValueError("CONDA_PREFIX environment variable is not set")
+def _gdal_lib_pattern() -> str:
+    """Return a glob pattern for finding GDAL shared libraries."""
+    if sys.platform == "win32":
+        return "gdal*.dll"
+    elif sys.platform == "darwin":
+        return "libgdal*.dylib"
+    else:
+        return "libgdal.so*"
 
-    prefix = Path(conda_prefix)
+
+def _find_gdal_shared_library(lib_dir: Path) -> Path:
+    """Find the GDAL shared library in the given directory.
+
+    Raises ValueError if not found or multiple matches.
+    """
+    pattern = _gdal_lib_pattern()
+    possible_files = list(lib_dir.glob(pattern))
+
+    # Filter out debug/test variants if multiple matches
+    if len(possible_files) > 1:
+        # Prefer exact matches or versioned libraries without suffixes like _d
+        filtered = [f for f in possible_files if "_d." not in f.name]
+        if filtered:
+            possible_files = filtered
+
+    if len(possible_files) == 0:
+        raise ValueError(
+            f"Can't find GDAL shared library matching '{pattern}' in '{lib_dir}'"
+        )
+    if len(possible_files) > 1:
+        # Pick the one with shortest name (usually the main library)
+        possible_files.sort(key=lambda p: len(p.name))
+
+    return possible_files[0]
+
+
+def _configure_gdal_conda():
+    # Try CONDA_PREFIX first, then fall back to sys.prefix
+    conda_prefix = os.environ.get("CONDA_PREFIX")
+    if conda_prefix:
+        prefix = Path(conda_prefix)
+    else:
+        # When running python directly without `conda activate`, CONDA_PREFIX
+        # may not be set, but sys.prefix points to the environment
+        prefix = Path(sys.prefix)
+
     if not prefix.exists():
         raise ValueError(
-            f"Can't configure GDAL from CONDA_PREFIX '{prefix}': does not exist"
+            f"Can't configure GDAL from prefix '{prefix}': does not exist"
         )
 
     if sys.platform == "win32":
-        shared_library = prefix / "Library" / "bin" / "gdal.dll"
+        lib_dir = prefix / "Library" / "bin"
     else:
-        shared_library = prefix / "lib" / _gdal_lib_name()
+        lib_dir = prefix / "lib"
 
+    if not lib_dir.exists():
+        raise ValueError(f"Can't find GDAL library directory '{lib_dir}'")
+
+    shared_library = _find_gdal_shared_library(lib_dir)
     configure_gdal(shared_library=shared_library)
 
 
