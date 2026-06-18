@@ -18,7 +18,7 @@
 import struct
 import math
 
-from typing import List, Optional, TYPE_CHECKING, Tuple, Any, Iterable
+from typing import List, Optional, Tuple, Any, Iterable, TYPE_CHECKING
 import geoarrow.types as gat
 import pyarrow as pa
 
@@ -79,6 +79,93 @@ def _resolve_dim_names(ndim, dim_names):
     return dim_names
 
 
+def _wrap_data_zero_copy(data) -> pa.BinaryViewArray:
+    """Wrap data as a single-element BinaryViewArray without copying.
+
+    For numpy arrays and memoryviews, this creates a zero-copy view.
+    For bytes, pyarrow handles the wrapping efficiently.
+    """
+    if isinstance(data, bytes):
+        # For empty or small bytes, just use pa.array
+        return pa.array([data], type=pa.binary_view())
+
+    import numpy as np
+
+    view = memoryview(data)
+    if not view.c_contiguous:
+        # Must copy if not contiguous
+        data = np.ascontiguousarray(data)
+        view = memoryview(data)
+
+    nbytes = view.nbytes
+    if nbytes == 0:
+        return pa.array([b""], type=pa.binary_view())
+
+    # Build BinaryArray zero-copy using from_buffers, then cast to binary_view
+    # BinaryArray buffers: [validity, offsets, data]
+    offsets = pa.py_buffer(np.array([0, nbytes], dtype=np.int32))
+    data_buffer = pa.py_buffer(view)
+    binary_array = pa.BinaryArray.from_buffers(
+        pa.binary(),
+        length=1,
+        buffers=[None, offsets, data_buffer],
+    )
+
+    # Cast to binary_view is zero-copy at array buffer level
+    return binary_array.cast(pa.binary_view())
+
+
+def _get_binary_view_buffer(
+    data_array: pa.BinaryViewArray, index: int = 0
+) -> Optional[memoryview]:
+    """Extract a zero-copy memoryview from a BinaryViewArray element.
+
+    Decodes the BinaryView format to resolve the correct variadic buffer
+    for out-of-line data. Returns None for inline data (≤12 bytes) which
+    requires copying.
+
+    Args:
+        data_array: A BinaryViewArray (may be sliced).
+        index: The element index within the array (after any slicing).
+
+    Returns:
+        A memoryview pointing directly into the variadic buffer for out-of-line
+        data, or None if the data is inline and must be copied.
+    """
+    # BinaryView layout: [validity, views, variadic_buffers...]
+    # Each view is 16 bytes:
+    #   - Inline (len ≤ 12): length:i4, data:12bytes
+    #   - Out-of-line (len > 12): length:i4, prefix:4bytes, buf_idx:i4, offset:i4
+    buffers = data_array.buffers()
+    if len(buffers) < 2 or buffers[1] is None:
+        return None
+
+    views_buf = memoryview(buffers[1])
+    # Account for array offset (e.g., from slicing) plus the requested index
+    array_offset = data_array.offset + index
+    view_start = array_offset * 16
+    view_bytes = views_buf[view_start : view_start + 16]
+
+    # Decode length from first 4 bytes
+    length = struct.unpack_from("<I", view_bytes, 0)[0]
+
+    if length <= 12:
+        # Inline data - caller must copy
+        return None
+
+    # Out-of-line: decode buffer_index and offset
+    buf_idx = struct.unpack_from("<I", view_bytes, 8)[0]
+    offset = struct.unpack_from("<I", view_bytes, 12)[0]
+
+    # Variadic buffers start at index 2
+    variadic_buf_idx = 2 + buf_idx
+    if variadic_buf_idx >= len(buffers) or buffers[variadic_buf_idx] is None:
+        return None
+
+    data_buf = memoryview(buffers[variadic_buf_idx])
+    return data_buf[offset : offset + length]
+
+
 def _build_raster(
     dim_names,
     shape,
@@ -99,34 +186,79 @@ def _build_raster(
         crs = gat.type_spec(crs=crs).crs.to_json()
     nodata_bytes = None
     if nodata is not None:
-        nodata_bytes = struct.pack("<" + BAND_DATA_TYPE_STRUCT_CHARS[data_type_id], nodata)
+        nodata_bytes = struct.pack(
+            "<" + BAND_DATA_TYPE_STRUCT_CHARS[data_type_id], nodata
+        )
 
     # spatial_dims / spatial_shape reference the trailing (y, x) axes, in x,y order.
     y_name, x_name = dim_names[-2], dim_names[-1]
     height, width = shape[-2], shape[-1]
 
-    band = {
-        "name": None,
-        "dim_names": list(dim_names),
-        "source_shape": list(shape),
-        "data_type": data_type_id,
-        "nodata": nodata_bytes,
-        "view": None,
-        "outdb_uri": outdb_uri,
-        "outdb_format": outdb_format,
-        "data": data,
-    }
-    raster = {
-        "crs": crs,
-        "transform": list(transform)
-        if transform is not None
-        else [0.0, 1.0, 0.0, 0.0, 0.0, -1.0],
-        "spatial_dims": [x_name, y_name],
-        "spatial_shape": [width, height],
-        "bands": [band],
-    }
-    storage_type = pa.DataType._import_from_c_capsule(raster_type().__arrow_c_schema__())
-    return Raster(pa.array([raster], type=storage_type))
+    # Build band struct array with zero-copy data field
+    band_data_array = _wrap_data_zero_copy(data)
+
+    band_struct = pa.StructArray.from_arrays(
+        [
+            pa.array([None], type=pa.utf8()),  # name
+            pa.array([list(dim_names)], type=pa.list_(pa.utf8())),  # dim_names
+            pa.array([list(shape)], type=pa.list_(pa.int64())),  # source_shape
+            pa.array([data_type_id], type=pa.uint32()),  # data_type
+            pa.array([nodata_bytes], type=pa.binary()),  # nodata
+            pa.array(
+                [None],
+                type=pa.list_(
+                    pa.struct(
+                        [  # view
+                            pa.field("source_axis", pa.int64()),
+                            pa.field("start", pa.int64()),
+                            pa.field("step", pa.int64()),
+                            pa.field("steps", pa.int64()),
+                        ]
+                    )
+                ),
+            ),
+            pa.array([outdb_uri], type=pa.utf8()),  # outdb_uri
+            pa.array([outdb_format], type=pa.string_view()),  # outdb_format
+            band_data_array,  # data (zero-copy)
+        ],
+        names=[
+            "name",
+            "dim_names",
+            "source_shape",
+            "data_type",
+            "nodata",
+            "view",
+            "outdb_uri",
+            "outdb_format",
+            "data",
+        ],
+    )
+
+    # Wrap band in a list array (single element list containing one band)
+    bands_list = pa.ListArray.from_arrays(
+        pa.array([0, 1], type=pa.int32()),
+        band_struct,
+    )
+
+    transform_values = (
+        list(transform) if transform is not None else [0.0, 1.0, 0.0, 0.0, 0.0, -1.0]
+    )
+
+    # Build raster struct array
+    raster_struct = pa.StructArray.from_arrays(
+        [
+            pa.array([crs], type=pa.string_view()),  # crs
+            pa.array([transform_values], type=pa.list_(pa.float64())),  # transform
+            pa.array(
+                [[x_name, y_name]], type=pa.list_(pa.string_view())
+            ),  # spatial_dims
+            pa.array([[width, height]], type=pa.list_(pa.int64())),  # spatial_shape
+            bands_list,  # bands
+        ],
+        names=["crs", "transform", "spatial_dims", "spatial_shape", "bands"],
+    )
+
+    return Raster(raster_struct)
 
 
 class Raster:
@@ -238,11 +370,15 @@ class Raster:
         if dtype not in BAND_DATA_TYPE_IDS:
             raise ValueError(f"Unsupported raster dtype: {dtype}")
 
+        # Ensure contiguous for zero-copy wrapping
+        if not array.flags.c_contiguous:
+            array = np.ascontiguousarray(array)
+
         return _build_raster(
             dim_names,
             shape,
             BAND_DATA_TYPE_IDS[dtype],
-            data=array.tobytes(),
+            data=array,  # Pass array directly for zero-copy
             crs=crs,
             nodata=nodata,
             transform=transform,
@@ -253,7 +389,8 @@ class Raster:
         if isinstance(array, pa.ExtensionArray):
             array = array.storage
 
-        self._array = pa.array(array.slice(i, i + 1))
+        # Use slice directly - pa.array() would copy
+        self._array = array.slice(i, i + 1)
 
     def _py_field(self, k):
         """Extract a field value as a Python object."""
@@ -339,9 +476,24 @@ class Band:
 
     @property
     def source_data(self) -> memoryview:
-        """The raw source data buffer as a memoryview."""
-        view_scalar = self._array.field("data")[0]
-        return memoryview(view_scalar.as_buffer())
+        """The raw source data buffer as a memoryview.
+
+        Zero-copy for out-of-line BinaryView data by decoding the view descriptor
+        and resolving the correct variadic buffer. Falls back to copying for
+        inline data (≤12 bytes).
+        """
+        if self.source_data_size == 0:
+            return memoryview(b"")
+
+        data_array = self._array.field("data")
+
+        # Try zero-copy path for out-of-line data
+        result = _get_binary_view_buffer(data_array, index=0)
+        if result is not None:
+            return result
+
+        # Fallback: inline data or missing buffer - must copy
+        return memoryview(data_array[0].as_buffer())
 
     @property
     def source_data_size(self) -> int:
@@ -384,13 +536,14 @@ class Band:
         return self.source_data.cast(buffer_type_char, self.shape)
 
     def to_numpy(self) -> "np.ndarray":
-        """Convert this band's data to a numpy array."""
+        """Convert this band's data to a numpy array (zero-copy when possible)."""
         import numpy as np
 
         if self.data_size == 0:
             return np.empty(self.shape, dtype=self.data_type)
 
-        return np.array(self.data)
+        # Use frombuffer for zero-copy
+        return np.frombuffer(self.source_data, dtype=self.data_type).reshape(self.shape)
 
     def __repr__(self) -> str:
         """Return a string representation of this band."""

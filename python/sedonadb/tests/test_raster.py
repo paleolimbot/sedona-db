@@ -185,6 +185,54 @@ def test_raster_from_numpy_invalid_shape():
         Raster.from_numpy(np.zeros((2, 2, 3), dtype="uint8"))
 
 
+def test_raster_zero_copy_roundtrip(con):
+    from sedonadb.raster import RasterType, _get_binary_view_buffer
+
+    first_arr = np.arange(2 * 2 * 3, dtype="float32").reshape(2, 2, 3)
+    first_r = Raster.from_numpy(
+        first_arr, dim_names=["time", "y", "x"], crs="EPSG:4326"
+    )
+
+    # First verify zero-copy at construction level (before SQL)
+    arr_from_raster = first_r.bands[0].to_numpy()
+    assert (
+        first_arr.__array_interface__["data"][0]
+        == arr_from_raster.__array_interface__["data"][0]
+    ), "Zero-copy failed at Raster construction"
+
+    # Check buffers at each step
+    original_data = first_r._array.field("bands").flatten().field("data")
+    original_mv = _get_binary_view_buffer(original_data, 0)
+    original_addr = np.frombuffer(original_mv, dtype=np.uint8).__array_interface__[
+        "data"
+    ][0]
+
+    # Check if wrap_array preserves zero-copy at buffer level
+    first_storage = first_r._array
+    raster_type = RasterType(first_storage.type)
+    extension_array = raster_type.wrap_array(first_storage)
+
+    wrapped_data = extension_array.storage.field("bands").flatten().field("data")
+    wrapped_mv = _get_binary_view_buffer(wrapped_data, 0)
+    wrapped_addr = np.frombuffer(wrapped_mv, dtype=np.uint8).__array_interface__[
+        "data"
+    ][0]
+
+    assert original_addr == first_arr.__array_interface__["data"][0], (
+        "Buffer doesn't match numpy at construction"
+    )
+    assert wrapped_addr == original_addr, "wrap_array caused buffer copy"
+
+    # Zero-copy access via Raster(array, i) - bypasses scalar extraction
+    ext_r = Raster(extension_array, i=0)
+    ext_arr = ext_r.bands[0].to_numpy()
+    ext_addr = ext_arr.__array_interface__["data"][0]
+
+    assert ext_addr == original_addr, (
+        f"Raster(array, i) caused copy. Expected {hex(original_addr)}, got {hex(ext_addr)}"
+    )
+
+
 def test_raster_lazy_zero_size():
     """Test that a raster with zero-size shape returns an empty memoryview."""
     r = Raster.lazy(
