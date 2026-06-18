@@ -1025,9 +1025,7 @@ def _configure_gdal_conda():
         prefix = Path(sys.prefix)
 
     if not prefix.exists():
-        raise ValueError(
-            f"Can't configure GDAL from prefix '{prefix}': does not exist"
-        )
+        raise ValueError(f"Can't configure GDAL from prefix '{prefix}': does not exist")
 
     if sys.platform == "win32":
         lib_dir = prefix / "Library" / "bin"
