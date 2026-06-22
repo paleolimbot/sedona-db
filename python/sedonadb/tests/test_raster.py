@@ -22,7 +22,6 @@ import pytest
 from sedonadb.raster import (
     Raster,
     RasterArray,
-    RasterDtype,
     RasterScalar,
     RasterType,
     _get_binary_view_buffer,
@@ -38,6 +37,44 @@ def test_type_class_resolution(con):
     assert isinstance(tab["raster"].chunk(0), RasterArray)
     assert isinstance(tab["raster"][0], RasterScalar)
     assert isinstance(tab["raster"][0].as_py(), Raster)
+
+
+def test_raster_from_chunked_array(con):
+    t = con.sql("SELECT RS_Example() as raster")
+    tab = pa.concat_tables([t.to_arrow_table(), t.to_arrow_table()])
+    chunked = tab["raster"]
+
+    # Ensure we created a chunked array with two chunks
+    assert tab["raster"].num_chunks == 2
+
+    # Check the first element (first chunk)
+
+    r = Raster(chunked, 0)
+    assert r.width == 64
+    assert r.height == 32
+    assert len(r.bands) == 3
+
+    # Verify zero-copy: compare with constructing from the chunk directly
+    r_from_chunk = Raster(chunked.chunk(0), 0)
+    arr1 = r.bands[0].to_numpy()
+    arr2 = r_from_chunk.bands[0].to_numpy()
+    assert np.shares_memory(arr1, arr2), "ChunkedArray constructor should be zero-copy"
+
+    # Check the second element (second chunk)
+    r = Raster(chunked, 1)
+    assert r.width == 64
+    assert r.height == 32
+    assert len(r.bands) == 3
+
+    # Verify zero-copy: compare with constructing from the chunk directly
+    r_from_chunk = Raster(chunked.chunk(1), 0)
+    arr1 = r.bands[0].to_numpy()
+    arr2 = r_from_chunk.bands[0].to_numpy()
+    assert np.shares_memory(arr1, arr2), "ChunkedArray constructor should be zero-copy"
+
+    # Test index out of bounds
+    with pytest.raises(IndexError):
+        Raster(chunked, 100)
 
 
 def test_raster_accessors(con):
@@ -105,6 +142,19 @@ def test_raster_zero_copy_access(con):
     # Verify the data matches
     expected_first_value = 127  # Known value from RS_Example
     assert arr[0, 0] == expected_first_value
+
+    # Check a roundtripped table through SedonaDB
+    tab_roundtrip = con.create_data_frame(tab).to_arrow_table()
+    r_from_tab = Raster(tab_roundtrip["raster"].chunk(0), 0)
+    b_from_tab = r_from_tab.bands[0]
+    arr_from_tab = b_from_tab.to_numpy()
+    assert (
+        arr.__array_interface__["data"][0]
+        == arr_from_tab.__array_interface__["data"][0]
+    ), "to_numpy should return zero-copy view sharing the same buffer"
+
+    # Verify the arrays are views, not copies (same base memory)
+    assert np.shares_memory(arr, arr_from_tab)
 
     # This should also be true of the collected Pandas DataFrame
     df = con.create_data_frame(tab).to_pandas()

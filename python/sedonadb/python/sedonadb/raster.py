@@ -316,6 +316,17 @@ class Raster:
 
     def __init__(self, array, i=0):
         """Create a Raster from an Arrow array at index i."""
+        # It is convenient to handle this case because this is what to_arrow_table()
+        # returns.
+        if isinstance(array, pa.ChunkedArray):
+            for chunk in array.chunks:
+                if i < len(chunk):
+                    chunk = chunk.storage if isinstance(chunk, pa.ExtensionArray) else chunk
+                    self._array = chunk.slice(i, i + 1)
+                    return
+                i -= len(chunk)
+            raise IndexError("Index out of bounds for chunked array")
+
         if isinstance(array, pa.ExtensionArray):
             array = array.storage
 
