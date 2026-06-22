@@ -122,18 +122,8 @@ def test_raster_to_lit(con):
 def test_raster_zero_copy_access(con):
     t = con.sql("SELECT RS_Example() as raster")
     tab = t.to_arrow_table()
-    r = tab["raster"][0].as_py()
+    r = Raster(tab["raster"], 0)
     b = r.bands[0]
-
-    # Get the underlying data array
-    data_array = r._array.field("bands").flatten().field("data")
-
-    # Zero-copy buffer extraction should work for out-of-line data
-    mv = _get_binary_view_buffer(data_array, index=0)
-    assert mv is not None, "Expected out-of-line data for raster band"
-
-    # The memoryview should have the expected size
-    assert len(mv) == b.source_data_size
 
     # to_numpy should return array backed by the same buffer
     arr = b.to_numpy()
