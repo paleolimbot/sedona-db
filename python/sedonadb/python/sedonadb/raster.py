@@ -89,23 +89,32 @@ def _get_binary_view_buffer(
     # Account for array offset (e.g., from slicing) plus the requested index
     array_offset = data_array.offset + index
     view_start = array_offset * 16
-    view_bytes = views_buf[view_start : view_start + 16]
+    view_end = view_start + 16
+    if view_end > len(views_buf):
+        raise IndexError(
+            f"index {index} is out of bounds for BinaryViewArray with "
+            f"{len(views_buf) // 16} elements"
+        )
+    view_bytes = views_buf[view_start:view_end]
 
     # Decode length from first 4 bytes
-    length = struct.unpack_from("<I", view_bytes, 0)[0]
+    length = struct.unpack_from("=I", view_bytes, 0)[0]
 
     if length <= 12:
         # Inline data - caller must copy
         return None
 
     # Out-of-line: decode buffer_index and offset
-    buf_idx = struct.unpack_from("<I", view_bytes, 8)[0]
-    offset = struct.unpack_from("<I", view_bytes, 12)[0]
+    buf_idx = struct.unpack_from("=I", view_bytes, 8)[0]
+    offset = struct.unpack_from("=I", view_bytes, 12)[0]
 
     # Variadic buffers start at index 2
     variadic_buf_idx = 2 + buf_idx
     if variadic_buf_idx >= len(buffers) or buffers[variadic_buf_idx] is None:
-        return None
+        raise IndexError(
+            f"BinaryView references buffer index {buf_idx} but only "
+            f"{len(buffers) - 2} variadic buffers are available"
+        )
 
     data_buf = memoryview(buffers[variadic_buf_idx])
     return data_buf[offset : offset + length]

@@ -16,6 +16,7 @@
 # under the License.
 
 import numpy as np
+import pyarrow as pa
 import pytest
 
 from sedonadb.raster import (
@@ -120,9 +121,9 @@ def test_raster_zero_copy_shares_buffer(con):
     arr2 = b.to_numpy()
 
     # They should share the same underlying buffer (same data pointer)
-    assert (
-        arr1.__array_interface__["data"][0] == arr2.__array_interface__["data"][0]
-    ), "to_numpy should return zero-copy view sharing the same buffer"
+    assert arr1.__array_interface__["data"][0] == arr2.__array_interface__["data"][0], (
+        "to_numpy should return zero-copy view sharing the same buffer"
+    )
 
     # Verify the arrays are views, not copies (same base memory)
     assert np.shares_memory(arr1, arr2)
@@ -256,3 +257,84 @@ def test_raster_lazy_zero_size():
     arr = b.to_numpy()
     assert arr.shape == (0, 64)
     assert arr.dtype == "float32"
+
+
+def test_get_binary_view_buffer():
+    # Out-of-line data (>12 bytes) should return a memoryview
+    large_data = b"x" * 100
+    arr = pa.array([large_data], type=pa.binary_view())
+    mv = _get_binary_view_buffer(arr, index=0)
+    assert mv is not None
+    assert len(mv) == 100
+    assert bytes(mv) == large_data
+
+    # Inline data (≤12 bytes) should return None
+    small_data = b"hello"
+    arr_small = pa.array([small_data], type=pa.binary_view())
+    mv_small = _get_binary_view_buffer(arr_small, index=0)
+    assert mv_small is None
+
+    # Empty array should raise IndexError
+    arr_empty = pa.array([], type=pa.binary_view())
+    with pytest.raises(IndexError, match="index 0 is out of bounds"):
+        _get_binary_view_buffer(arr_empty, index=0)
+
+    # Null element should return None (inline with length 0)
+    arr_null = pa.array([None], type=pa.binary_view())
+    mv_null = _get_binary_view_buffer(arr_null, index=0)
+    assert mv_null is None
+
+
+def test_get_binary_view_buffer_index_out_of_bounds():
+    # Create an array with one element, then access index 1
+    data = b"x" * 20
+    arr = pa.array([data], type=pa.binary_view())
+
+    with pytest.raises(IndexError, match="index 1 is out of bounds"):
+        _get_binary_view_buffer(arr, index=1)
+
+    # Also test negative-ish scenario with index beyond array length
+    with pytest.raises(IndexError, match="index 5 is out of bounds"):
+        _get_binary_view_buffer(arr, index=5)
+
+
+def test_get_binary_view_buffer_invalid_buffer_index():
+    import struct
+
+    # Create a BinaryView that references a non-existent variadic buffer.
+    # BinaryView format for out-of-line (len > 12):
+    #   length:i4, prefix:4bytes, buf_idx:i4, offset:i4
+    length = 100  # > 12, so out-of-line
+    prefix = b"xxxx"
+    buf_idx = 99  # References non-existent buffer
+    offset = 0
+    view_bytes = (
+        struct.pack("=I", length) + prefix + struct.pack("=II", buf_idx, offset)
+    )
+
+    views_buffer = pa.py_buffer(view_bytes)
+    # BinaryView buffers: [validity, views, variadic_buffers...]
+    # We provide no variadic buffers, so buf_idx=99 is invalid
+    arr = pa.Array.from_buffers(pa.binary_view(), 1, [None, views_buffer])
+
+    with pytest.raises(IndexError, match="buffer index 99"):
+        _get_binary_view_buffer(arr, index=0)
+
+
+def test_get_binary_view_buffer_sliced():
+    # Create array with multiple out-of-line elements
+    data = [b"a" * 20, b"b" * 30, b"c" * 40]
+    arr = pa.array(data, type=pa.binary_view())
+
+    # Slice to get second element at index 0 of the slice
+    sliced = arr.slice(1, 1)
+    mv = _get_binary_view_buffer(sliced, index=0)
+    assert mv is not None
+    assert len(mv) == 30
+    assert bytes(mv) == b"b" * 30
+
+    # Access different indices in the original array
+    for i, expected in enumerate(data):
+        mv = _get_binary_view_buffer(arr, index=i)
+        assert mv is not None
+        assert bytes(mv) == expected
