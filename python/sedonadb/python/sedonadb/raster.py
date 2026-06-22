@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import struct
 from typing import List, Optional, TYPE_CHECKING, Tuple
 import geoarrow.types as gat
 import pyarrow as pa
@@ -53,6 +54,57 @@ BAND_DATA_TYPE_STRUCT_CHARS = {
 }
 
 
+def _get_binary_view_buffer(
+    data_array: pa.BinaryViewArray, index: int = 0
+) -> Optional[memoryview]:
+    """Extract a zero-copy memoryview from a BinaryViewArray element.
+
+    Decodes the BinaryView format to resolve the correct variadic buffer
+    for out-of-line data. Returns None for inline data (≤12 bytes) which
+    requires copying.
+
+    Args:
+        data_array: A BinaryViewArray (may be sliced).
+        index: The element index within the array (after any slicing).
+
+    Returns:
+        A memoryview pointing directly into the variadic buffer for out-of-line
+        data, or None if the data is inline and must be copied.
+    """
+    # BinaryView layout: [validity, views, variadic_buffers...]
+    # Each view is 16 bytes:
+    #   - Inline (len ≤ 12): length:i4, data:12bytes
+    #   - Out-of-line (len > 12): length:i4, prefix:4bytes, buf_idx:i4, offset:i4
+    buffers = data_array.buffers()
+    if len(buffers) < 2 or buffers[1] is None:
+        return None
+
+    views_buf = memoryview(buffers[1])
+    # Account for array offset (e.g., from slicing) plus the requested index
+    array_offset = data_array.offset + index
+    view_start = array_offset * 16
+    view_bytes = views_buf[view_start : view_start + 16]
+
+    # Decode length from first 4 bytes
+    length = struct.unpack_from("<I", view_bytes, 0)[0]
+
+    if length <= 12:
+        # Inline data - caller must copy
+        return None
+
+    # Out-of-line: decode buffer_index and offset
+    buf_idx = struct.unpack_from("<I", view_bytes, 8)[0]
+    offset = struct.unpack_from("<I", view_bytes, 12)[0]
+
+    # Variadic buffers start at index 2
+    variadic_buf_idx = 2 + buf_idx
+    if variadic_buf_idx >= len(buffers) or buffers[variadic_buf_idx] is None:
+        return None
+
+    data_buf = memoryview(buffers[variadic_buf_idx])
+    return data_buf[offset : offset + length]
+
+
 class Raster:
     """Python representation of a sedona.raster scalar value."""
 
@@ -61,7 +113,8 @@ class Raster:
         if isinstance(array, pa.ExtensionArray):
             array = array.storage
 
-        self._array = pa.array(array.slice(i, i + 1))
+        # Use slice directly - pa.array() would copy
+        self._array = array.slice(i, i + 1)
 
     def _py_field(self, k):
         """Extract a field value as a Python object."""
@@ -109,7 +162,8 @@ class Band:
 
     def __init__(self, array, i=0):
         """Create a Band from an Arrow array at index i."""
-        self._array = pa.array(array.slice(i, i + 1))
+        # Use slice directly - pa.array() would copy
+        self._array = array.slice(i, i + 1)
 
     def _py_field(self, k):
         """Extract a field value as a Python object."""
@@ -147,9 +201,30 @@ class Band:
 
     @property
     def source_data(self) -> memoryview:
-        """The raw source data buffer as a memoryview."""
-        view_scalar = self._array.field("data")[0]
-        return memoryview(view_scalar.as_buffer())
+        """The raw source data buffer as a memoryview.
+
+        Zero-copy for out-of-line BinaryView data by decoding the view descriptor
+        and resolving the correct variadic buffer. Falls back to copying for
+        inline data (≤12 bytes).
+        """
+        if self.source_data_size == 0:
+            return memoryview(b"")
+
+        data_array = self._array.field("data")
+
+        # Try zero-copy path for out-of-line data
+        result = _get_binary_view_buffer(data_array, index=0)
+        if result is not None:
+            return result
+
+        # Fallback: inline data or missing buffer - must copy
+        return memoryview(data_array[0].as_buffer())
+
+    @property
+    def source_data_size(self) -> int:
+        """The size of the source data buffer in bytes."""
+        data_array = self._array.field("data")
+        return len(data_array[0].as_buffer())
 
     @property
     def data(self) -> memoryview:
@@ -168,10 +243,14 @@ class Band:
         return self.source_data.cast(buffer_type_char, self.shape)
 
     def to_numpy(self) -> "np.ndarray":
-        """Convert this band's data to a numpy array."""
+        """Convert this band's data to a numpy array (zero-copy when possible)."""
         import numpy as np
 
-        return np.array(self.data)
+        if self.source_data_size == 0:
+            return np.empty(self.shape, dtype=self.data_type)
+
+        # Use frombuffer for zero-copy
+        return np.frombuffer(self.source_data, dtype=self.data_type).reshape(self.shape)
 
     def __repr__(self) -> str:
         """Return a string representation of this band."""

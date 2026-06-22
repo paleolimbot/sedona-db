@@ -15,7 +15,15 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from sedonadb.raster import Raster, RasterArray, RasterScalar, RasterType
+import numpy as np
+
+from sedonadb.raster import (
+    Raster,
+    RasterArray,
+    RasterScalar,
+    RasterType,
+    _get_binary_view_buffer,
+)
 
 
 def test_type_class_resolution(con):
@@ -67,3 +75,51 @@ def test_raster_to_lit(con):
     ).to_pandas()
     assert t2.iloc[0, 0] == r.width
     assert t2.iloc[0, 1] == r.height
+
+
+def test_raster_zero_copy_access(con):
+    """Test that zero-copy buffer extraction works for BinaryView data."""
+    t = con.sql("SELECT RS_Example() as raster")
+    tab = t.to_arrow_table()
+    r: Raster = tab["raster"][0].as_py()
+
+    b = r.bands[0]
+
+    # Get the underlying data array
+    data_array = r._array.field("bands").flatten().field("data")
+
+    # Zero-copy buffer extraction should work for out-of-line data
+    mv = _get_binary_view_buffer(data_array, index=0)
+    assert mv is not None, "Expected out-of-line data for raster band"
+
+    # The memoryview should have the expected size
+    assert len(mv) == b.source_data_size
+
+    # to_numpy should return array backed by the same buffer
+    arr = b.to_numpy()
+    assert arr.shape == b.shape
+
+    # Verify the data matches
+    expected_first_value = 127  # Known value from RS_Example
+    assert arr[0, 0] == expected_first_value
+
+
+def test_raster_zero_copy_shares_buffer(con):
+    """Test that to_numpy shares the underlying buffer (zero-copy)."""
+    t = con.sql("SELECT RS_Example() as raster")
+    tab = t.to_arrow_table()
+    r: Raster = tab["raster"][0].as_py()
+
+    b = r.bands[0]
+
+    # Get two numpy arrays from the same band
+    arr1 = b.to_numpy()
+    arr2 = b.to_numpy()
+
+    # They should share the same underlying buffer (same data pointer)
+    assert (
+        arr1.__array_interface__["data"][0] == arr2.__array_interface__["data"][0]
+    ), "to_numpy should return zero-copy view sharing the same buffer"
+
+    # Verify the arrays are views, not copies (same base memory)
+    assert np.shares_memory(arr1, arr2)
