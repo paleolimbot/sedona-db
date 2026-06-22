@@ -254,15 +254,19 @@ def test_raster_lazy_nd():
 
 
 def test_raster_from_numpy_2d():
-    arr = np.arange(2 * 3, dtype="uint8").reshape(2, 3)
+    # Use array >12 bytes so BinaryView uses out-of-line storage (zero-copy eligible)
+    arr = np.arange(4 * 5, dtype="uint8").reshape(4, 5)
     r = Raster.from_numpy(arr)
 
-    assert r.width == 3
-    assert r.height == 2
+    assert r.width == 5
+    assert r.height == 4
     b = r.bands[0]
-    assert b.source_shape == (2, 3)
+    assert b.source_shape == (4, 5)
     assert b.data_type == "uint8"
     np.testing.assert_array_equal(b.to_numpy(), arr)
+
+    # Ensure that the stored data is zero copy (only works for >12 byte arrays)
+    assert np.shares_memory(b.to_numpy(), arr)
 
 
 def test_raster_from_numpy_nd_with_crs():

@@ -144,7 +144,7 @@ class Raster:
             dim_names,
             shape,
             BAND_DATA_TYPE_IDS[dtype],
-            data=array.tobytes(),
+            data=array,
             crs=crs,
             nodata=nodata,
             transform=transform,
@@ -557,6 +557,38 @@ def _get_binary_view_buffer(
     return data_buf[offset : offset + length]
 
 
+def _wrap_data_zero_copy(data) -> pa.BinaryViewArray:
+    """Wrap data as a single-element BinaryViewArray without copying.
+
+    For numpy arrays and memoryviews, this creates a zero-copy view.
+    For bytes, pyarrow handles the wrapping efficiently.
+    """
+    import numpy as np
+
+    view = memoryview(data)
+    if not view.c_contiguous:
+        # Must copy if not contiguous
+        data = np.ascontiguousarray(data)
+        view = memoryview(data)
+
+    nbytes = view.nbytes
+    if nbytes == 0:
+        return pa.array([b""], type=pa.binary_view())
+
+    # Build BinaryArray zero-copy using from_buffers, then cast to binary_view
+    # BinaryArray buffers: [validity, offsets, data]
+    offsets = pa.py_buffer(np.array([0, nbytes], dtype=np.int32))
+    data_buffer = pa.py_buffer(view)
+    binary_array = pa.BinaryArray.from_buffers(
+        pa.binary(),
+        length=1,
+        buffers=[None, offsets, data_buffer],
+    )
+
+    # Cast to binary_view is zero-copy at array buffer level
+    return binary_array.cast(pa.binary_view())
+
+
 def _resolve_dim_names(ndim, dim_names):
     """Resolve a band's dimension names. The trailing two are the spatial
     ``(y, x)`` pair; a 2-D raster defaults to ``["y", "x"]`` and higher
@@ -603,27 +635,71 @@ def _build_raster(
     y_name, x_name = dim_names[-2], dim_names[-1]
     height, width = shape[-2], shape[-1]
 
-    band = {
-        "name": None,
-        "dim_names": list(dim_names),
-        "source_shape": list(shape),
-        "data_type": data_type_id,
-        "nodata": nodata_bytes,
-        "view": None,
-        "outdb_uri": outdb_uri,
-        "outdb_format": outdb_format,
-        "data": data,
-    }
-    raster = {
-        "crs": crs,
-        "transform": list(transform)
-        if transform is not None
-        else [0.0, 1.0, 0.0, 0.0, 0.0, -1.0],
-        "spatial_dims": [x_name, y_name],
-        "spatial_shape": [width, height],
-        "bands": [band],
-    }
-    storage_type = pa.DataType._import_from_c_capsule(
-        raster_type().__arrow_c_schema__()
+    # Build band struct array with zero-copy data field
+    band_data_array = _wrap_data_zero_copy(data)
+
+    band_struct = pa.StructArray.from_arrays(
+        [
+            pa.array([None], type=pa.utf8()),  # name
+            pa.array([list(dim_names)], type=pa.list_(pa.utf8())),  # dim_names
+            pa.array([list(shape)], type=pa.list_(pa.int64())),  # source_shape
+            pa.array([data_type_id], type=pa.uint32()),  # data_type
+            pa.array([nodata_bytes], type=pa.binary()),  # nodata
+            pa.array(
+                [None],
+                type=pa.list_(
+                    pa.struct(
+                        [  # view
+                            pa.field("source_axis", pa.int64()),
+                            pa.field("start", pa.int64()),
+                            pa.field("step", pa.int64()),
+                            pa.field("steps", pa.int64()),
+                        ]
+                    )
+                ),
+            ),
+            pa.array([outdb_uri], type=pa.utf8()),  # outdb_uri
+            pa.array([outdb_format], type=pa.string_view()),  # outdb_format
+            band_data_array,  # data (zero-copy)
+        ],
+        names=[
+            "name",
+            "dim_names",
+            "source_shape",
+            "data_type",
+            "nodata",
+            "view",
+            "outdb_uri",
+            "outdb_format",
+            "data",
+        ],
     )
-    return Raster(pa.array([raster], type=storage_type))
+
+    # Wrap band in a list array (single element list containing one band)
+    bands_list = pa.ListArray.from_arrays(
+        pa.array([0, 1], type=pa.int32()),
+        band_struct,
+    )
+
+    transform_values = (
+        list(transform) if transform is not None else [0.0, 1.0, 0.0, 0.0, 0.0, -1.0]
+    )
+
+    # Build raster struct array
+    raster_struct = pa.StructArray.from_arrays(
+        [
+            pa.array([crs], type=pa.string_view()),  # crs
+            pa.array([transform_values], type=pa.list_(pa.float64())),  # transform
+            pa.array(
+                [[x_name, y_name]], type=pa.list_(pa.string_view())
+            ),  # spatial_dims
+            pa.array([[width, height]], type=pa.list_(pa.int64())),  # spatial_shape
+            bands_list,  # bands
+        ],
+        names=["crs", "transform", "spatial_dims", "spatial_shape", "bands"],
+    )
+
+    # Cast to the canonical storage type to ensure nullability matches
+    raster_struct = raster_struct.cast(RASTER_STORAGE_TYPE)
+
+    return Raster(raster_struct)
