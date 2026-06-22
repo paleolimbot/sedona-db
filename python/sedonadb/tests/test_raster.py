@@ -22,6 +22,7 @@ import pytest
 from sedonadb.raster import (
     Raster,
     RasterArray,
+    RasterDtype,
     RasterScalar,
     RasterType,
     _get_binary_view_buffer,
@@ -42,7 +43,7 @@ def test_type_class_resolution(con):
 def test_raster_accessors(con):
     t = con.sql("SELECT RS_Example() as raster")
     tab = t.to_arrow_table()
-    r: Raster = tab["raster"][0].as_py()
+    r = tab["raster"][0].as_py()
 
     assert r.crs.to_json_dict()["id"] == {"authority": "OGC", "code": "CRS84"}
     assert r.width == 64
@@ -82,11 +83,9 @@ def test_raster_to_lit(con):
 
 
 def test_raster_zero_copy_access(con):
-    """Test that zero-copy buffer extraction works for BinaryView data."""
     t = con.sql("SELECT RS_Example() as raster")
     tab = t.to_arrow_table()
-    r: Raster = tab["raster"][0].as_py()
-
+    r = tab["raster"][0].as_py()
     b = r.bands[0]
 
     # Get the underlying data array
@@ -107,26 +106,31 @@ def test_raster_zero_copy_access(con):
     expected_first_value = 127  # Known value from RS_Example
     assert arr[0, 0] == expected_first_value
 
+    # This should also be true of the collected Pandas DataFrame
+    df = con.create_data_frame(tab).to_pandas()
 
-def test_raster_zero_copy_shares_buffer(con):
-    """Test that to_numpy shares the underlying buffer (zero-copy)."""
-    t = con.sql("SELECT RS_Example() as raster")
-    tab = t.to_arrow_table()
-    r: Raster = tab["raster"][0].as_py()
+    # The DataFrame should contain Raster objects
+    assert len(df) == 1
+    r_from_df = df["raster"].iloc[0]
+    assert isinstance(r_from_df, Raster)
 
-    b = r.bands[0]
+    # Verify the Raster has the expected properties
+    assert r_from_df.width == 64
+    assert r_from_df.height == 32
+    assert len(r_from_df.bands) == 3
 
-    # Get two numpy arrays from the same band
-    arr1 = b.to_numpy()
-    arr2 = b.to_numpy()
+    # Verify zero-copy: the band data should be backed by the same buffer
+    b_from_df = r_from_df.bands[0]
+    arr_from_df = b_from_df.to_numpy()
+    assert arr_from_df[0, 0] == 127  # Known value from RS_Example
 
     # They should share the same underlying buffer (same data pointer)
-    assert arr1.__array_interface__["data"][0] == arr2.__array_interface__["data"][0], (
-        "to_numpy should return zero-copy view sharing the same buffer"
-    )
+    assert (
+        arr.__array_interface__["data"][0] == arr_from_df.__array_interface__["data"][0]
+    ), "to_numpy should return zero-copy view sharing the same buffer"
 
     # Verify the arrays are views, not copies (same base memory)
-    assert np.shares_memory(arr1, arr2)
+    assert np.shares_memory(arr, arr_from_df)
 
 
 def test_raster_lazy():

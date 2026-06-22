@@ -494,7 +494,13 @@ class RasterScalar(pa.ExtensionScalar):
 class RasterArray(pa.ExtensionArray):
     """Array type for sedona.raster extension arrays."""
 
-    pass
+    def to_pandas(self, **kwargs):
+        """Convert to a Pandas Series of Raster objects (zero-copy where possible)."""
+        import pandas as pd
+
+        # Create Raster objects that reference the underlying storage directly
+        rasters = [Raster(self.storage, i) for i in range(len(self))]
+        return pd.array(rasters, dtype=object)
 
 
 class RasterType(pa.ExtensionType):
@@ -533,6 +539,53 @@ class RasterType(pa.ExtensionType):
 
     def __arrow_ext_scalar_class__(self):
         return RasterScalar
+
+    def to_pandas_dtype(self):
+        """Return the Pandas dtype for this extension type."""
+        return RasterDtype()
+
+
+class RasterDtype:
+    """Pandas-compatible dtype for Raster arrays.
+
+    This dtype enables conversion from Arrow to Pandas with zero-copy
+    Raster objects that reference the underlying Arrow buffers.
+    """
+
+    name = "raster"
+    na_value = None
+
+    def __repr__(self):
+        return "RasterDtype()"
+
+    def __eq__(self, other):
+        return isinstance(other, RasterDtype)
+
+    def __hash__(self):
+        return hash("RasterDtype")
+
+    @classmethod
+    def __from_arrow__(cls, arr):
+        """Convert an Arrow array to a numpy array of Raster objects.
+
+        This is called by PyArrow when converting to Pandas. Each Raster
+        object wraps a slice of the Arrow array for zero-copy access.
+        """
+        import pandas as pd
+
+        # Handle ChunkedArray by iterating over chunks
+        if isinstance(arr, pa.ChunkedArray):
+            rasters = []
+            for chunk in arr.chunks:
+                storage = chunk.storage if isinstance(chunk, pa.ExtensionArray) else chunk
+                for i in range(len(storage)):
+                    rasters.append(Raster(storage, i))
+            return pd.array(rasters, dtype=object)
+
+        # Handle single array
+        storage = arr.storage if isinstance(arr, pa.ExtensionArray) else arr
+        rasters = [Raster(storage, i) for i in range(len(storage))]
+        return pd.array(rasters, dtype=object)
 
 
 def register_extension_type():
