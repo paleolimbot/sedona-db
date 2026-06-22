@@ -321,7 +321,9 @@ class Raster:
         if isinstance(array, pa.ChunkedArray):
             for chunk in array.chunks:
                 if i < len(chunk):
-                    chunk = chunk.storage if isinstance(chunk, pa.ExtensionArray) else chunk
+                    chunk = (
+                        chunk.storage if isinstance(chunk, pa.ExtensionArray) else chunk
+                    )
                     self._array = chunk.slice(i, i + 1)
                     return
                 i -= len(chunk)
@@ -588,7 +590,9 @@ class RasterDtype:
         if isinstance(arr, pa.ChunkedArray):
             rasters = []
             for chunk in arr.chunks:
-                storage = chunk.storage if isinstance(chunk, pa.ExtensionArray) else chunk
+                storage = (
+                    chunk.storage if isinstance(chunk, pa.ExtensionArray) else chunk
+                )
                 for i in range(len(storage)):
                     rasters.append(Raster(storage, i))
             return pd.array(rasters, dtype=object)
