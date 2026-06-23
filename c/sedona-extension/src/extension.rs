@@ -18,7 +18,7 @@
 use std::{
     ffi::c_int,
     os::raw::{c_char, c_void},
-    ptr::{null_mut},
+    ptr::null_mut,
 };
 
 use arrow_array::{
@@ -159,7 +159,19 @@ impl SedonaCError {
                     release: Some(release_error),
                 }
             }
-            Err(_) => UNKNOWN_SEDONA_C_ERROR
+            Err(_) => UNKNOWN_SEDONA_C_ERROR,
+        }
+    }
+}
+
+impl std::fmt::Display for SedonaCError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.err.is_null() || self.err_len == 0 {
+            return write!(f, "");
+        }
+        unsafe {
+            let bytes = std::slice::from_raw_parts(self.err as *const u8, self.err_len as usize);
+            write!(f, "{}", String::from_utf8_lossy(bytes))
         }
     }
 }
