@@ -42,7 +42,7 @@ config_namespace! {
         pub spatial_join: SpatialJoinOptions, default = SpatialJoinOptions::default()
 
         /// Global [CrsEngine] for CRS operations
-        pub crs_provider: CrsEngineOption, default = CrsEngineOption::default()
+        pub crs_provider: SedonaRuntime, default = SedonaRuntime::default()
 
         /// Options for configuring GDAL usage
         pub gdal: GdalOptions, default = GdalOptions::default()
@@ -427,38 +427,44 @@ impl ConfigField for TgIndexType {
     }
 }
 
-/// Wrapper class implementing [ConfigField] that allows a [CrsEngine]
-/// member in [SedonaOptions].
+/// Access spatial utilities at runtime
+///
+/// These utilities are generally provided by third-party libraries (e.g.,
+/// PROJ, S2), abstracted here to simplify the dependencies between crates.
 #[derive(Debug, Clone)]
-pub struct CrsEngineOption(Arc<dyn CrsEngine + Send + Sync>);
+pub struct SedonaRuntime {
+    crs_engine: Arc<dyn CrsEngine + Send + Sync>,
+}
 
-impl CrsEngineOption {
-    /// Create a new option from a [CrsEngine] reference
-    pub fn new(inner: Arc<dyn CrsEngine + Send + Sync>) -> Self {
-        CrsEngineOption(inner)
+impl SedonaRuntime {
+    /// Replace the runtime [CrsEngine] reference
+    pub fn with_crs_engine(&self, crs_engine: Arc<dyn CrsEngine + Send + Sync>) -> Self {
+        Self { crs_engine }
     }
 
     /// Convert an arbitrary string to a PROJJSON representation if possible
-    pub fn inner(&self) -> &Arc<dyn CrsEngine + Send + Sync> {
-        &self.0
+    pub fn crs_engine(&self) -> &Arc<dyn CrsEngine + Send + Sync> {
+        &self.crs_engine
     }
 }
 
-impl Default for CrsEngineOption {
+impl Default for SedonaRuntime {
     fn default() -> Self {
-        Self(Arc::new(DefaultCrsEngine {}))
+        Self {
+            crs_engine: Arc::new(DefaultCrsEngine {}),
+        }
     }
 }
 
-impl PartialEq for CrsEngineOption {
+impl PartialEq for SedonaRuntime {
     fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.0, &other.0)
+        Arc::ptr_eq(&self.crs_engine, &other.crs_engine)
     }
 }
 
-impl ConfigField for CrsEngineOption {
+impl ConfigField for SedonaRuntime {
     fn visit<V: Visit>(&self, v: &mut V, key: &str, description: &'static str) {
-        v.some(key, format!("{:?}", self.0), description);
+        v.some(key, format!("{:?}", self), description);
     }
 
     fn set(&mut self, key: &str, _value: &str) -> Result<()> {
@@ -620,8 +626,8 @@ mod tests {
 
     #[test]
     fn test_default_crs_provider_returns_error() {
-        let provider = CrsEngineOption::default();
-        let result = provider.inner().to_projjson("EPSG:4326");
+        let provider = SedonaRuntime::default();
+        let result = provider.crs_engine().to_projjson("EPSG:4326");
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
         assert!(
@@ -636,7 +642,7 @@ mod tests {
 
     #[test]
     fn test_crs_provider_option_set_from_sql_returns_error() {
-        let mut option = CrsEngineOption::default();
+        let mut option = SedonaRuntime::default();
         let result = option.set("sedona.crs_provider", "some_value");
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();

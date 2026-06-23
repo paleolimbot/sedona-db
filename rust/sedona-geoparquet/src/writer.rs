@@ -47,7 +47,7 @@ use datafusion_physical_plan::{
 use float_next_after::NextAfter;
 use futures::StreamExt;
 use geo_traits::GeometryTrait;
-use sedona_common::{sedona_internal_err, CrsEngineOption, SedonaOptions};
+use sedona_common::{sedona_internal_err, SedonaRuntime, SedonaOptions};
 use sedona_expr::scalar_udf::{SedonaScalarKernel, SedonaScalarUDF};
 use sedona_functions::executor::WkbExecutor;
 use sedona_geometry::{
@@ -317,7 +317,7 @@ fn project_bboxes(
     input: &Arc<dyn ExecutionPlan>,
     overwrite_bbox_columns: bool,
     session_config_options: &Arc<ConfigOptions>,
-    crs_provider: &CrsEngineOption,
+    crs_provider: &SedonaRuntime,
     version: GeoParquetVersion,
 ) -> Result<ProjectBboxesResult> {
     let input_schema = input.schema();
@@ -402,7 +402,7 @@ Use overwrite_bbox_columns = True if this is what was intended.",
 
 fn project_normalize_geo(
     input_schema: &Schema,
-    crs_provider: &CrsEngineOption,
+    crs_provider: &SedonaRuntime,
     version: GeoParquetVersion,
     session_config_options: &Arc<ConfigOptions>,
 ) -> Result<Vec<(Arc<dyn PhysicalExpr>, String)>> {
@@ -576,13 +576,13 @@ fn append_float_bbox(
 
 #[derive(Debug, PartialEq)]
 struct NormalizeForGeoParquet {
-    crs_provider: CrsEngineOption,
+    crs_provider: SedonaRuntime,
     version: GeoParquetVersion,
     signature: Signature,
 }
 
 impl NormalizeForGeoParquet {
-    fn new(crs_provider: CrsEngineOption, version: GeoParquetVersion) -> Self {
+    fn new(crs_provider: SedonaRuntime, version: GeoParquetVersion) -> Self {
         Self {
             crs_provider,
             version,
@@ -629,7 +629,7 @@ impl ScalarUDFImpl for NormalizeForGeoParquet {
 fn normalize_field_for_geoparquet(
     field: &FieldRef,
     version: GeoParquetVersion,
-    crs_provider: &CrsEngineOption,
+    crs_provider: &SedonaRuntime,
 ) -> Result<FieldRef> {
     if field.metadata().is_empty() && !field.data_type().is_nested() {
         return Ok(field.clone());
@@ -720,7 +720,7 @@ fn serialize_edges_and_crs_with_parquet_bug(
 fn normalize_crs_for_geoparquet(
     field_name: &str,
     crs: &Crs,
-    crs_provider: &CrsEngineOption,
+    crs_provider: &SedonaRuntime,
 ) -> Result<Option<Value>> {
     if crs == &lnglat() {
         // Do nothing, lnglat is the meaning of an omitted CRS
@@ -732,7 +732,7 @@ fn normalize_crs_for_geoparquet(
 
         if let Value::String(string) = &crs_value {
             let projjson_string = crs_provider
-                .inner()
+                .crs_engine()
                 .to_projjson(string)
                 .map_err(|e| exec_datafusion_err!("{e}"))?;
             crs_value = projjson_string.parse().map_err(|e| {
