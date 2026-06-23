@@ -47,7 +47,7 @@ use datafusion_physical_plan::{
 use float_next_after::NextAfter;
 use futures::StreamExt;
 use geo_traits::GeometryTrait;
-use sedona_common::{sedona_internal_err, SedonaRuntime, SedonaOptions};
+use sedona_common::{sedona_internal_err, SedonaOptions, SedonaRuntime};
 use sedona_expr::scalar_udf::{SedonaScalarKernel, SedonaScalarUDF};
 use sedona_functions::executor::WkbExecutor;
 use sedona_geometry::{
@@ -102,7 +102,7 @@ pub fn create_geoparquet_writer_physical_plan(
             metadata.version = "1.0.0".to_string();
             projection = project_normalize_geo(
                 &input.schema(),
-                &sedona_options.crs_provider,
+                &sedona_options.runtime,
                 GeoParquetVersion::V1_0,
                 session_config_options,
             )?;
@@ -113,7 +113,7 @@ pub fn create_geoparquet_writer_physical_plan(
                 &input,
                 options.overwrite_bbox_columns,
                 session_config_options,
-                &sedona_options.crs_provider,
+                &sedona_options.runtime,
                 GeoParquetVersion::V1_1,
             )?;
         }
@@ -121,7 +121,7 @@ pub fn create_geoparquet_writer_physical_plan(
             metadata.version = "2.0.0".to_string();
             projection = project_normalize_geo(
                 &input.schema(),
-                &sedona_options.crs_provider,
+                &sedona_options.runtime,
                 GeoParquetVersion::V2_0,
                 session_config_options,
             )?;
@@ -131,7 +131,7 @@ pub fn create_geoparquet_writer_physical_plan(
             metadata.version = "".to_string();
             projection = project_normalize_geo(
                 &input.schema(),
-                &sedona_options.crs_provider,
+                &sedona_options.runtime,
                 GeoParquetVersion::Omitted,
                 session_config_options,
             )?;
@@ -181,7 +181,7 @@ pub fn create_geoparquet_writer_physical_plan(
 
             // Assign crs
             column_metadata.crs =
-                normalize_crs_for_geoparquet(f.name(), &crs, &sedona_options.crs_provider)?;
+                normalize_crs_for_geoparquet(f.name(), &crs, &sedona_options.runtime)?;
 
             // Add bbox column info, if we added one in project_bboxes()
             if let Some(bbox_column_name) = bbox_columns.get(f.name()) {

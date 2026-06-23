@@ -126,8 +126,8 @@ impl SedonaContext {
             .extensions
             .get_mut::<SedonaOptions>()
             .ok_or_else(|| sedona_internal_datafusion_err!("SedonaOptions not available"))?;
-        opts.crs_provider = opts
-            .crs_provider
+        opts.runtime = opts
+            .runtime
             .with_crs_engine(Arc::new(sedona_proj::transform::LazyProjEngine));
 
         // Set the spilled batch in-memory size threshold to 5% of the per-partition memory limit,
@@ -164,7 +164,7 @@ impl SedonaContext {
                     GeographySpatialJoinPhysicalPlanner::new(),
                 ));
 
-                opts.crs_provider = opts.crs_provider.with_bounder(Arc::new(
+                opts.runtime = opts.runtime.with_bounder(Arc::new(
                     sedona_s2geography::rect_bounder::WkbGeographyBounder::default(),
                 ))
             }

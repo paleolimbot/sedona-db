@@ -42,8 +42,8 @@ config_namespace! {
         /// Options for spatial join
         pub spatial_join: SpatialJoinOptions, default = SpatialJoinOptions::default()
 
-        /// Global [CrsEngine] for CRS operations
-        pub crs_provider: SedonaRuntime, default = SedonaRuntime::default()
+        /// Global [SedonaRuntime] for CRS and geography operations
+        pub runtime: SedonaRuntime, default = SedonaRuntime::default()
 
         /// Options for configuring GDAL usage
         pub gdal: GdalOptions, default = GdalOptions::default()
@@ -659,13 +659,13 @@ mod tests {
     }
 
     #[test]
-    fn test_crs_provider_option_set_from_sql_returns_error() {
+    fn test_runtime_option_set_from_sql_returns_error() {
         let mut option = SedonaRuntime::default();
-        let result = option.set("sedona.crs_provider", "some_value");
+        let result = option.set("sedona.runtime", "some_value");
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
         assert!(
-            err_msg.contains("Can't set sedona.crs_provider from SQL"),
+            err_msg.contains("Can't set sedona.runtime from SQL"),
             "Unexpected error message: {err_msg}"
         );
     }
