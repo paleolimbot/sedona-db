@@ -20,14 +20,14 @@ use std::{any::Any, sync::Arc};
 use datafusion_common::{Result, Statistics};
 use datafusion_execution::TaskContext;
 use datafusion_physical_plan::{
-    metrics::MetricsSet, DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
-    SendableRecordBatchStream,
+    DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties, SendableRecordBatchStream, execution_plan::CardinalityEffect, metrics::MetricsSet,
 };
 
 #[derive(Debug)]
 struct ImportedTableProviderExec {
     name: String,
     properties: Arc<PlanProperties>,
+    children: Vec<Arc<dyn ExecutionPlan>>
 }
 
 impl DisplayAs for ImportedTableProviderExec {
@@ -42,7 +42,7 @@ impl ExecutionPlan for ImportedTableProviderExec {
     }
 
     fn name(&self) -> &str {
-        "MyExecPlan"
+        &self.name
     }
 
     fn properties(&self) -> &PlanProperties {
@@ -53,7 +53,7 @@ impl ExecutionPlan for ImportedTableProviderExec {
         todo!()
     }
 
-    fn cardinality_effect(&self) -> datafusion_physical_plan::execution_plan::CardinalityEffect {
+    fn cardinality_effect(&self) -> CardinalityEffect {
         todo!()
     }
 
@@ -82,14 +82,13 @@ impl ExecutionPlan for ImportedTableProviderExec {
     }
 
     fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
-        vec![]
+        self.children.iter().collect()
     }
 
     fn with_new_children(
         self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        assert!(children.is_empty());
-        Ok(self)
+        todo!()
     }
 }
