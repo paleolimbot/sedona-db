@@ -21,8 +21,8 @@ use std::sync::Arc;
 use datafusion_common::config::{
     ConfigEntry, ConfigExtension, ConfigField, ExtensionOptions, Visit,
 };
+use datafusion_common::Result;
 use datafusion_common::{config_err, config_namespace};
-use datafusion_common::{DataFusionError, Result};
 use regex::Regex;
 use sedona_geometry::bounding_box::BoundingBox;
 use sedona_geometry::error::SedonaGeometryError;
@@ -439,10 +439,8 @@ impl CrsEngineOption {
     }
 
     /// Convert an arbitrary string to a PROJJSON representation if possible
-    pub fn to_projjson(&self, crs_string: &str) -> Result<String> {
-        self.0
-            .to_projjson(crs_string)
-            .map_err(|e| DataFusionError::External(Box::new(e)))
+    pub fn inner(&self) -> &Arc<dyn CrsEngine + Send + Sync> {
+        &self.0
     }
 }
 
@@ -623,7 +621,7 @@ mod tests {
     #[test]
     fn test_default_crs_provider_returns_error() {
         let provider = CrsEngineOption::default();
-        let result = provider.to_projjson("EPSG:4326");
+        let result = provider.inner().to_projjson("EPSG:4326");
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
         assert!(

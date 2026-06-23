@@ -731,7 +731,10 @@ fn normalize_crs_for_geoparquet(
         })?;
 
         if let Value::String(string) = &crs_value {
-            let projjson_string = crs_provider.to_projjson(string)?;
+            let projjson_string = crs_provider
+                .inner()
+                .to_projjson(string)
+                .map_err(|e| exec_datafusion_err!("{e}"))?;
             crs_value = projjson_string.parse().map_err(|e| {
                 exec_datafusion_err!(
                     "Failed to parse CRS for column '{}' from CrsProvider {e}",
