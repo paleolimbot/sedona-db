@@ -5781,8 +5781,12 @@ version = "0.4.0"
 dependencies = [
  "arrow-array",
  "arrow-schema",
+ "async-trait",
+ "datafusion-catalog",
  "datafusion-common",
+ "datafusion-execution",
  "datafusion-expr",
+ "datafusion-physical-plan",
  "libc",
  "sedona-common",
  "sedona-expr",
