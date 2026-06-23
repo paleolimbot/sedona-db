@@ -18,10 +18,13 @@
 use std::{
     ffi::c_int,
     os::raw::{c_char, c_void},
-    ptr::null_mut,
+    ptr::{null_mut},
 };
 
-use arrow_array::ffi::{FFI_ArrowArray, FFI_ArrowSchema};
+use arrow_array::{
+    ffi::{FFI_ArrowArray, FFI_ArrowSchema},
+    ffi_stream::FFI_ArrowArrayStream,
+};
 
 /// Raw FFI representation of the SedonaCScalarKernel
 ///
@@ -119,4 +122,189 @@ struct ArrowSchemaInternal {
     dictionary: *mut ArrowSchemaInternal,
     release: Option<unsafe extern "C" fn(*mut ArrowSchemaInternal)>,
     private_data: *mut c_void,
+}
+
+/// Raw FFI representation of the SedonaCError
+#[derive(Default)]
+#[repr(C)]
+pub struct SedonaCError {
+    pub err: *const c_char,
+    pub err_len: u32,
+    pub reserved: u32,
+    pub release: Option<unsafe extern "C" fn(self_: *mut SedonaCError)>,
+}
+
+impl SedonaCError {
+    pub fn new(message: &str) -> Self {
+        use std::ffi::CString;
+
+        match CString::new(message) {
+            Ok(c_string) => {
+                let len = message.len() as u32;
+                let ptr = c_string.into_raw();
+
+                extern "C" fn release_error(self_: *mut SedonaCError) {
+                    unsafe {
+                        if !(*self_).err.is_null() {
+                            let _ = std::ffi::CString::from_raw((*self_).err as *mut c_char);
+                        }
+                        (*self_).release = None;
+                    }
+                }
+
+                SedonaCError {
+                    err: ptr,
+                    err_len: len,
+                    reserved: 0,
+                    release: Some(release_error),
+                }
+            }
+            Err(_) => UNKNOWN_SEDONA_C_ERROR
+        }
+    }
+}
+
+impl Drop for SedonaCError {
+    fn drop(&mut self) {
+        if let Some(releaser) = self.release {
+            unsafe { releaser(self) }
+            self.release = None;
+        }
+    }
+}
+
+extern "C" fn sedona_c_noop_release(_self: *mut SedonaCError) {}
+
+pub const UNKNOWN_SEDONA_C_ERROR: SedonaCError = SedonaCError {
+    err: c"Unknown error".as_ptr(),
+    err_len: "Unknown error".len() as u32,
+    reserved: 0,
+    release: Some(sedona_c_noop_release),
+};
+
+/// Raw FFI representation of the SedonaCExpr
+#[derive(Default)]
+#[repr(C)]
+pub struct SedonaCExpr {
+    pub get_property_schema: Option<
+        unsafe extern "C" fn(
+            self_: *const SedonaCExpr,
+            property: *const c_char,
+            err: *mut SedonaCError,
+        ) -> c_int,
+    >,
+
+    pub get_property: Option<
+        unsafe extern "C" fn(
+            self_: *const SedonaCExpr,
+            property: *const c_char,
+            args: *const c_char,
+            out: *mut FFI_ArrowArray,
+            err: *mut SedonaCError,
+        ) -> c_int,
+    >,
+
+    pub reserved: *mut c_void,
+
+    pub release: Option<unsafe extern "C" fn(self_: *mut SedonaCExpr)>,
+
+    pub private_data: *mut c_void,
+}
+
+unsafe impl Send for SedonaCExpr {}
+unsafe impl Sync for SedonaCExpr {}
+
+impl Drop for SedonaCExpr {
+    fn drop(&mut self) {
+        if let Some(releaser) = self.release {
+            unsafe { releaser(self) }
+            self.release = None;
+            self.private_data = null_mut();
+        }
+    }
+}
+
+/// Raw FFI representation of the SedonaCExecutionPlanArgs
+#[derive(Default)]
+#[repr(C)]
+pub struct SedonaCExecutionPlanArgs {
+    pub args: *const u8,
+    pub args_len: usize,
+    pub children: *mut *mut SedonaCExecutionPlan,
+    pub num_children: usize,
+    pub reserved: *mut c_void,
+}
+
+/// Raw FFI representation of the SedonaCExecutionPlan
+#[derive(Default)]
+#[repr(C)]
+pub struct SedonaCExecutionPlan {
+    pub get_schema:
+        Option<unsafe extern "C" fn(self_: *const SedonaCExecutionPlan, out: *mut FFI_ArrowSchema)>,
+
+    pub get_property_schema: Option<
+        unsafe extern "C" fn(
+            self_: *const SedonaCExecutionPlan,
+            property: *const c_char,
+            out: *mut FFI_ArrowSchema,
+            err: *mut SedonaCError,
+        ) -> c_int,
+    >,
+
+    pub get_property: Option<
+        unsafe extern "C" fn(
+            self_: *const SedonaCExecutionPlan,
+            property: *const c_char,
+            args: *mut SedonaCExecutionPlanArgs,
+            out: *mut FFI_ArrowArray,
+            err: *mut SedonaCError,
+        ) -> c_int,
+    >,
+
+    pub with_property: Option<
+        unsafe extern "C" fn(
+            self_: *const SedonaCExecutionPlan,
+            property: *const c_char,
+            args: *mut SedonaCExecutionPlanArgs,
+            out: *mut SedonaCExecutionPlan,
+            err: *mut SedonaCError,
+        ) -> c_int,
+    >,
+
+    pub execute: Option<
+        unsafe extern "C" fn(
+            self_: *const SedonaCExecutionPlan,
+            args: *mut SedonaCExecutionPlanArgs,
+            out: *mut FFI_ArrowArrayStream,
+            err: *mut SedonaCError,
+        ) -> c_int,
+    >,
+
+    pub execute_async: Option<
+        unsafe extern "C" fn(
+            self_: *const SedonaCExecutionPlan,
+            args: *mut SedonaCExecutionPlanArgs,
+            out: *mut c_void,
+            err: *mut SedonaCError,
+        ) -> c_int,
+    >,
+
+    pub reserved: *mut c_void,
+
+    pub release: Option<unsafe extern "C" fn(self_: *mut SedonaCExecutionPlan)>,
+
+    pub private_data: *mut c_void,
+}
+
+unsafe impl Send for SedonaCExecutionPlan {}
+unsafe impl Sync for SedonaCExecutionPlan {}
+
+impl Drop for SedonaCExecutionPlan {
+    fn drop(&mut self) {
+        if let Some(releaser) = self.release {
+            unsafe { releaser(self) }
+            self.release = None;
+            self.private_data = null_mut();
+        }
+    }
 }
