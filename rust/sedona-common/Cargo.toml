@@ -30,3 +30,4 @@ rust-version.workspace = true
 [dependencies]
 datafusion-common = { workspace = true }
 regex = { workspace = true }
+sedona-geometry = { workspace = true }

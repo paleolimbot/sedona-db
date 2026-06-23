@@ -60,6 +60,13 @@ pub trait CrsEngine: Debug {
         pipeline: &str,
         options: &str,
     ) -> Result<Rc<dyn CrsTransform>, SedonaGeometryError>;
+
+    /// Convert an arbitrary CRS represented by a string to its PROJJSON string representation
+    ///
+    /// This may be used to write valid GeoParquet files from arbitrary CRSes
+    fn to_projjson(&self, _crs_string: &str) -> Result<String, SedonaGeometryError> {
+        todo!()
+    }
 }
 
 /// Trait for transforming coordinates in a geometry from one CRS to another.

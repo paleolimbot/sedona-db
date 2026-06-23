@@ -15,16 +15,18 @@
 // specific language governing permissions and limitations
 // under the License.
 use std::fmt::Display;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use datafusion_common::config::{
     ConfigEntry, ConfigExtension, ConfigField, ExtensionOptions, Visit,
 };
-use datafusion_common::Result;
 use datafusion_common::{config_err, config_namespace};
+use datafusion_common::{DataFusionError, Result};
 use regex::Regex;
-
-use crate::sedona_internal_err;
+use sedona_geometry::bounding_box::BoundingBox;
+use sedona_geometry::error::SedonaGeometryError;
+use sedona_geometry::transform::{CrsEngine, CrsTransform};
 
 /// Default minimum number of analyzed geometries for speculative execution mode to select an
 /// optimal execution mode.
@@ -39,8 +41,8 @@ config_namespace! {
         /// Options for spatial join
         pub spatial_join: SpatialJoinOptions, default = SpatialJoinOptions::default()
 
-        /// Global [CrsProvider] for CRS metadata operations
-        pub crs_provider: CrsProviderOption, default = CrsProviderOption::default()
+        /// Global [CrsEngine] for CRS operations
+        pub crs_provider: CrsEngineOption, default = CrsEngineOption::default()
 
         /// Options for configuring GDAL usage
         pub gdal: GdalOptions, default = GdalOptions::default()
@@ -425,47 +427,38 @@ impl ConfigField for TgIndexType {
     }
 }
 
-/// Trait defining an abstract provider of Coordinate Reference System metadata
-///
-/// Unlike a CrsEngine, which provides concrete coordinate transformations for
-/// pairs of projections, a CrsProvider is handles metadata-only operations.
-/// Currently this is only used to resolve an arbitrary CRS representation to
-/// PROJJSON (e.g., to write valid GeoParquet files from arbitrary CRSes), but
-/// could also be used to validate CRSes.
-pub trait CrsProvider: std::fmt::Debug + Send + Sync {
-    fn to_projjson(&self, crs_string: &str) -> Result<String>;
-}
-
-/// Wrapper class implementing [ConfigField] that allows a [CrsProvider]
+/// Wrapper class implementing [ConfigField] that allows a [CrsEngine]
 /// member in [SedonaOptions].
 #[derive(Debug, Clone)]
-pub struct CrsProviderOption(Arc<dyn CrsProvider>);
+pub struct CrsEngineOption(Arc<dyn CrsEngine + Send + Sync>);
 
-impl CrsProviderOption {
-    /// Create a new option from a [CrsProvider] reference
-    pub fn new(inner: Arc<dyn CrsProvider>) -> Self {
-        CrsProviderOption(inner)
+impl CrsEngineOption {
+    /// Create a new option from a [CrsEngine] reference
+    pub fn new(inner: Arc<dyn CrsEngine + Send + Sync>) -> Self {
+        CrsEngineOption(inner)
     }
 
     /// Convert an arbitrary string to a PROJJSON representation if possible
     pub fn to_projjson(&self, crs_string: &str) -> Result<String> {
-        self.0.to_projjson(crs_string)
+        self.0
+            .to_projjson(crs_string)
+            .map_err(|e| DataFusionError::External(Box::new(e)))
     }
 }
 
-impl Default for CrsProviderOption {
+impl Default for CrsEngineOption {
     fn default() -> Self {
-        Self(Arc::new(DefaultCrsProvider {}))
+        Self(Arc::new(DefaultCrsEngine {}))
     }
 }
 
-impl PartialEq for CrsProviderOption {
+impl PartialEq for CrsEngineOption {
     fn eq(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.0, &other.0)
     }
 }
 
-impl ConfigField for CrsProviderOption {
+impl ConfigField for CrsEngineOption {
     fn visit<V: Visit>(&self, v: &mut V, key: &str, description: &'static str) {
         v.some(key, format!("{:?}", self.0), description);
     }
@@ -476,13 +469,35 @@ impl ConfigField for CrsProviderOption {
 }
 
 #[derive(Debug)]
-struct DefaultCrsProvider {}
+struct DefaultCrsEngine {}
 
-impl CrsProvider for DefaultCrsProvider {
-    fn to_projjson(&self, crs_string: &str) -> Result<String> {
-        sedona_internal_err!(
-            "Can't convert {crs_string} to PROJJSON CRS (no CrsProvider registered)"
-        )
+impl CrsEngine for DefaultCrsEngine {
+    fn to_projjson(&self, crs_string: &str) -> Result<String, SedonaGeometryError> {
+        Err(SedonaGeometryError::Invalid(format!(
+            "Can't convert {crs_string} to PROJJSON CRS (no CrsEngine registered)"
+        )))
+    }
+
+    fn get_transform_crs_to_crs(
+        &self,
+        from: &str,
+        to: &str,
+        _area_of_interest: Option<BoundingBox>,
+        _options: &str,
+    ) -> Result<Rc<dyn CrsTransform>, SedonaGeometryError> {
+        Err(SedonaGeometryError::Invalid(format!(
+            "Can't convert coordinates from {from} to {to} (no CrsEngine registered)"
+        )))
+    }
+
+    fn get_transform_pipeline(
+        &self,
+        pipeline: &str,
+        _options: &str,
+    ) -> Result<Rc<dyn CrsTransform>, SedonaGeometryError> {
+        Err(SedonaGeometryError::Invalid(format!(
+            "Can't convert pipeline {pipeline} (no CrsEngine registered)"
+        )))
     }
 }
 
@@ -607,7 +622,7 @@ mod tests {
 
     #[test]
     fn test_default_crs_provider_returns_error() {
-        let provider = CrsProviderOption::default();
+        let provider = CrsEngineOption::default();
         let result = provider.to_projjson("EPSG:4326");
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
@@ -616,14 +631,14 @@ mod tests {
             "Unexpected error message: {err_msg}"
         );
         assert!(
-            err_msg.contains("no CrsProvider registered"),
+            err_msg.contains("no CrsEngine registered"),
             "Unexpected error message: {err_msg}"
         );
     }
 
     #[test]
     fn test_crs_provider_option_set_from_sql_returns_error() {
-        let mut option = CrsProviderOption::default();
+        let mut option = CrsEngineOption::default();
         let result = option.set("sedona.crs_provider", "some_value");
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();

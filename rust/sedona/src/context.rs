@@ -47,7 +47,7 @@ use datafusion_expr::dml::InsertOp;
 use datafusion_expr::sqlparser::dialect::{dialect_from_str, Dialect};
 use datafusion_expr::{LogicalPlan, LogicalPlanBuilder, SortExpr};
 use parking_lot::Mutex;
-use sedona_common::{sedona_internal_datafusion_err, CrsProviderOption, SedonaOptions};
+use sedona_common::{sedona_internal_datafusion_err, CrsEngineOption, SedonaOptions};
 use sedona_datasource::provider::external_table;
 use sedona_datasource::spec::ExternalFormatSpec;
 use sedona_expr::scalar_udf::IntoScalarKernelRefs;
@@ -126,8 +126,7 @@ impl SedonaContext {
             .extensions
             .get_mut::<SedonaOptions>()
             .ok_or_else(|| sedona_internal_datafusion_err!("SedonaOptions not available"))?;
-        opts.crs_provider =
-            CrsProviderOption::new(Arc::new(sedona_proj::provider::ProjCrsProvider::default()));
+        opts.crs_provider = CrsEngineOption::new(Arc::new(sedona_proj::transform::LazyProjEngine));
 
         // Set the spilled batch in-memory size threshold to 5% of the per-partition memory limit,
         // with a minimum of 10MB. Batches larger than this threshold will be broken into smaller batches
