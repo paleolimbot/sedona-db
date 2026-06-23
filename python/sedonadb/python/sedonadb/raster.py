@@ -103,8 +103,7 @@ class Raster:
         The mirror of `lazy`: identical dimension/CRS conventions, but the
         pixel data is carried in the raster rather than referenced by URI.
 
-        **Warning:** this copies the *entire* array into the raster value; it
-        is not zero-copy.
+        This operation is zero-copy for contiguous arrays.
 
         Args:
             array: The pixel data. The trailing two axes are the spatial `(y, x)`
@@ -160,7 +159,7 @@ class Raster:
                     chunk = (
                         chunk.storage if isinstance(chunk, pa.ExtensionArray) else chunk
                     )
-                    self._array = chunk.slice(i, i + 1)
+                    self._array = chunk.slice(i, 1)
                     return
                 i -= len(chunk)
             raise IndexError("Index out of bounds for chunked array")
@@ -169,7 +168,7 @@ class Raster:
             array = array.storage
 
         # Use slice directly - pa.array() would copy
-        self._array = array.slice(i, i + 1)
+        self._array = array.slice(i, 1)
 
     def _py_field(self, k):
         """Extract a field value as a Python object."""
@@ -218,7 +217,7 @@ class Band:
     def __init__(self, array, i=0):
         """Create a Band from an Arrow array at index i."""
         # Use slice directly - pa.array() would copy
-        self._array = array.slice(i, i + 1)
+        self._array = array.slice(i, 1)
 
     def _py_field(self, k):
         """Extract a field value as a Python object."""
@@ -262,11 +261,8 @@ class Band:
         and resolving the correct variadic buffer. Falls back to copying for
         inline data (≤12 bytes).
         """
-        data_array = self._array.field("data")
-        if len(data_array[0].as_buffer()) == 0:
-            return memoryview(b"")
-
         # Try zero-copy path for out-of-line data
+        data_array = self._array.field("data")
         result = _get_binary_view_buffer(data_array, index=0)
         if result is not None:
             return result
