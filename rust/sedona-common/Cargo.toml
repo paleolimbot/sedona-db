@@ -28,6 +28,5 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-datafusion = { workspace = true }
 datafusion-common = { workspace = true }
 regex = { workspace = true }

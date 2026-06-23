@@ -17,8 +17,9 @@
 use std::fmt::Display;
 use std::sync::Arc;
 
-use datafusion::config::{ConfigEntry, ConfigExtension, ConfigField, ExtensionOptions, Visit};
-use datafusion::prelude::SessionConfig;
+use datafusion_common::config::{
+    ConfigEntry, ConfigExtension, ConfigField, ExtensionOptions, Visit,
+};
 use datafusion_common::Result;
 use datafusion_common::{config_err, config_namespace};
 use regex::Regex;
@@ -31,11 +32,6 @@ pub const DEFAULT_SPECULATIVE_THRESHOLD: usize = 1000;
 
 /// Default minimum number of points per geometry to use prepared geometries for the build side.
 pub const DEFAULT_MIN_POINTS_FOR_BUILD_PREPARATION: usize = 50;
-
-/// Helper function to register the spatial join optimizer with a session config
-pub fn add_sedona_option_extension(config: SessionConfig) -> SessionConfig {
-    config.with_option_extension(SedonaOptions::default())
-}
 
 config_namespace! {
     /// Configuration options for Sedona.
@@ -493,7 +489,7 @@ impl CrsProvider for DefaultCrsProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use datafusion::config::ConfigField;
+    use datafusion_common::config::ConfigField;
 
     #[test]
     fn test_execution_mode_parsing_basic_modes() {

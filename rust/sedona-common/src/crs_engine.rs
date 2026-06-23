@@ -14,13 +14,16 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-//! Common utilities and configurations for Sedona.
-//!
-//! This crate contains shared components that are used across multiple
-//! Sedona modules, including configuration options and common data structures.
 
-pub mod error;
-pub mod option;
-pub mod crs_engine;
+use datafusion_common::Result;
 
-pub use option::*;
+/// Trait defining an abstract provider of Coordinate Reference System metadata
+///
+/// Unlike a CrsEngine, which provides concrete coordinate transformations for
+/// pairs of projections, a CrsProvider is handles metadata-only operations.
+/// Currently this is only used to resolve an arbitrary CRS representation to
+/// PROJJSON (e.g., to write valid GeoParquet files from arbitrary CRSes), but
+/// could also be used to validate CRSes.
+pub trait CrsProvider: std::fmt::Debug + Send + Sync {
+    fn to_projjson(&self, crs_string: &str) -> Result<String>;
+}
