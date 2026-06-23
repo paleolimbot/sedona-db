@@ -25,6 +25,7 @@ use datafusion_common::Result;
 use datafusion_common::{config_err, config_namespace};
 use regex::Regex;
 use sedona_geometry::bounding_box::BoundingBox;
+use sedona_geometry::bounds::{WkbBounder2D, WkbGeometryBounder};
 use sedona_geometry::error::SedonaGeometryError;
 use sedona_geometry::transform::{CrsEngine, CrsTransform};
 
@@ -434,17 +435,33 @@ impl ConfigField for TgIndexType {
 #[derive(Debug, Clone)]
 pub struct SedonaRuntime {
     crs_engine: Arc<dyn CrsEngine + Send + Sync>,
+    bounder: Arc<dyn WkbBounder2D>,
 }
 
 impl SedonaRuntime {
     /// Replace the runtime [CrsEngine] reference
     pub fn with_crs_engine(&self, crs_engine: Arc<dyn CrsEngine + Send + Sync>) -> Self {
-        Self { crs_engine }
+        Self {
+            crs_engine,
+            ..self.clone()
+        }
     }
 
-    /// Convert an arbitrary string to a PROJJSON representation if possible
+    // Replace the runtime [WkbBounder2d] reference
+    pub fn with_bounder(&self, bounder: Arc<dyn WkbBounder2D>) -> Self {
+        Self {
+            bounder,
+            ..self.clone()
+        }
+    }
+
+    /// Access a global [CrsEngine] for coordinate transformations and CRS metadata operations
     pub fn crs_engine(&self) -> &Arc<dyn CrsEngine + Send + Sync> {
         &self.crs_engine
+    }
+
+    pub fn bounder(&self) -> &Arc<dyn WkbBounder2D> {
+        &self.bounder
     }
 }
 
@@ -452,6 +469,7 @@ impl Default for SedonaRuntime {
     fn default() -> Self {
         Self {
             crs_engine: Arc::new(DefaultCrsEngine {}),
+            bounder: Arc::new(WkbGeometryBounder::default()),
         }
     }
 }

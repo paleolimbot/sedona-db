@@ -143,22 +143,6 @@ impl SedonaContext {
                 .max(MIN_SPILLED_BATCH_IN_MEMORY_THRESHOLD_BYTES);
         }
 
-        #[cfg(feature = "pointcloud")]
-        let session_config = session_config.with_option_extension(
-            LasOptions::default()
-                .with_geometry_encoding(GeometryEncoding::Wkb)
-                .with_las_extra_bytes(LasExtraBytes::Typed),
-        );
-
-        #[cfg(feature = "gpu")]
-        let session_config = session_config.with_option_extension(GpuOptions::default());
-
-        #[allow(unused_mut)]
-        let mut state_builder = SessionStateBuilder::new()
-            .with_default_features()
-            .with_runtime_env(runtime_env)
-            .with_config(session_config);
-
         // Register the spatial join planner extension
         #[allow(unused_mut)]
         let mut planner = SedonaQueryPlanner::new();
@@ -179,6 +163,10 @@ impl SedonaContext {
                 planner = planner.with_spatial_join_physical_planner(Arc::new(
                     GeographySpatialJoinPhysicalPlanner::new(),
                 ));
+
+                opts.crs_provider = opts.crs_provider.with_bounder(Arc::new(
+                    sedona_s2geography::rect_bounder::WkbGeographyBounder::default(),
+                ))
             }
 
             // Register the GPU join after the default planner
@@ -192,6 +180,21 @@ impl SedonaContext {
                 ));
             }
         }
+
+        #[cfg(feature = "pointcloud")]
+        let session_config = session_config.with_option_extension(
+            LasOptions::default()
+                .with_geometry_encoding(GeometryEncoding::Wkb)
+                .with_las_extra_bytes(LasExtraBytes::Typed),
+        );
+
+        #[cfg(feature = "gpu")]
+        let session_config = session_config.with_option_extension(GpuOptions::default());
+
+        let mut state_builder = SessionStateBuilder::new()
+            .with_default_features()
+            .with_runtime_env(runtime_env)
+            .with_config(session_config);
 
         state_builder = register_spatial_join_logical_optimizer(state_builder)?;
         state_builder = register_ensure_loaded_optimizer(state_builder)?;
