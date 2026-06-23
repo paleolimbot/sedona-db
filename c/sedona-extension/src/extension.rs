@@ -242,8 +242,9 @@ impl Drop for SedonaCExpr {
 pub struct SedonaCExecutionPlanArgs {
     pub args: *const u8,
     pub args_len: usize,
-    pub children: *mut *mut SedonaCExecutionPlan,
+    pub children: *const *const SedonaCExecutionPlan,
     pub num_children: usize,
+    pub expr: *const SedonaCExpr,
     pub reserved: *mut c_void,
 }
 

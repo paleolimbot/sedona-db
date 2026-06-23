@@ -240,8 +240,9 @@ struct SedonaCExecutionPlan;
 struct SedonaCExecutionPlanArgs {
   const uint8_t* args;
   size_t args_len;
-  struct SedonaCExecutionPlan** children;
+  const struct SedonaCExecutionPlan** children;
   size_t num_children;
+  const struct SedonaCExpr* expr;
   void* reserved;
 };
 

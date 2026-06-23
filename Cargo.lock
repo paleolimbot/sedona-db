@@ -5786,12 +5786,16 @@ dependencies = [
  "datafusion-common",
  "datafusion-execution",
  "datafusion-expr",
+ "datafusion-physical-expr",
  "datafusion-physical-plan",
  "libc",
  "sedona-common",
  "sedona-expr",
+ "sedona-geometry",
  "sedona-schema",
  "sedona-testing",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
