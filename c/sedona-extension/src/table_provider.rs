@@ -372,7 +372,10 @@ mod tests {
     use arrow_array::{Float64Array, Int32Array, Int64Array, RecordBatch};
     use arrow_schema::{DataType, Field, Schema};
     use datafusion::prelude::SessionContext;
+    use datafusion_catalog::Session;
     use datafusion_common::assert_batches_eq;
+    use datafusion_expr::Expr;
+    use datafusion_physical_plan::ExecutionPlan;
 
     /// Create a SessionContext with a test table containing 5 numeric columns and multiple batches.
     async fn create_test_context() -> Result<SessionContext> {
@@ -683,6 +686,83 @@ mod tests {
         ];
 
         assert_batches_eq!(expected, &result);
+        Ok(())
+    }
+
+    /// A dummy TableProvider with configurable table_type for testing FFI roundtrip.
+    #[derive(Debug)]
+    struct DummyTableProvider {
+        schema: SchemaRef,
+        table_type: TableType,
+    }
+
+    impl DummyTableProvider {
+        fn with_table_type(table_type: TableType) -> Self {
+            let schema = Arc::new(Schema::new(vec![
+                Field::new("id", DataType::Int32, false),
+                Field::new("value", DataType::Int32, false),
+            ]));
+            Self { schema, table_type }
+        }
+    }
+
+    #[async_trait]
+    impl TableProvider for DummyTableProvider {
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+
+        fn schema(&self) -> SchemaRef {
+            self.schema.clone()
+        }
+
+        fn table_type(&self) -> TableType {
+            self.table_type
+        }
+
+        async fn scan(
+            &self,
+            _state: &dyn Session,
+            _projection: Option<&Vec<usize>>,
+            _filters: &[Expr],
+            _limit: Option<usize>,
+        ) -> Result<Arc<dyn ExecutionPlan>> {
+            exec_err!("DummyTableProvider does not support scan")
+        }
+    }
+
+    /// Helper to set up an imported table provider from a DummyTableProvider through FFI roundtrip.
+    fn setup_imported_provider_with(table_type: TableType) -> ImportedTableProvider {
+        let dummy = Arc::new(DummyTableProvider::with_table_type(table_type));
+        let ctx = SessionContext::new();
+        let runtime = tokio::runtime::Handle::current();
+        let session = Arc::new(ctx.state());
+        let exported = ExportedTableProvider::new(dummy, session, runtime);
+        let ffi_provider: SedonaCTableProvider = exported.into();
+        ImportedTableProvider::try_new(ffi_provider).expect("Failed to import table provider")
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_table_provider_roundtrip_schema() -> Result<()> {
+        let imported = setup_imported_provider_with(TableType::Base);
+
+        // Check schema roundtrip
+        let schema = imported.schema();
+        assert_eq!(schema.fields().len(), 2);
+        assert_eq!(schema.field(0).name(), "id");
+        assert_eq!(schema.field(0).data_type(), &DataType::Int32);
+        assert_eq!(schema.field(1).name(), "value");
+        assert_eq!(schema.field(1).data_type(), &DataType::Int32);
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_table_provider_roundtrip_table_type() -> Result<()> {
+        for table_type in [TableType::Base, TableType::View, TableType::Temporary] {
+            let imported = setup_imported_provider_with(table_type);
+            assert_eq!(imported.table_type(), table_type);
+        }
         Ok(())
     }
 }
