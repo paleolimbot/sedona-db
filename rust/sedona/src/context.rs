@@ -182,6 +182,18 @@ impl SedonaContext {
             }
         }
 
+        // Inject the statically-set accumulator factory, which allows arrow-rs Parquet writer
+        // to write Geography statistics based on the geography bounders in our SedonaRuntime.
+        let init_result =
+            sedona_geoparquet::statistics_accumulator::SedonaGeoStatsAccumulatorFactory::try_init(
+                &opts.runtime,
+            );
+        if let Err(init_err) = init_result {
+            if !matches!(init_err, DataFusionError::ParquetError(_)) {
+                return Err(init_err);
+            }
+        }
+
         #[cfg(feature = "pointcloud")]
         let session_config = session_config.with_option_extension(
             LasOptions::default()
@@ -206,13 +218,6 @@ impl SedonaContext {
         // Register GeoParquet and try to initialize our statistics accumulator. It is OK if this fails
         // because we already registered it, but we propagate other errors for safety.
         state.register_file_format(Arc::new(GeoParquetFormatFactory::new()), true)?;
-        let init_result =
-            sedona_geoparquet::statistics_accumulator::SedonaGeoStatsAccumulatorFactory::try_init();
-        if let Err(init_err) = init_result {
-            if !matches!(init_err, DataFusionError::ParquetError(_)) {
-                return Err(init_err);
-            }
-        }
 
         #[cfg(feature = "pointcloud")]
         {

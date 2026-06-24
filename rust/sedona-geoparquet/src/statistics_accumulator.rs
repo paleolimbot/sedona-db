@@ -26,13 +26,18 @@ use parquet::{
     },
     schema::types::ColumnDescPtr,
 };
+use sedona_common::SedonaRuntime;
+use sedona_geometry::{bounds::WkbBounder2D, types::Edges};
 
-/// Factory for Parquet GeoStatsAccumulators that can handle Geography
-pub struct SedonaGeoStatsAccumulatorFactory;
+/// Factory for Parquet [GeoStatsAccumulator]s that can handle Geography
+pub struct SedonaGeoStatsAccumulatorFactory {
+    spherical_bounder: Option<Arc<dyn WkbBounder2D>>,
+}
 
 impl SedonaGeoStatsAccumulatorFactory {
-    pub fn try_init() -> Result<()> {
-        init_geo_stats_accumulator_factory(Arc::new(Self))?;
+    pub fn try_init(runtime: &SedonaRuntime) -> Result<()> {
+        let spherical_bounder = runtime.bounder(Edges::Spherical).ok().cloned();
+        init_geo_stats_accumulator_factory(Arc::new(Self { spherical_bounder }))?;
         Ok(())
     }
 }
@@ -43,65 +48,63 @@ impl GeoStatsAccumulatorFactory for SedonaGeoStatsAccumulatorFactory {
             return Box::new(ParquetGeoStatsAccumulator::default());
         }
 
-        #[cfg(feature = "s2geography")]
         if let Some(LogicalType::Geography {
             crs: _,
             algorithm: None,
         }) = descr.logical_type_ref()
         {
-            return Box::new(GeographyGeoStatsAccumulator::default());
+            if let Some(ref spherical_bounder) = self.spherical_bounder {
+                return Box::new(GeographyGeoStatsAccumulator::new(
+                    spherical_bounder.create_instance(),
+                ));
+            }
         }
 
-        #[cfg(feature = "s2geography")]
         if let Some(LogicalType::Geography {
             crs: _,
             algorithm: Some(parquet::basic::EdgeInterpolationAlgorithm::SPHERICAL),
         }) = descr.logical_type_ref()
         {
-            return Box::new(GeographyGeoStatsAccumulator::default());
+            if let Some(ref spherical_bounder) = self.spherical_bounder {
+                return Box::new(GeographyGeoStatsAccumulator::new(
+                    spherical_bounder.create_instance(),
+                ));
+            }
         }
 
         Box::new(VoidGeoStatsAccumulator::default())
     }
 }
 
-#[cfg(feature = "s2geography")]
 #[derive(Debug)]
 struct GeographyGeoStatsAccumulator {
     invalid: bool,
-    geog_bounder: sedona_s2geography::rect_bounder::WkbGeographyBounder,
+    geog_bounder: Box<dyn WkbBounder2D>,
     bounder: parquet_geospatial::bounding::GeometryBounder,
 }
 
-#[cfg(feature = "s2geography")]
-impl Default for GeographyGeoStatsAccumulator {
-    fn default() -> Self {
+impl GeographyGeoStatsAccumulator {
+    fn new(geog_bounder: Box<dyn WkbBounder2D>) -> Self {
         Self {
             invalid: false,
-            geog_bounder: Default::default(),
+            geog_bounder,
             bounder: parquet_geospatial::bounding::GeometryBounder::empty(),
         }
     }
-}
 
-#[cfg(feature = "s2geography")]
-impl GeographyGeoStatsAccumulator {
     fn clear(&mut self) {
         self.invalid = false;
         self.bounder = parquet_geospatial::bounding::GeometryBounder::empty();
-        self.geog_bounder = Default::default();
+        self.geog_bounder.clear();
     }
 }
 
-#[cfg(feature = "s2geography")]
 impl GeoStatsAccumulator for GeographyGeoStatsAccumulator {
     fn is_valid(&self) -> bool {
         !self.invalid
     }
 
     fn update_wkb(&mut self, wkb: &[u8]) {
-        use sedona_geometry::bounds::WkbBounder2D;
-
         if self.invalid {
             return;
         }
@@ -120,7 +123,7 @@ impl GeoStatsAccumulator for GeographyGeoStatsAccumulator {
     fn finish(&mut self) -> Option<Box<parquet::geospatial::statistics::GeospatialStatistics>> {
         use parquet::geospatial::bounding_box::BoundingBox;
         use parquet_geospatial::interval::IntervalTrait as ParquetIntervalTrait;
-        use sedona_geometry::{bounds::WkbBounder2D, interval::IntervalTrait};
+        use sedona_geometry::interval::IntervalTrait;
 
         if self.invalid {
             self.clear();
@@ -144,7 +147,7 @@ impl GeoStatsAccumulator for GeographyGeoStatsAccumulator {
             ));
         };
 
-        // s2geography's rect bounder outputs (x, y) intervals; BoundingBox::new()
+        // The WkbBounder2D's rect bounder outputs (x, y) intervals; BoundingBox::new()
         // accepts xmin, xmax, ymin, ymax.
         let mut bbox = BoundingBox::new(x.lo(), x.hi(), y.lo(), y.hi());
 
@@ -284,11 +287,13 @@ mod test {
     #[test]
     fn test_geography_accumulator() {
         use parquet_geospatial::testing::{wkb_point_xy, wkb_point_xyzm};
+        use sedona_s2geography::rect_bounder::WkbGeographyBounder;
 
         // The geography bounder produces slightly expanded bounds compared to the
         // geometry bounder due to spherical interpolation along geodesics.
         const EPSILON: f64 = 1e-10;
-        let mut accumulator = GeographyGeoStatsAccumulator::default();
+        let mut accumulator =
+            GeographyGeoStatsAccumulator::new(Box::new(WkbGeographyBounder::default()));
 
         // A fresh instance should be able to bound input
         assert!(accumulator.is_valid());

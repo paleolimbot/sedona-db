@@ -175,8 +175,8 @@ pub fn create_geoparquet_writer_physical_plan(
             // Assign edge type if needed
             match edge_type {
                 Edges::Planar => {}
-                Edges::Spherical => {
-                    column_metadata.edges = Some("spherical".to_string());
+                other => {
+                    column_metadata.edges = Some(other.to_string());
                 }
             }
 
@@ -696,7 +696,7 @@ fn serialize_edges_and_crs_with_parquet_bug(
         Edges::Planar => None,
         // This is where we apply the workaround relative to our usual
         // serialize_edges_and_crs().
-        Edges::Spherical => Some(r#""algorithm":"spherical""#),
+        other => Some(format!(r#""algorithm":"{other}""#)),
     };
 
     let serialized = match (crs_component, edges_component) {
