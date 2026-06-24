@@ -19,13 +19,12 @@
 
 use std::ffi::{c_int, CString};
 use std::ptr::null_mut;
-use std::sync::Mutex;
 
 use arrow_array::ffi_stream::FFI_ArrowArrayStream;
 use arrow_array::{RecordBatch, RecordBatchReader};
 use arrow_schema::ffi::FFI_ArrowSchema;
 use arrow_schema::{ArrowError, DataType, Field, SchemaRef};
-use datafusion_common::Result;
+use datafusion_common::{Result, exec_err};
 use datafusion_physical_plan::SendableRecordBatchStream;
 use futures::StreamExt;
 use sedona_common::{sedona_internal_datafusion_err, sedona_internal_err};
@@ -337,14 +336,23 @@ pub fn get_table_provider_string_property(
         .map_err(|e| sedona_internal_datafusion_err!("Invalid UTF-8 in '{}': {}", property, e))
 }
 
+/// A cancellation check callback for FFI operations.
+///
+/// Returns `true` if the operation should be cancelled, `false` to continue.
+/// This allows Python, R, ADBC, and other runtimes to integrate their own
+/// cancellation mechanisms.
+pub type CancelChecker = Box<dyn Fn() -> bool + Send + Sync>;
+
 /// A RecordBatchReader that lazily polls a SendableRecordBatchStream.
 ///
 /// This allows exporting a DataFusion stream over FFI without collecting all
 /// batches upfront. Used when exporting execution plans across FFI boundaries.
 pub struct StreamingRecordBatchReader {
     schema: SchemaRef,
-    stream: Mutex<SendableRecordBatchStream>,
+    stream: SendableRecordBatchStream,
     runtime: tokio::runtime::Handle,
+    cancel_checker: Option<CancelChecker>,
+    cancelled: bool,
 }
 
 impl StreamingRecordBatchReader {
@@ -352,8 +360,29 @@ impl StreamingRecordBatchReader {
     pub fn new(stream: SendableRecordBatchStream, runtime: tokio::runtime::Handle) -> Self {
         Self {
             schema: stream.schema(),
-            stream: Mutex::new(stream),
+            stream,
             runtime,
+            cancel_checker: None,
+            cancelled: false,
+        }
+    }
+
+    /// Create a new StreamingRecordBatchReader with a cancellation checker.
+    ///
+    /// The cancellation checker is called before each batch is fetched. If it
+    /// returns `true`, iteration stops with a cancellation error on the next
+    /// call and `None` on subsequent calls.
+    pub fn with_cancel_checker(
+        stream: SendableRecordBatchStream,
+        runtime: tokio::runtime::Handle,
+        cancel_checker: CancelChecker,
+    ) -> Self {
+        Self {
+            schema: stream.schema(),
+            stream,
+            runtime,
+            cancel_checker: Some(cancel_checker),
+            cancelled: false,
         }
     }
 }
@@ -362,14 +391,28 @@ impl Iterator for StreamingRecordBatchReader {
     type Item = std::result::Result<RecordBatch, ArrowError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let stream = &self.stream;
+        // If already cancelled, return None to stop iteration
+        if self.cancelled {
+            return None;
+        }
+
+        // Check for cancellation before fetching the next batch
+        if let Some(ref checker) = self.cancel_checker {
+            if checker() {
+                self.cancelled = true;
+                return Some(Err(ArrowError::ExternalError(Box::new(
+                    std::io::Error::new(std::io::ErrorKind::Interrupted, "Operation cancelled"),
+                ))));
+            }
+        }
+
+        let stream = &mut self.stream;
         let runtime = &self.runtime;
 
         std::thread::scope(|s| {
             s.spawn(|| {
-                let mut guard = stream.lock().unwrap();
                 runtime.block_on(async {
-                    match guard.next().await {
+                    match stream.next().await {
                         Some(Ok(batch)) => Some(Ok(batch)),
                         Some(Err(e)) => Some(Err(ArrowError::ExternalError(Box::new(e)))),
                         None => None,
@@ -405,14 +448,213 @@ impl RecordBatchReader for StreamingRecordBatchReader {
 pub unsafe fn ffi_stream_to_sendable(
     ffi_stream: &mut FFI_ArrowArrayStream,
 ) -> Result<SendableRecordBatchStream> {
+    ffi_stream_to_sendable_with_cancel(ffi_stream, None)
+}
+
+/// Convert an FFI ArrowArrayStream into a SendableRecordBatchStream with cancellation support.
+///
+/// The cancellation checker is called before each batch is read. If it returns
+/// `true`, the stream yields a cancellation error.
+///
+/// # Safety
+///
+/// The caller must ensure that the FFI stream pointer is valid and properly
+/// initialized.
+pub unsafe fn ffi_stream_to_sendable_with_cancel(
+    ffi_stream: &mut FFI_ArrowArrayStream,
+    cancel_checker: Option<CancelChecker>,
+) -> Result<SendableRecordBatchStream> {
     let reader = arrow_array::ffi_stream::ArrowArrayStreamReader::from_raw(ffi_stream)?;
 
     let schema = reader.schema();
-    let stream = futures::stream::iter(reader).map(|result| {
+    let stream = futures::stream::iter(reader).map(move |result| {
+        // Check for cancellation before yielding each batch
+        if let Some(ref checker) = cancel_checker {
+            if checker() {
+                return exec_err!("Operation cancelled");
+            }
+        }
         result.map_err(|e| datafusion_common::DataFusionError::ArrowError(Box::new(e), None))
     });
 
     Ok(Box::pin(
         datafusion_physical_plan::stream::RecordBatchStreamAdapter::new(schema, stream),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arrow_array::Int32Array;
+    use arrow_schema::{Field, Schema};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    /// Create a slow stream that yields batches with a configurable delay.
+    fn create_slow_stream(
+        num_batches: usize,
+        delay_ms: u64,
+    ) -> (SchemaRef, SendableRecordBatchStream) {
+        let schema = Arc::new(Schema::new(vec![Field::new("value", DataType::Int32, false)]));
+        let schema_clone = schema.clone();
+
+        let stream = futures::stream::iter(0..num_batches).then(move |i| {
+            let schema = schema_clone.clone();
+            async move {
+                if delay_ms > 0 {
+                    // Use std::thread::sleep because tokio::time::sleep requires
+                    // the runtime to poll, which can deadlock with block_on
+                    std::thread::sleep(Duration::from_millis(delay_ms));
+                }
+                let array = Int32Array::from(vec![i as i32]);
+                Ok(RecordBatch::try_new(schema, vec![Arc::new(array)]).unwrap())
+            }
+        });
+
+        (
+            schema.clone(),
+            Box::pin(datafusion_physical_plan::stream::RecordBatchStreamAdapter::new(
+                schema, stream,
+            )),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_streaming_reader_basic() {
+        let runtime = tokio::runtime::Handle::current();
+        let (_schema, stream) = create_slow_stream(5, 10);
+
+        let reader = StreamingRecordBatchReader::new(stream, runtime);
+        let batches: Vec<_> = reader.collect();
+
+        assert_eq!(batches.len(), 5);
+        for (i, batch) in batches.iter().enumerate() {
+            let batch = batch.as_ref().unwrap();
+            let array = batch
+                .column(0)
+                .as_any()
+                .downcast_ref::<Int32Array>()
+                .unwrap();
+            assert_eq!(array.value(0), i as i32);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_streaming_reader_cancel() {
+        let runtime = tokio::runtime::Handle::current();
+        let (_schema, stream) = create_slow_stream(10, 50);
+
+        // Cancel after reading 3 batches
+        let counter = Arc::new(AtomicUsize::new(0));
+        let counter_clone = counter.clone();
+        let cancel_checker: CancelChecker = Box::new(move || {
+            let count = counter_clone.fetch_add(1, Ordering::SeqCst);
+            count >= 3
+        });
+
+        let reader = StreamingRecordBatchReader::with_cancel_checker(stream, runtime, cancel_checker);
+        let batches: Vec<_> = reader.collect();
+
+        // Should have 3 successful batches + 1 cancellation error
+        assert_eq!(batches.len(), 4);
+
+        // First 3 should be Ok
+        for i in 0..3 {
+            assert!(batches[i].is_ok(), "batch {} should be Ok", i);
+        }
+
+        // Last one should be a cancellation error
+        let last = batches.last().unwrap();
+        assert!(last.is_err());
+        let err = last.as_ref().unwrap_err();
+        assert!(
+            err.to_string().contains("cancelled"),
+            "error should mention cancellation: {}",
+            err
+        );
+    }
+
+    #[tokio::test]
+    async fn test_ffi_stream_to_sendable_basic() {
+        use arrow_array::ffi_stream::FFI_ArrowArrayStream;
+
+        let runtime = tokio::runtime::Handle::current();
+        let (_schema, stream) = create_slow_stream(5, 10);
+
+        // Export to FFI stream
+        let reader = StreamingRecordBatchReader::new(stream, runtime.clone());
+        let mut ffi_stream = FFI_ArrowArrayStream::new(Box::new(reader));
+
+        // Import back
+        let imported = unsafe { ffi_stream_to_sendable(&mut ffi_stream).unwrap() };
+
+        // Collect results
+        let batches: Vec<_> = imported.collect::<Vec<_>>().await;
+
+        assert_eq!(batches.len(), 5);
+        for (i, batch) in batches.iter().enumerate() {
+            let batch = batch.as_ref().unwrap();
+            let array = batch
+                .column(0)
+                .as_any()
+                .downcast_ref::<Int32Array>()
+                .unwrap();
+            assert_eq!(array.value(0), i as i32);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_ffi_stream_to_sendable_cancel() {
+        use arrow_array::ffi_stream::FFI_ArrowArrayStream;
+
+        let runtime = tokio::runtime::Handle::current();
+        let (_schema, stream) = create_slow_stream(10, 50);
+
+        // Export to FFI stream (no cancellation on export side)
+        let reader = StreamingRecordBatchReader::new(stream, runtime.clone());
+        let mut ffi_stream = FFI_ArrowArrayStream::new(Box::new(reader));
+
+        // Cancel after reading 3 batches on import side
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let cancelled_clone = cancelled.clone();
+        let cancel_checker: CancelChecker =
+            Box::new(move || cancelled_clone.load(Ordering::SeqCst));
+
+        let imported = unsafe {
+            ffi_stream_to_sendable_with_cancel(&mut ffi_stream, Some(cancel_checker)).unwrap()
+        };
+
+        // Collect with cancellation after 3 batches, stop on first error
+        let mut batches = Vec::new();
+        let mut stream = imported;
+        while let Some(result) = stream.next().await {
+            let is_err = result.is_err();
+            batches.push(result);
+            if batches.len() == 3 {
+                cancelled.store(true, Ordering::SeqCst);
+            }
+            if is_err {
+                break; // Stop on first error
+            }
+        }
+
+        // Should have 3 successful batches + 1 cancellation error
+        assert_eq!(batches.len(), 4);
+
+        // First 3 should be Ok
+        for i in 0..3 {
+            assert!(batches[i].is_ok(), "batch {} should be Ok", i);
+        }
+
+        // Last one should be a cancellation error
+        let last = batches.last().unwrap();
+        assert!(last.is_err());
+        let err = last.as_ref().unwrap_err();
+        assert!(
+            err.to_string().contains("cancelled"),
+            "error should mention cancellation: {}",
+            err
+        );
+    }
 }
