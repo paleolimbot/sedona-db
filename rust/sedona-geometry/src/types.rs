@@ -30,9 +30,21 @@ use crate::error::SedonaGeometryError;
 /// the concept of "edges" in GeoArrow and "algorithm" in Parquet and Iceberg (where the
 /// planar case would be resolved to a geometry instead of a geography).
 #[derive(Debug, PartialEq, Clone, Copy)]
+#[non_exhaustive]
 pub enum Edges {
     Planar,
     Spherical,
+}
+
+impl std::fmt::Display for Edges {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let lower_str = match self {
+            Edges::Planar => "planar",
+            Edges::Spherical => "spherical",
+        };
+
+        write!(f, "{lower_str}")
+    }
 }
 
 /// Geometry types

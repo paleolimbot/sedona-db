@@ -164,9 +164,10 @@ impl SedonaContext {
                     GeographySpatialJoinPhysicalPlanner::new(),
                 ));
 
-                opts.runtime = opts.runtime.with_bounder(Arc::new(
-                    sedona_s2geography::rect_bounder::WkbGeographyBounder::default(),
-                ))
+                opts.runtime = opts.runtime.with_bounder(
+                    sedona_geometry::types::Edges::Spherical,
+                    Arc::new(sedona_s2geography::rect_bounder::WkbGeographyBounder::default()),
+                )?;
             }
 
             // Register the GPU join after the default planner

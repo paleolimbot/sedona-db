@@ -231,9 +231,7 @@ impl SedonaType {
             SedonaType::Wkb(Edges::Planar, _) | SedonaType::WkbView(Edges::Planar, _) => {
                 "geometry".to_string()
             }
-            SedonaType::Wkb(Edges::Spherical, _) | SedonaType::WkbView(Edges::Spherical, _) => {
-                "geography".to_string()
-            }
+            SedonaType::Wkb(_, _) | SedonaType::WkbView(_, _) => "geography".to_string(),
             SedonaType::Raster => "raster".to_string(),
             SedonaType::Arrow(data_type) => match data_type {
                 DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => "utf8".to_string(),
@@ -330,8 +328,8 @@ fn display_geometry(
 
     match edges {
         Edges::Planar => {}
-        Edges::Spherical => {
-            params.push("Spherical".to_string());
+        other => {
+            params.push(format!("{other:?}"));
         }
     }
 
@@ -413,7 +411,7 @@ fn serialize_edges_and_crs(edges: &Edges, crs: &Crs) -> String {
 
     let edges_component = match edges {
         Edges::Planar => None,
-        Edges::Spherical => Some(r#""edges":"spherical""#),
+        other => Some(format!(r#""edges":"{other}""#)),
     };
 
     match (crs_component, edges_component) {

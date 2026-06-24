@@ -21,13 +21,14 @@ use std::sync::Arc;
 use datafusion_common::config::{
     ConfigEntry, ConfigExtension, ConfigField, ExtensionOptions, Visit,
 };
-use datafusion_common::Result;
 use datafusion_common::{config_err, config_namespace};
+use datafusion_common::{not_impl_err, Result};
 use regex::Regex;
 use sedona_geometry::bounding_box::BoundingBox;
 use sedona_geometry::bounds::{WkbBounder2D, WkbGeometryBounder};
 use sedona_geometry::error::SedonaGeometryError;
 use sedona_geometry::transform::{CrsEngine, CrsTransform};
+use sedona_geometry::types::Edges;
 
 /// Default minimum number of analyzed geometries for speculative execution mode to select an
 /// optimal execution mode.
@@ -436,6 +437,7 @@ impl ConfigField for TgIndexType {
 pub struct SedonaRuntime {
     crs_engine: Arc<dyn CrsEngine + Send + Sync>,
     bounder: Arc<dyn WkbBounder2D>,
+    spherical_bounder: Option<Arc<dyn WkbBounder2D>>,
 }
 
 impl SedonaRuntime {
@@ -447,11 +449,18 @@ impl SedonaRuntime {
         }
     }
 
-    // Replace the runtime [WkbBounder2d] reference
-    pub fn with_bounder(&self, bounder: Arc<dyn WkbBounder2D>) -> Self {
-        Self {
-            bounder,
-            ..self.clone()
+    // Replace the runtime [WkbBounder2D] reference for a specific [Edges]
+    pub fn with_bounder(&self, edges: Edges, bounder: Arc<dyn WkbBounder2D>) -> Result<Self> {
+        match edges {
+            Edges::Planar => Ok(Self {
+                bounder,
+                ..self.clone()
+            }),
+            Edges::Spherical => Ok(Self {
+                spherical_bounder: Some(bounder),
+                ..self.clone()
+            }),
+            e => not_impl_err!("Can't set bounder for edge type {e:?} (not supported)"),
         }
     }
 
@@ -460,8 +469,17 @@ impl SedonaRuntime {
         &self.crs_engine
     }
 
-    pub fn bounder(&self) -> &Arc<dyn WkbBounder2D> {
-        &self.bounder
+    /// Get a registered bounder for a given edge type
+    pub fn bounder(&self, edges: Edges) -> Result<&Arc<dyn WkbBounder2D>> {
+        match edges {
+            Edges::Planar => Ok(&self.bounder),
+            Edges::Spherical if self.spherical_bounder.is_some() => {
+                Ok(self.spherical_bounder.as_ref().unwrap())
+            }
+            _ => not_impl_err!(
+                "Can't get bounder for edge type {edges:?} (not supported or not registered)"
+            ),
+        }
     }
 }
 
@@ -470,6 +488,7 @@ impl Default for SedonaRuntime {
         Self {
             crs_engine: Arc::new(DefaultCrsEngine {}),
             bounder: Arc::new(WkbGeometryBounder::default()),
+            spherical_bounder: None,
         }
     }
 }
