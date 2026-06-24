@@ -20,3 +20,4 @@ pub mod expr;
 pub mod extension;
 pub mod scalar_kernel;
 pub mod table_provider;
+mod utils;

@@ -237,14 +237,21 @@ impl Drop for SedonaCExpr {
 }
 
 /// Raw FFI representation of the SedonaCExecutionPlanArgs
+///
+/// This structure is passed to methods that need JSON-serialized arguments,
+/// optional execution plans, and/or expressions.
 #[derive(Default)]
 #[repr(C)]
 pub struct SedonaCExecutionPlanArgs {
+    /// JSON-serialized arguments
     pub args: *const u8,
     pub args_len: usize,
-    pub children: *const *const SedonaCExecutionPlan,
-    pub num_children: usize,
-    pub expr: *const SedonaCExpr,
+    /// Optional array of execution plans
+    pub exec_plans: *const *const SedonaCExecutionPlan,
+    pub num_exec_plans: usize,
+    /// Optional array of expressions
+    pub exprs: *const *const SedonaCExpr,
+    pub num_exprs: usize,
     pub reserved: *mut c_void,
 }
 
@@ -313,6 +320,113 @@ unsafe impl Send for SedonaCExecutionPlan {}
 unsafe impl Sync for SedonaCExecutionPlan {}
 
 impl Drop for SedonaCExecutionPlan {
+    fn drop(&mut self) {
+        if let Some(releaser) = self.release {
+            unsafe { releaser(self) }
+            self.release = None;
+            self.private_data = null_mut();
+        }
+    }
+}
+
+/// Raw FFI representation of a TableProvider.
+///
+/// This provides a minimal interface for importing a TableProvider
+/// across an FFI boundary in a version-agnostic manner.
+#[derive(Default)]
+#[repr(C)]
+pub struct SedonaCTableProvider {
+    /// Get the schema of this table provider
+    pub get_schema:
+        Option<unsafe extern "C" fn(self_: *const SedonaCTableProvider, out: *mut FFI_ArrowSchema)>,
+
+    /// Get the schema of a property
+    pub get_property_schema: Option<
+        unsafe extern "C" fn(
+            self_: *const SedonaCTableProvider,
+            property: *const c_char,
+            out: *mut FFI_ArrowSchema,
+            err: *mut SedonaCError,
+        ) -> c_int,
+    >,
+
+    /// Get a property value as an Arrow array
+    pub get_property: Option<
+        unsafe extern "C" fn(
+            self_: *const SedonaCTableProvider,
+            property: *const c_char,
+            args: *mut SedonaCExecutionPlanArgs,
+            out: *mut FFI_ArrowArray,
+            err: *mut SedonaCError,
+        ) -> c_int,
+    >,
+
+    /// Perform a scan operation and return an execution plan
+    ///
+    /// The args parameter contains JSON-serialized scan arguments.
+    /// Returns an execution plan that can be used to read the data.
+    pub scan: Option<
+        unsafe extern "C" fn(
+            self_: *const SedonaCTableProvider,
+            args: *mut SedonaCExecutionPlanArgs,
+            out: *mut SedonaCExecutionPlan,
+            err: *mut SedonaCError,
+        ) -> c_int,
+    >,
+
+    /// Perform an insert operation
+    ///
+    /// The args parameter contains JSON-serialized insert arguments.
+    /// The exec_plans field should contain the plan providing rows to insert.
+    /// Returns an execution plan that performs the insert.
+    pub insert: Option<
+        unsafe extern "C" fn(
+            self_: *const SedonaCTableProvider,
+            args: *mut SedonaCExecutionPlanArgs,
+            out: *mut SedonaCExecutionPlan,
+            err: *mut SedonaCError,
+        ) -> c_int,
+    >,
+
+    /// Perform an update operation
+    ///
+    /// The args parameter contains JSON-serialized update arguments
+    /// (filters, column assignments, etc.).
+    /// Returns an execution plan that performs the update.
+    pub update: Option<
+        unsafe extern "C" fn(
+            self_: *const SedonaCTableProvider,
+            args: *mut SedonaCExecutionPlanArgs,
+            out: *mut SedonaCExecutionPlan,
+            err: *mut SedonaCError,
+        ) -> c_int,
+    >,
+
+    /// Perform a delete operation
+    ///
+    /// The args parameter contains JSON-serialized delete arguments
+    /// (filters, etc.).
+    /// Returns an execution plan that performs the delete.
+    pub delete_rows: Option<
+        unsafe extern "C" fn(
+            self_: *const SedonaCTableProvider,
+            args: *mut SedonaCExecutionPlanArgs,
+            out: *mut SedonaCExecutionPlan,
+            err: *mut SedonaCError,
+        ) -> c_int,
+    >,
+
+    pub reserved: *mut c_void,
+
+    pub release: Option<unsafe extern "C" fn(self_: *mut SedonaCTableProvider)>,
+
+    pub private_data: *mut c_void,
+}
+
+unsafe impl Send for SedonaCTableProvider {}
+unsafe impl Sync for SedonaCTableProvider {}
+
+impl Drop for SedonaCTableProvider {
     fn drop(&mut self) {
         if let Some(releaser) = self.release {
             unsafe { releaser(self) }

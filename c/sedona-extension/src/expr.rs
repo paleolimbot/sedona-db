@@ -26,10 +26,12 @@ use arrow_array::{builder::StringBuilder, ffi::FFI_ArrowArray, Array};
 use arrow_schema::SchemaRef;
 use datafusion_common::{DataFusionError, Result};
 use datafusion_physical_expr::PhysicalExpr;
+use sedona_common::{sedona_internal_datafusion_err, sedona_internal_err};
 use sedona_expr::spatial_filter::SpatialFilterFactory;
 use serde::Deserialize;
 
 use crate::extension::{SedonaCError, SedonaCExpr};
+use crate::utils::ERRNO_OK;
 
 /// A wrapper around a DataFusion [PhysicalExpr] with its associated schema.
 ///
@@ -78,9 +80,8 @@ impl PhysicalExprWithSchema {
         let factory = SpatialFilterFactory::default();
         let spatial_filter = factory.try_from_expr(&self.expr)?;
         let bbox = spatial_filter.filter_bbox(column_name);
-        serde_json::to_string(&bbox).map_err(|e| {
-            DataFusionError::Internal(format!("Failed to serialize bounding box: {}", e))
-        })
+        serde_json::to_string(&bbox)
+            .map_err(|e| sedona_internal_datafusion_err!("Failed to serialize bounding box: {}", e))
     }
 }
 
@@ -110,8 +111,8 @@ impl TryFrom<SedonaCExpr> for ImportedExpr {
     fn try_from(value: SedonaCExpr) -> Result<Self> {
         match (&value.get_property, &value.release) {
             (Some(_), Some(_)) => Ok(Self { inner: value }),
-            _ => Err(DataFusionError::Internal(
-                "Can't import released or uninitialized SedonaCExpr".to_string(),
+            _ => Err(sedona_internal_datafusion_err!(
+                "Can't import released or uninitialized SedonaCExpr"
             )),
         }
     }
@@ -129,9 +130,10 @@ impl ImportedExpr {
         property: &CStr,
         args: Option<&CStr>,
     ) -> Result<FFI_ArrowArray> {
-        let get_property = self.inner.get_property.ok_or_else(|| {
-            DataFusionError::Internal("get_property callback is null".to_string())
-        })?;
+        let get_property = self
+            .inner
+            .get_property
+            .ok_or_else(|| sedona_internal_datafusion_err!("get_property callback is null"))?;
 
         let args_ptr = args.map(|a| a.as_ptr()).unwrap_or(std::ptr::null());
         let mut out = FFI_ArrowArray::empty();
@@ -139,11 +141,8 @@ impl ImportedExpr {
 
         let result = get_property(&self.inner, property.as_ptr(), args_ptr, &mut out, &mut err);
 
-        if result != 0 {
-            return Err(DataFusionError::Internal(format!(
-                "get_property failed: {}",
-                err
-            )));
+        if result != ERRNO_OK {
+            return sedona_internal_err!("get_property failed: {}", err);
         }
 
         Ok(out)
@@ -189,7 +188,7 @@ unsafe extern "C" fn exported_expr_get_property_schema(
     if !err.is_null() {
         *err = SedonaCError::new("get_property_schema not implemented");
     }
-    -1
+    libc::EINVAL
 }
 
 unsafe extern "C" fn exported_expr_get_property(
@@ -203,7 +202,7 @@ unsafe extern "C" fn exported_expr_get_property(
         if !err.is_null() {
             *err = SedonaCError::new("null self pointer");
         }
-        return -1;
+        return libc::EINVAL;
     }
 
     let expr_arc = &*((*self_).private_data as *const Arc<PhysicalExprWithSchema>);
@@ -212,7 +211,7 @@ unsafe extern "C" fn exported_expr_get_property(
         if !err.is_null() {
             *err = SedonaCError::new("null property pointer");
         }
-        return -1;
+        return libc::EINVAL;
     }
 
     let property_str = match CStr::from_ptr(property).to_str() {
@@ -221,7 +220,7 @@ unsafe extern "C" fn exported_expr_get_property(
             if !err.is_null() {
                 *err = SedonaCError::new("invalid UTF-8 in property name");
             }
-            return -1;
+            return libc::EINVAL;
         }
     };
 
@@ -232,7 +231,7 @@ unsafe extern "C" fn exported_expr_get_property(
                 if !err.is_null() {
                     *err = SedonaCError::new("bbox property requires args with column name");
                 }
-                return -1;
+                return libc::EINVAL;
             }
 
             let args_str = match CStr::from_ptr(args).to_str() {
@@ -241,7 +240,7 @@ unsafe extern "C" fn exported_expr_get_property(
                     if !err.is_null() {
                         *err = SedonaCError::new("invalid UTF-8 in args");
                     }
-                    return -1;
+                    return libc::EINVAL;
                 }
             };
 
@@ -251,7 +250,7 @@ unsafe extern "C" fn exported_expr_get_property(
                     if !err.is_null() {
                         *err = SedonaCError::new(&format!("failed to parse args: {}", e));
                     }
-                    return -1;
+                    return libc::EINVAL;
                 }
             };
 
@@ -262,7 +261,7 @@ unsafe extern "C" fn exported_expr_get_property(
                     if !err.is_null() {
                         *err = SedonaCError::new(&format!("failed to extract bbox: {}", e));
                     }
-                    return -1;
+                    return libc::EINVAL;
                 }
             };
 
@@ -273,13 +272,13 @@ unsafe extern "C" fn exported_expr_get_property(
 
             // Export the array via FFI
             std::ptr::write(out, FFI_ArrowArray::new(&array.to_data()));
-            0
+            ERRNO_OK
         }
         _ => {
             if !err.is_null() {
                 *err = SedonaCError::new(&format!("unknown property: {}", property_str));
             }
-            -1
+            libc::EINVAL
         }
     }
 }

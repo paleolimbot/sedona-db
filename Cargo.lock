@@ -5782,12 +5782,14 @@ dependencies = [
  "arrow-array",
  "arrow-schema",
  "async-trait",
+ "datafusion",
  "datafusion-catalog",
  "datafusion-common",
  "datafusion-execution",
  "datafusion-expr",
  "datafusion-physical-expr",
  "datafusion-physical-plan",
+ "futures",
  "libc",
  "sedona-common",
  "sedona-expr",
@@ -5796,6 +5798,7 @@ dependencies = [
  "sedona-testing",
  "serde",
  "serde_json",
+ "tokio",
 ]
 
 [[package]]
