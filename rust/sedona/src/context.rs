@@ -24,12 +24,8 @@ use crate::object_storage::ensure_object_store_registered_with_options;
 use crate::{
     catalog::DynamicObjectStoreCatalog,
     random_geometry_provider::RandomGeometryFunction,
-    show::{show_batches, DisplayTableOptions},
 };
-use arrow_array::RecordBatch;
 use arrow_schema::DataType;
-use async_trait::async_trait;
-use datafusion::datasource::file_format::format_as_file_type;
 use datafusion::{
     common::plan_err,
     error::{DataFusionError, Result},
@@ -41,11 +37,8 @@ use datafusion::{
     prelude::{DataFrame, SessionConfig, SessionContext},
     sql::parser::{DFParser, Statement},
 };
-use datafusion::{dataframe::DataFrameWriteOptions, execution::memory_pool::MemoryLimit};
-use datafusion_common::not_impl_err;
-use datafusion_expr::dml::InsertOp;
+use datafusion::{execution::memory_pool::MemoryLimit};
 use datafusion_expr::sqlparser::dialect::{dialect_from_str, Dialect};
-use datafusion_expr::{LogicalPlan, LogicalPlanBuilder, SortExpr};
 use parking_lot::Mutex;
 use sedona_common::{
     option::add_sedona_option_extension, sedona_internal_datafusion_err, CrsProviderOption,
@@ -55,7 +48,6 @@ use sedona_datasource::provider::external_table;
 use sedona_datasource::spec::ExternalFormatSpec;
 use sedona_expr::scalar_udf::IntoScalarKernelRefs;
 use sedona_expr::{aggregate_udf::IntoSedonaAccumulatorRefs, function_set::FunctionSet};
-use sedona_geoparquet::options::TableGeoParquetOptions;
 use sedona_geoparquet::{
     format::GeoParquetFormatFactory,
     provider::{geoparquet_listing_table, GeoParquetReadOptions},
@@ -517,179 +509,6 @@ impl Default for SedonaContext {
     }
 }
 
-/// Sedona-specific [`DataFrame`] actions
-///
-/// This trait, implemented for [`DataFrame`], extends the DataFrame API to make it
-/// ergonomic to work with dataframes that contain geometry columns. Currently these
-/// are limited to output functions, as geometry columns currently require special
-/// handling when written or exported to an external system.
-#[async_trait]
-pub trait SedonaDataFrame {
-    /// Build a table of the first `limit` results in this DataFrame
-    ///
-    /// This will limit and execute the query and build a table using [show_batches].
-    async fn show_sedona<'a>(
-        self,
-        ctx: &SedonaContext,
-        limit: Option<usize>,
-        options: DisplayTableOptions<'a>,
-    ) -> Result<String>;
-
-    async fn write_geoparquet(
-        self,
-        ctx: &SedonaContext,
-        path: &str,
-        options: SedonaWriteOptions,
-        writer_options: Option<TableGeoParquetOptions>,
-    ) -> Result<Vec<RecordBatch>>;
-}
-
-#[async_trait]
-impl SedonaDataFrame for DataFrame {
-    async fn show_sedona<'a>(
-        self,
-        ctx: &SedonaContext,
-        limit: Option<usize>,
-        mut options: DisplayTableOptions<'a>,
-    ) -> Result<String> {
-        let df = if matches!(
-            self.logical_plan(),
-            LogicalPlan::Explain(_) | LogicalPlan::DescribeTable(_) | LogicalPlan::Analyze(_)
-        ) {
-            // Show multi-line output without truncation for plans like `EXPLAIN`
-            options.max_row_height = usize::MAX;
-
-            // We don't want to apply an additional .limit() to plans like `Explain`
-            // as that will trigger an internal error: Unsupported logical plan: Explain must be root of the plan
-            self
-        } else {
-            // Apply limit if specified
-            self.limit(0, limit)?
-        };
-
-        let schema_without_qualifiers = df.schema().clone().strip_qualifiers();
-        let schema = schema_without_qualifiers.as_arrow();
-        let batches = df.collect().await?;
-        let mut out = Vec::new();
-        show_batches(ctx, &mut out, schema, batches, options)?;
-        String::from_utf8(out).map_err(|e| DataFusionError::External(Box::new(e)))
-    }
-
-    async fn write_geoparquet(
-        self,
-        ctx: &SedonaContext,
-        path: &str,
-        options: SedonaWriteOptions,
-        writer_options: Option<TableGeoParquetOptions>,
-    ) -> Result<Vec<RecordBatch>, DataFusionError> {
-        if options.insert_op != InsertOp::Append {
-            return not_impl_err!(
-                "{} is not implemented for DataFrame::write_geoparquet.",
-                options.insert_op
-            );
-        }
-
-        let format = if let Some(parquet_opts) = writer_options {
-            Arc::new(GeoParquetFormatFactory::new_with_options(parquet_opts))
-        } else {
-            Arc::new(GeoParquetFormatFactory::new())
-        };
-
-        let file_type = format_as_file_type(format);
-
-        let plan = if options.sort_by.is_empty() {
-            self.into_unoptimized_plan()
-        } else {
-            LogicalPlanBuilder::from(self.into_unoptimized_plan())
-                .sort(options.sort_by)?
-                .build()?
-        };
-
-        let plan = LogicalPlanBuilder::copy_to(
-            plan,
-            path.into(),
-            file_type,
-            Default::default(),
-            options.partition_by,
-        )?
-        .build()?;
-
-        DataFrame::new(ctx.ctx.state(), plan).collect().await
-    }
-}
-
-/// A Sedona-specific copy of [DataFrameWriteOptions]
-///
-/// This is needed because [DataFrameWriteOptions] has private fields, so we
-/// can't use it in our interfaces. This object can be converted to a
-/// [DataFrameWriteOptions] using `.into()`.
-pub struct SedonaWriteOptions {
-    /// Controls how new data should be written to the table, determining whether
-    /// to append, overwrite, or replace existing data.
-    pub insert_op: InsertOp,
-    /// Controls if all partitions should be coalesced into a single output file
-    /// Generally will have slower performance when set to true.
-    pub single_file_output: bool,
-    /// Sets which columns should be used for hive-style partitioned writes by name.
-    /// Can be set to empty vec![] for non-partitioned writes.
-    pub partition_by: Vec<String>,
-    /// Sets which columns should be used for sorting the output by name.
-    /// Can be set to empty vec![] for non-sorted writes.
-    pub sort_by: Vec<SortExpr>,
-}
-
-impl From<SedonaWriteOptions> for DataFrameWriteOptions {
-    fn from(value: SedonaWriteOptions) -> Self {
-        DataFrameWriteOptions::new()
-            .with_insert_operation(value.insert_op)
-            .with_single_file_output(value.single_file_output)
-            .with_partition_by(value.partition_by)
-            .with_sort_by(value.sort_by)
-    }
-}
-
-impl SedonaWriteOptions {
-    /// Create a new SedonaWriteOptions with default values
-    pub fn new() -> Self {
-        SedonaWriteOptions {
-            insert_op: InsertOp::Append,
-            single_file_output: false,
-            partition_by: vec![],
-            sort_by: vec![],
-        }
-    }
-
-    /// Set the insert operation
-    pub fn with_insert_operation(mut self, insert_op: InsertOp) -> Self {
-        self.insert_op = insert_op;
-        self
-    }
-
-    /// Set the single_file_output value to true or false
-    pub fn with_single_file_output(mut self, single_file_output: bool) -> Self {
-        self.single_file_output = single_file_output;
-        self
-    }
-
-    /// Sets the partition_by columns for output partitioning
-    pub fn with_partition_by(mut self, partition_by: Vec<String>) -> Self {
-        self.partition_by = partition_by;
-        self
-    }
-
-    /// Sets the sort_by columns for output sorting
-    pub fn with_sort_by(mut self, sort_by: Vec<SortExpr>) -> Self {
-        self.sort_by = sort_by;
-        self
-    }
-}
-
-impl Default for SedonaWriteOptions {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 // Because Dialect/dialect_from_str is not marked as Send, using the async
 // function in certain contexts will fail to compile. Here we use a wrapper
 // to ensure that that the Dialect can be specified and parsed in any async
@@ -720,18 +539,18 @@ impl ThreadSafeDialect {
 
 #[cfg(test)]
 mod tests {
-
-    use arrow_array::{create_array, ArrayRef, RecordBatchIterator, RecordBatchReader};
+    use arrow_array::{ArrayRef, RecordBatch, RecordBatchIterator, RecordBatchReader, create_array};
     use arrow_schema::{DataType, Field, Schema};
-    use datafusion::assert_batches_eq;
-    use sedona_datasource::spec::{Object, OpenReaderArgs};
+    use async_trait::async_trait;
+use datafusion::assert_batches_eq;
+    use datafusion_common::not_impl_err;
+use sedona_datasource::spec::{Object, OpenReaderArgs};
     use sedona_schema::{
         crs::{deserialize_crs, lnglat},
         datatypes::{Edges, SedonaType},
         schema::SedonaSchema,
     };
     use sedona_testing::data::test_geoparquet;
-    use tempfile::tempdir;
 
     use super::*;
 
@@ -929,77 +748,6 @@ mod tests {
         );
 
         Ok(())
-    }
-
-    #[tokio::test]
-    async fn show() {
-        let ctx = SedonaContext::new();
-        let tbl = ctx
-            .sql("SELECT 1 as one")
-            .await
-            .unwrap()
-            .show_sedona(&ctx, None, DisplayTableOptions::default())
-            .await
-            .unwrap();
-
-        #[rustfmt::skip]
-        assert_eq!(
-            tbl.lines().collect::<Vec<_>>(),
-            vec![
-                "+-----+",
-                "| one |",
-                "+-----+",
-                "|   1 |",
-                "+-----+"
-            ]
-        );
-    }
-
-    #[tokio::test]
-    async fn show_explain() {
-        let ctx = SedonaContext::new();
-        for limit in [None, Some(10)] {
-            let tbl = ctx
-                .sql("EXPLAIN SELECT 1 as one")
-                .await
-                .unwrap()
-                .show_sedona(&ctx, limit, DisplayTableOptions::default())
-                .await
-                .unwrap();
-
-            #[rustfmt::skip]
-            assert_eq!(
-                tbl.lines().collect::<Vec<_>>(),
-                vec![
-                    "+---------------+---------------------------------+",
-                    "|   plan_type   |               plan              |",
-                    "+---------------+---------------------------------+",
-                    "| logical_plan  | Projection: Int64(1) AS one     |",
-                    "|               |   EmptyRelation: rows=1         |",
-                    "| physical_plan | ProjectionExec: expr=[1 as one] |",
-                    "|               |   PlaceholderRowExec            |",
-                    "|               |                                 |",
-                    "+---------------+---------------------------------+",
-                ]
-            );
-        }
-    }
-
-    #[tokio::test]
-    async fn write_geoparquet() {
-        let tmpdir = tempdir().unwrap();
-        let tmp_parquet = tmpdir.path().join("tmp.parquet");
-        let ctx = SedonaContext::new();
-        ctx.sql("SELECT 1 as one")
-            .await
-            .unwrap()
-            .write_parquet(
-                &tmp_parquet.to_string_lossy(),
-                DataFrameWriteOptions::default(),
-                None,
-            )
-            .await
-            .unwrap();
     }
 
     #[tokio::test]

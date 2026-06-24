@@ -34,7 +34,7 @@ use futures::lock::Mutex;
 use futures::TryStreamExt;
 use pyo3::prelude::*;
 use pyo3::types::{PyCapsule, PyDict, PyList};
-use sedona::context::{SedonaDataFrame, SedonaWriteOptions};
+use sedona::dataframe::{SedonaDataFrame, SedonaWriteOptions};
 use sedona::projected_reader::simplify_record_batch_reader;
 use sedona::show::{DisplayMode, DisplayTableOptions};
 use sedona_geoparquet::options::TableGeoParquetOptions;
