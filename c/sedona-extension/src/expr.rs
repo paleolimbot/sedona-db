@@ -137,13 +137,7 @@ impl ImportedExpr {
         let mut out = FFI_ArrowArray::empty();
         let mut err = SedonaCError::default();
 
-        let result = get_property(
-            &self.inner,
-            property.as_ptr(),
-            args_ptr,
-            &mut out,
-            &mut err,
-        );
+        let result = get_property(&self.inner, property.as_ptr(), args_ptr, &mut out, &mut err);
 
         if result != 0 {
             return Err(DataFusionError::Internal(format!(
@@ -310,8 +304,8 @@ unsafe extern "C" fn exported_expr_release(self_: *mut SedonaCExpr) {
 mod tests {
     use super::*;
     use arrow_schema::{DataType, Field, Schema};
-    use datafusion_physical_expr::expressions::Literal;
     use datafusion_common::ScalarValue;
+    use datafusion_physical_expr::expressions::Literal;
 
     #[test]
     fn test_physical_expr_with_schema_new() {

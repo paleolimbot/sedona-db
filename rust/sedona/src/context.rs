@@ -21,11 +21,9 @@ use std::{
 
 use crate::exec::create_plan_from_sql;
 use crate::object_storage::ensure_object_store_registered_with_options;
-use crate::{
-    catalog::DynamicObjectStoreCatalog,
-    random_geometry_provider::RandomGeometryFunction,
-};
+use crate::{catalog::DynamicObjectStoreCatalog, random_geometry_provider::RandomGeometryFunction};
 use arrow_schema::DataType;
+use datafusion::execution::memory_pool::MemoryLimit;
 use datafusion::{
     common::plan_err,
     error::{DataFusionError, Result},
@@ -37,7 +35,6 @@ use datafusion::{
     prelude::{DataFrame, SessionConfig, SessionContext},
     sql::parser::{DFParser, Statement},
 };
-use datafusion::{execution::memory_pool::MemoryLimit};
 use datafusion_expr::sqlparser::dialect::{dialect_from_str, Dialect};
 use parking_lot::Mutex;
 use sedona_common::{
@@ -539,12 +536,14 @@ impl ThreadSafeDialect {
 
 #[cfg(test)]
 mod tests {
-    use arrow_array::{ArrayRef, RecordBatch, RecordBatchIterator, RecordBatchReader, create_array};
+    use arrow_array::{
+        create_array, ArrayRef, RecordBatch, RecordBatchIterator, RecordBatchReader,
+    };
     use arrow_schema::{DataType, Field, Schema};
     use async_trait::async_trait;
-use datafusion::assert_batches_eq;
+    use datafusion::assert_batches_eq;
     use datafusion_common::not_impl_err;
-use sedona_datasource::spec::{Object, OpenReaderArgs};
+    use sedona_datasource::spec::{Object, OpenReaderArgs};
     use sedona_schema::{
         crs::{deserialize_crs, lnglat},
         datatypes::{Edges, SedonaType},

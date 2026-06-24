@@ -267,7 +267,7 @@ struct SedonaCExecutionPlan {
                  struct SedonaCExecutionPlanArgs* args, struct ArrowArrayStream* out,
                  struct SedonaCError* err);
 
-  // Future implemenatation with async streams
+  // Future implementation with async streams
   int (*execute_async)(const struct SedonaCExecutionPlan* self,
                        struct SedonaCExecutionPlanArgs* args, void* out,
                        struct SedonaCError* err);

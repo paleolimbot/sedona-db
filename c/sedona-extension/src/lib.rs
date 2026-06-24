@@ -15,8 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-pub mod extension;
-pub mod expr;
-pub mod scalar_kernel;
 pub mod execution_plan;
+pub mod expr;
+pub mod extension;
+pub mod scalar_kernel;
 pub mod table_provider;

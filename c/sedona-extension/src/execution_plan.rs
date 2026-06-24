@@ -20,14 +20,15 @@ use std::{any::Any, sync::Arc};
 use datafusion_common::{Result, Statistics};
 use datafusion_execution::TaskContext;
 use datafusion_physical_plan::{
-    DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties, SendableRecordBatchStream, execution_plan::CardinalityEffect, metrics::MetricsSet,
+    execution_plan::CardinalityEffect, metrics::MetricsSet, DisplayAs, DisplayFormatType,
+    ExecutionPlan, PlanProperties, SendableRecordBatchStream,
 };
 
 #[derive(Debug)]
 struct ImportedTableProviderExec {
     name: String,
     properties: Arc<PlanProperties>,
-    children: Vec<Arc<dyn ExecutionPlan>>
+    children: Vec<Arc<dyn ExecutionPlan>>,
 }
 
 impl DisplayAs for ImportedTableProviderExec {

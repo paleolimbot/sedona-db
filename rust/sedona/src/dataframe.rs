@@ -211,10 +211,9 @@ impl Default for SedonaWriteOptions {
 mod test {
     use tempfile::tempdir;
 
-use crate::context::SedonaContext;
+    use crate::context::SedonaContext;
 
     use super::*;
-
 
     #[tokio::test]
     async fn show() {
