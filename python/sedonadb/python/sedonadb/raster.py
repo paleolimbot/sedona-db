@@ -292,11 +292,11 @@ class Band:
         buffer_type_id = self._py_field("data_type")
         buffer_type_char = BAND_DATA_TYPE_STRUCT_CHARS[buffer_type_id]
 
-        # This is not quite right, but shapes that contain zeroes are not well
-        # supported by the memoryview yet. Callers should check data_size for
-        # empty handling with non-numpy views.
+        # Shapes that contain zeroes are supported by memroyview.cast().
+        # Callers should check data_size for empty handling with non-numpy views
+        # if they want to avoid a numpy dependency.
         if self.data_size == 0:
-            return memoryview(b"")
+            return memoryview(self.to_numpy())
 
         source_data = self.source_data
         if self.outdb_uri is not None and len(source_data) == 0:
@@ -317,11 +317,7 @@ class Band:
         if self.data_size == 0:
             return np.empty(self.shape, dtype=self.data_type)
 
-        # Use frombuffer for zero-copy when data is loaded
-        if self.outdb_uri is not None and len(self.source_data) == 0:
-            raise ValueError("Can't extract buffer from a reference to external data.")
-
-        return np.frombuffer(self.source_data, dtype=self.data_type).reshape(self.shape)
+        return np.array(self.data, dtype=self.data_type, copy=False).reshape(self.shape)
 
     def __repr__(self) -> str:
         """Return a string representation of this band."""

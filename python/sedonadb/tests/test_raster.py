@@ -300,7 +300,7 @@ def test_raster_lazy_zero_size():
     assert b.source_shape == (0, 64)
     assert b.data_size == 0
     assert b.source_data_size == 0
-    assert b.data == memoryview(b"")
+    np.testing.assert_array_equal(b.data, np.empty((0, 64), dtype="float32"))
 
     arr = b.to_numpy()
     assert arr.shape == (0, 64)
