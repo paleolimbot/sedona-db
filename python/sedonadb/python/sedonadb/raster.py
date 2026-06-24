@@ -566,6 +566,8 @@ def _wrap_data_zero_copy(data) -> pa.BinaryViewArray:
     nbytes = view.nbytes
     if nbytes == 0:
         return pa.array([b""], type=pa.binary_view())
+    elif nbytes >= 2**31:
+        raise ValueError(f"Can't store {nbytes} (>2GB) in a single raster band")
 
     # Build BinaryArray zero-copy using from_buffers, then cast to binary_view
     # BinaryArray buffers: [validity, offsets, data]
