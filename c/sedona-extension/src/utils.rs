@@ -23,7 +23,8 @@ use std::sync::Mutex;
 
 use arrow_array::ffi_stream::FFI_ArrowArrayStream;
 use arrow_array::{RecordBatch, RecordBatchReader};
-use arrow_schema::{ArrowError, SchemaRef};
+use arrow_schema::ffi::FFI_ArrowSchema;
+use arrow_schema::{ArrowError, DataType, Field, SchemaRef};
 use datafusion_common::Result;
 use datafusion_physical_plan::SendableRecordBatchStream;
 use futures::StreamExt;
@@ -37,6 +38,36 @@ use crate::extension::{
 
 /// Success return code for FFI functions.
 pub const ERRNO_OK: c_int = 0;
+
+/// Get the schema for a property from a [SedonaCExecutionPlan].
+///
+/// Returns the DataType describing the property's data type.
+/// If `get_property_schema` is not implemented, defaults to Binary.
+fn get_plan_property_data_type(plan: &SedonaCExecutionPlan, property: &str) -> Result<DataType> {
+    let Some(get_property_schema) = plan.get_property_schema else {
+        // Default to Binary if get_property_schema is not implemented
+        return Ok(DataType::Binary);
+    };
+
+    let property_cstr = CString::new(property)
+        .map_err(|e| sedona_internal_datafusion_err!("Invalid property name: {}", e))?;
+
+    let mut ffi_schema = FFI_ArrowSchema::empty();
+    let mut err = SedonaCError::default();
+
+    let code =
+        unsafe { get_property_schema(plan, property_cstr.as_ptr(), &mut ffi_schema, &mut err) };
+
+    if code != ERRNO_OK {
+        return sedona_internal_err!("Failed to get property schema for '{}': {}", property, err);
+    }
+
+    // Try to convert the FFI schema to a Field
+    let field = Field::try_from(&ffi_schema).map_err(|e| {
+        sedona_internal_datafusion_err!("Failed to parse property schema for '{}': {}", property, e)
+    })?;
+    Ok(field.data_type().clone())
+}
 
 /// Call `get_property` on a [SedonaCExecutionPlan] and deserialize the result.
 ///
@@ -113,35 +144,71 @@ where
         return sedona_internal_err!("Failed to get property '{}': {}", property, err);
     }
 
-    // Parse the binary array to get the JSON bytes
-    parse_binary_ffi_array(ffi_array)
+    // Get the property schema to know how to interpret the array
+    let data_type = get_plan_property_data_type(plan, property)?;
+
+    // Parse the array to get the JSON bytes
+    parse_ffi_array(ffi_array, &data_type)
 }
 
-/// Parse a binary FFI array containing JSON and deserialize to the target type.
-fn parse_binary_ffi_array<T: DeserializeOwned>(
+/// Parse an FFI array containing JSON and deserialize to the target type.
+fn parse_ffi_array<T: DeserializeOwned>(
     ffi_array: arrow_array::ffi::FFI_ArrowArray,
+    data_type: &DataType,
 ) -> Result<T> {
-    let bytes = parse_binary_ffi_array_to_bytes(ffi_array)?;
+    let bytes = parse_ffi_array_to_bytes(ffi_array, data_type)?;
     serde_json::from_slice::<T>(&bytes)
         .map_err(|e| sedona_internal_datafusion_err!("Failed to deserialize property: {}", e))
 }
 
-/// Parse a binary FFI array and return the raw bytes.
-fn parse_binary_ffi_array_to_bytes(
+/// Parse an FFI array and return the raw bytes.
+fn parse_ffi_array_to_bytes(
     ffi_array: arrow_array::ffi::FFI_ArrowArray,
+    data_type: &DataType,
 ) -> Result<Vec<u8>> {
-    let data = unsafe {
-        arrow_array::ffi::from_ffi_and_data_type(ffi_array, arrow_schema::DataType::Binary)?
-    };
+    let data = unsafe { arrow_array::ffi::from_ffi_and_data_type(ffi_array, data_type.clone())? };
     let array = arrow_array::make_array(data);
-    let binary_array = array
-        .as_any()
-        .downcast_ref::<arrow_array::BinaryArray>()
-        .ok_or_else(|| {
-            sedona_internal_datafusion_err!("Expected binary array from get_property")
-        })?;
 
-    Ok(binary_array.value(0).to_vec())
+    // Handle different array types
+    match data_type {
+        DataType::Binary => {
+            let binary_array = array
+                .as_any()
+                .downcast_ref::<arrow_array::BinaryArray>()
+                .ok_or_else(|| {
+                    sedona_internal_datafusion_err!("Expected binary array from get_property")
+                })?;
+            Ok(binary_array.value(0).to_vec())
+        }
+        DataType::LargeBinary => {
+            let binary_array = array
+                .as_any()
+                .downcast_ref::<arrow_array::LargeBinaryArray>()
+                .ok_or_else(|| {
+                    sedona_internal_datafusion_err!("Expected large binary array from get_property")
+                })?;
+            Ok(binary_array.value(0).to_vec())
+        }
+        DataType::Utf8 => {
+            let string_array = array
+                .as_any()
+                .downcast_ref::<arrow_array::StringArray>()
+                .ok_or_else(|| {
+                    sedona_internal_datafusion_err!("Expected string array from get_property")
+                })?;
+            Ok(string_array.value(0).as_bytes().to_vec())
+        }
+        DataType::LargeUtf8 => {
+            let string_array = array
+                .as_any()
+                .downcast_ref::<arrow_array::LargeStringArray>()
+                .ok_or_else(|| {
+                    sedona_internal_datafusion_err!("Expected large string array from get_property")
+                })?;
+            Ok(string_array.value(0).as_bytes().to_vec())
+        }
+        _ => sedona_internal_err!("Unsupported data type for property: {:?}", data_type),
+    }
 }
 
 /// Get a string property from a [SedonaCExecutionPlan].
@@ -182,9 +249,45 @@ pub fn get_plan_string_property(plan: &SedonaCExecutionPlan, property: &str) -> 
         return sedona_internal_err!("Failed to get '{}': {}", property, err);
     }
 
-    let bytes = parse_binary_ffi_array_to_bytes(ffi_array)?;
+    // Get the property schema to know how to interpret the array
+    let data_type = get_plan_property_data_type(plan, property)?;
+
+    let bytes = parse_ffi_array_to_bytes(ffi_array, &data_type)?;
     String::from_utf8(bytes)
         .map_err(|e| sedona_internal_datafusion_err!("Invalid UTF-8 in '{}': {}", property, e))
+}
+
+/// Get the schema for a property from a [SedonaCTableProvider].
+///
+/// Returns the DataType describing the property's data type.
+/// If `get_property_schema` is not implemented, defaults to Binary.
+fn get_table_provider_property_data_type(
+    provider: &SedonaCTableProvider,
+    property: &str,
+) -> Result<DataType> {
+    let Some(get_property_schema) = provider.get_property_schema else {
+        // Default to Binary if get_property_schema is not implemented
+        return Ok(DataType::Binary);
+    };
+
+    let property_cstr = CString::new(property)
+        .map_err(|e| sedona_internal_datafusion_err!("Invalid property name: {}", e))?;
+
+    let mut ffi_schema = FFI_ArrowSchema::empty();
+    let mut err = SedonaCError::default();
+
+    let code =
+        unsafe { get_property_schema(provider, property_cstr.as_ptr(), &mut ffi_schema, &mut err) };
+
+    if code != ERRNO_OK {
+        return sedona_internal_err!("Failed to get property schema for '{}': {}", property, err);
+    }
+
+    // Try to convert the FFI schema to a Field
+    let field = Field::try_from(&ffi_schema).map_err(|e| {
+        sedona_internal_datafusion_err!("Failed to parse property schema for '{}': {}", property, e)
+    })?;
+    Ok(field.data_type().clone())
 }
 
 /// Get a string property from a [SedonaCTableProvider].
@@ -226,7 +329,10 @@ pub fn get_table_provider_string_property(
         return sedona_internal_err!("Failed to get '{}': {}", property, err);
     }
 
-    let bytes = parse_binary_ffi_array_to_bytes(ffi_array)?;
+    // Get the property schema to know how to interpret the array
+    let data_type = get_table_provider_property_data_type(provider, property)?;
+
+    let bytes = parse_ffi_array_to_bytes(ffi_array, &data_type)?;
     String::from_utf8(bytes)
         .map_err(|e| sedona_internal_datafusion_err!("Invalid UTF-8 in '{}': {}", property, e))
 }

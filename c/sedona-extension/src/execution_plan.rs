@@ -18,7 +18,7 @@
 use std::{
     any::Any,
     ffi::{c_int, c_void, CStr},
-    fmt::Debug,
+    fmt::{Debug, Display, Formatter},
     ptr::null_mut,
     sync::Arc,
 };
@@ -28,56 +28,19 @@ use arrow_schema::{ffi::FFI_ArrowSchema, Schema, SchemaRef};
 use datafusion_common::{exec_err, Result, Statistics};
 use datafusion_execution::TaskContext;
 use datafusion_physical_plan::{
-    execution_plan::CardinalityEffect, metrics::MetricsSet, DisplayAs, DisplayFormatType,
-    ExecutionPlan, Partitioning, PlanProperties, SendableRecordBatchStream,
+    execution_plan::{Boundedness, CardinalityEffect, EmissionType},
+    metrics::{CustomMetricValue, Metric, MetricValue, MetricsSet},
+    DisplayAs, DisplayFormatType, ExecutionPlan, Partitioning, PlanProperties,
+    SendableRecordBatchStream,
 };
 use sedona_common::{sedona_internal_datafusion_err, sedona_internal_err};
 use serde::{Deserialize, Serialize};
 
 use crate::extension::{SedonaCError, SedonaCExecutionPlan, SedonaCExecutionPlanArgs};
 use crate::utils::{
-    ffi_stream_to_sendable, get_plan_property, get_plan_string_property, StreamingRecordBatchReader,
-    ERRNO_OK,
+    ffi_stream_to_sendable, get_plan_property, get_plan_string_property,
+    StreamingRecordBatchReader, ERRNO_OK,
 };
-
-/// Arguments for executing a partition of an execution plan.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExecuteArgs {
-    pub partition: usize,
-}
-
-/// Properties of an execution plan serialized across FFI.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlanPropertiesArgs {
-    pub num_partitions: usize,
-    pub supports_limit_pushdown: bool,
-}
-
-impl PlanPropertiesArgs {
-    /// Extract plan properties from a SedonaCExecutionPlan via FFI.
-    pub fn from_ffi_plan(plan: &SedonaCExecutionPlan) -> Result<Self> {
-        get_plan_property::<Self, ()>(plan, "plan_properties", None)
-    }
-
-    /// Convert to DataFusion PlanProperties.
-    pub fn into_plan_properties(self, schema: SchemaRef) -> PlanProperties {
-        PlanProperties::new(
-            datafusion_physical_expr::EquivalenceProperties::new(schema),
-            Partitioning::UnknownPartitioning(self.num_partitions),
-            datafusion_physical_plan::execution_plan::EmissionType::Incremental,
-            datafusion_physical_plan::execution_plan::Boundedness::Bounded,
-        )
-    }
-}
-
-/// Helper wrapper to format an ExecutionPlan with a specific DisplayFormatType.
-struct DisplayAsWrapper<'a>(&'a Arc<dyn ExecutionPlan>, DisplayFormatType);
-
-impl std::fmt::Display for DisplayAsWrapper<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt_as(self.1, f)
-    }
-}
 
 /// Wrapper around an [ExecutionPlan] that can be exported across FFI.
 pub struct ExportedExecutionPlan {
@@ -112,41 +75,75 @@ impl ExportedExecutionPlan {
         self.plan.schema()
     }
 
-    fn get_property(&self, property: &str) -> Result<Vec<u8>> {
+    fn get_property(&self, property: &str) -> Result<String> {
         match property {
             "plan_properties" => {
-                let props = PlanPropertiesArgs {
-                    num_partitions: self
-                        .plan
-                        .properties()
-                        .output_partitioning()
-                        .partition_count(),
-                    supports_limit_pushdown: self.plan.supports_limit_pushdown(),
-                };
-                serde_json::to_vec(&props).map_err(|e| {
+                let props = PlanPropertiesArgs::from_plan(self.plan.as_ref());
+                serde_json::to_string(&props).map_err(|e| {
                     sedona_internal_datafusion_err!("Failed to serialize plan properties: {}", e)
                 })
             }
-            "debug_string" => Ok(format!("{:?}", self.plan).into_bytes()),
+            "debug_string" => Ok(format!("{:?}", self.plan)),
             "display_default" => {
                 use std::fmt::Write;
                 let mut s = String::new();
-                let _ = write!(s, "{}", DisplayAsWrapper(&self.plan, DisplayFormatType::Default));
-                Ok(s.into_bytes())
+                let _ = write!(
+                    s,
+                    "{}",
+                    DisplayAsWrapper(&self.plan, DisplayFormatType::Default)
+                );
+                Ok(s)
             }
             "display_verbose" => {
                 use std::fmt::Write;
                 let mut s = String::new();
-                let _ = write!(s, "{}", DisplayAsWrapper(&self.plan, DisplayFormatType::Verbose));
-                Ok(s.into_bytes())
+                let _ = write!(
+                    s,
+                    "{}",
+                    DisplayAsWrapper(&self.plan, DisplayFormatType::Verbose)
+                );
+                Ok(s)
             }
             "display_tree_render" => {
                 use std::fmt::Write;
                 let mut s = String::new();
-                let _ = write!(s, "{}", DisplayAsWrapper(&self.plan, DisplayFormatType::TreeRender));
-                Ok(s.into_bytes())
+                let _ = write!(
+                    s,
+                    "{}",
+                    DisplayAsWrapper(&self.plan, DisplayFormatType::TreeRender)
+                );
+                Ok(s)
             }
-            "name" => Ok(self.plan.name().as_bytes().to_vec()),
+            "name" => Ok(self.plan.name().to_string()),
+            "cardinality_effect" => {
+                let effect = match self.plan.cardinality_effect() {
+                    CardinalityEffect::Unknown => "Unknown",
+                    CardinalityEffect::Equal => "Equal",
+                    CardinalityEffect::LowerEqual => "LowerEqual",
+                    CardinalityEffect::GreaterEqual => "GreaterEqual",
+                };
+                Ok(effect.to_string())
+            }
+            "maintains_input_order" => {
+                let order = self.plan.maintains_input_order();
+                serde_json::to_string(&order).map_err(|e| {
+                    sedona_internal_datafusion_err!(
+                        "Failed to serialize maintains_input_order: {}",
+                        e
+                    )
+                })
+            }
+            "metrics" => {
+                // Serialize metrics as JSON with aggregated values
+                if let Some(metrics) = self.plan.metrics() {
+                    let serialized = SerializedMetrics::from_metrics_set(&metrics);
+                    serde_json::to_string(&serialized).map_err(|e| {
+                        sedona_internal_datafusion_err!("Failed to serialize metrics: {}", e)
+                    })
+                } else {
+                    Ok("null".to_string())
+                }
+            }
             _ => exec_err!("Unknown property: {}", property),
         }
     }
@@ -161,7 +158,7 @@ impl From<ExportedExecutionPlan> for SedonaCExecutionPlan {
         let boxed = Box::new(value);
         Self {
             get_schema: Some(c_exec_plan_get_schema),
-            get_property_schema: None,
+            get_property_schema: Some(c_exec_plan_get_property_schema),
             get_property: Some(c_exec_plan_get_property),
             with_property: None,
             execute: Some(c_exec_plan_execute),
@@ -184,6 +181,27 @@ unsafe extern "C" fn c_exec_plan_get_schema(
     }
 }
 
+unsafe extern "C" fn c_exec_plan_get_property_schema(
+    _self_: *const SedonaCExecutionPlan,
+    _property: *const std::ffi::c_char,
+    out: *mut FFI_ArrowSchema,
+    err: *mut SedonaCError,
+) -> c_int {
+    // All properties are returned as Utf8 strings (including JSON)
+    use arrow_schema::{DataType, Field};
+    let field = Field::new("value", DataType::Utf8, false);
+    match FFI_ArrowSchema::try_from(&field) {
+        Ok(ffi_schema) => {
+            std::ptr::write(out, ffi_schema);
+            ERRNO_OK
+        }
+        Err(e) => {
+            *err = SedonaCError::new(&format!("Failed to convert field to FFI schema: {}", e));
+            libc::EINVAL
+        }
+    }
+}
+
 unsafe extern "C" fn c_exec_plan_get_property(
     self_: *const SedonaCExecutionPlan,
     property: *const std::ffi::c_char,
@@ -195,11 +213,11 @@ unsafe extern "C" fn c_exec_plan_get_property(
     let property_str = CStr::from_ptr(property).to_string_lossy();
 
     match plan.get_property(&property_str) {
-        Ok(bytes) => {
-            // Return the bytes as a single-element binary array
-            use arrow_array::{builder::BinaryBuilder, Array};
-            let mut builder = BinaryBuilder::new();
-            builder.append_value(&bytes);
+        Ok(value) => {
+            // Return the string as a single-element string array
+            use arrow_array::{builder::StringBuilder, Array};
+            let mut builder = StringBuilder::new();
+            builder.append_value(&value);
             let array = builder.finish();
             let ffi_array = arrow_array::ffi::FFI_ArrowArray::new(&array.to_data());
             std::ptr::write(out, ffi_array);
@@ -355,15 +373,27 @@ impl ExecutionPlan for ImportedSedonaCExec {
     }
 
     fn cardinality_effect(&self) -> CardinalityEffect {
-        CardinalityEffect::Unknown
+        get_plan_string_property(&self.inner, "cardinality_effect")
+            .ok()
+            .and_then(|s| match s.as_str() {
+                "Equal" => Some(CardinalityEffect::Equal),
+                "LowerEqual" => Some(CardinalityEffect::LowerEqual),
+                "GreaterEqual" => Some(CardinalityEffect::GreaterEqual),
+                _ => None,
+            })
+            .unwrap_or(CardinalityEffect::Unknown)
     }
 
     fn maintains_input_order(&self) -> Vec<bool> {
-        vec![]
+        get_plan_property::<Vec<bool>, ()>(&self.inner, "maintains_input_order", None)
+            .unwrap_or_default()
     }
 
     fn metrics(&self) -> Option<MetricsSet> {
-        None
+        get_plan_property::<Option<SerializedMetrics>, ()>(&self.inner, "metrics", None)
+            .ok()
+            .flatten()
+            .map(|sm| sm.into_metrics_set())
     }
 
     fn supports_limit_pushdown(&self) -> bool {
@@ -426,4 +456,462 @@ impl ExecutionPlan for ImportedSedonaCExec {
     }
 }
 
+/// Arguments for executing a partition of an execution plan.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecuteArgs {
+    pub partition: usize,
+}
 
+/// Metrics serialized for FFI transfer.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SerializedMetrics {
+    pub display: String,
+}
+
+impl SerializedMetrics {
+    /// Create from a MetricsSet by capturing its display string.
+    pub fn from_metrics_set(set: &MetricsSet) -> Self {
+        Self {
+            display: set.to_string(),
+        }
+    }
+
+    /// Convert back to a MetricsSet with a custom metric containing the display string.
+    pub fn into_metrics_set(self) -> MetricsSet {
+        let mut set = MetricsSet::new();
+        let custom = ImportedMetrics::new(self.display);
+        let metric = Metric::new(
+            MetricValue::Custom {
+                name: "imported_metrics".into(),
+                value: Arc::new(custom),
+            },
+            None,
+        );
+        set.push(Arc::new(metric));
+        set
+    }
+}
+
+/// Custom metric value that holds imported metrics display string.
+#[derive(Debug, Clone)]
+pub struct ImportedMetrics {
+    display: String,
+}
+
+impl ImportedMetrics {
+    pub fn new(display: String) -> Self {
+        Self { display }
+    }
+}
+
+impl Display for ImportedMetrics {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.display)
+    }
+}
+
+impl CustomMetricValue for ImportedMetrics {
+    fn new_empty(&self) -> Arc<dyn CustomMetricValue> {
+        Arc::new(Self {
+            display: String::new(),
+        })
+    }
+
+    fn aggregate(&self, other: Arc<dyn CustomMetricValue>) {
+        // No aggregation for imported metrics - they're read-only snapshots
+        let _ = other;
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn is_eq(&self, other: &Arc<dyn CustomMetricValue>) -> bool {
+        other
+            .as_any()
+            .downcast_ref::<Self>()
+            .is_some_and(|o| o.display == self.display)
+    }
+}
+
+/// Properties of an execution plan serialized across FFI.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlanPropertiesArgs {
+    pub num_partitions: usize,
+    pub supports_limit_pushdown: bool,
+    pub emission_type: String,
+    pub boundedness: String,
+}
+
+impl PlanPropertiesArgs {
+    /// Create from an ExecutionPlan.
+    pub fn from_plan(plan: &dyn ExecutionPlan) -> Self {
+        let plan_props = plan.properties();
+        let emission_type = match plan_props.emission_type {
+            EmissionType::Incremental => "Incremental",
+            EmissionType::Final => "Final",
+            EmissionType::Both => "Both",
+        };
+        let boundedness = match plan_props.boundedness {
+            Boundedness::Bounded => "Bounded",
+            Boundedness::Unbounded {
+                requires_infinite_memory: false,
+            } => "Unbounded",
+            Boundedness::Unbounded {
+                requires_infinite_memory: true,
+            } => "UnboundedInfiniteMemory",
+        };
+        Self {
+            num_partitions: plan_props.output_partitioning().partition_count(),
+            supports_limit_pushdown: plan.supports_limit_pushdown(),
+            emission_type: emission_type.to_string(),
+            boundedness: boundedness.to_string(),
+        }
+    }
+
+    /// Extract plan properties from a SedonaCExecutionPlan via FFI.
+    pub fn from_ffi_plan(plan: &SedonaCExecutionPlan) -> Result<Self> {
+        get_plan_property::<Self, ()>(plan, "plan_properties", None)
+    }
+
+    /// Convert to DataFusion PlanProperties.
+    pub fn into_plan_properties(self, schema: SchemaRef) -> PlanProperties {
+        let emission_type = match self.emission_type.as_str() {
+            "Final" => EmissionType::Final,
+            "Both" => EmissionType::Both,
+            _ => EmissionType::Incremental,
+        };
+        let boundedness = match self.boundedness.as_str() {
+            "Unbounded" => Boundedness::Unbounded {
+                requires_infinite_memory: false,
+            },
+            "UnboundedInfiniteMemory" => Boundedness::Unbounded {
+                requires_infinite_memory: true,
+            },
+            _ => Boundedness::Bounded,
+        };
+        PlanProperties::new(
+            datafusion_physical_expr::EquivalenceProperties::new(schema),
+            Partitioning::UnknownPartitioning(self.num_partitions),
+            emission_type,
+            boundedness,
+        )
+    }
+}
+
+/// Helper wrapper to format an ExecutionPlan with a specific DisplayFormatType.
+struct DisplayAsWrapper<'a>(&'a Arc<dyn ExecutionPlan>, DisplayFormatType);
+
+impl std::fmt::Display for DisplayAsWrapper<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt_as(self.1, f)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arrow_array::{Int32Array, RecordBatch};
+    use arrow_schema::{DataType, Field};
+    use datafusion_common::assert_batches_eq;
+    use datafusion_physical_plan::stream::RecordBatchStreamAdapter;
+    use futures::{stream, StreamExt};
+    use std::fmt::Formatter;
+
+    /// A dummy ExecutionPlan with fixed, predictable values for testing FFI roundtrip.
+    #[derive(Debug)]
+    struct DummyExec {
+        schema: SchemaRef,
+        properties: PlanProperties,
+        limit_pushdown: bool,
+    }
+
+    impl DummyExec {
+        fn new() -> Self {
+            Self::with_properties(EmissionType::Incremental, Boundedness::Bounded, true)
+        }
+
+        fn with_properties(
+            emission_type: EmissionType,
+            boundedness: Boundedness,
+            supports_limit_pushdown: bool,
+        ) -> Self {
+            let schema = Arc::new(Schema::new(vec![
+                Field::new("id", DataType::Int32, false),
+                Field::new("value", DataType::Int32, false),
+            ]));
+            let properties = PlanProperties::new(
+                datafusion_physical_expr::EquivalenceProperties::new(schema.clone()),
+                Partitioning::UnknownPartitioning(3),
+                emission_type,
+                boundedness,
+            );
+            Self {
+                schema,
+                properties,
+                limit_pushdown: supports_limit_pushdown,
+            }
+        }
+    }
+
+    impl DisplayAs for DummyExec {
+        fn fmt_as(&self, t: DisplayFormatType, f: &mut Formatter) -> std::fmt::Result {
+            match t {
+                DisplayFormatType::Default => write!(f, "DummyExec: default format"),
+                DisplayFormatType::Verbose => write!(f, "DummyExec: verbose format with schema"),
+                DisplayFormatType::TreeRender => write!(f, "DummyExec: tree render format"),
+            }
+        }
+    }
+
+    impl ExecutionPlan for DummyExec {
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+
+        fn name(&self) -> &str {
+            "DummyExec"
+        }
+
+        fn properties(&self) -> &PlanProperties {
+            &self.properties
+        }
+
+        fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+            vec![]
+        }
+
+        fn with_new_children(
+            self: Arc<Self>,
+            children: Vec<Arc<dyn ExecutionPlan>>,
+        ) -> Result<Arc<dyn ExecutionPlan>> {
+            if !children.is_empty() {
+                return exec_err!("DummyExec does not support children");
+            }
+            Ok(self)
+        }
+
+        fn supports_limit_pushdown(&self) -> bool {
+            self.limit_pushdown
+        }
+
+        fn execute(
+            &self,
+            partition: usize,
+            _context: Arc<TaskContext>,
+        ) -> Result<SendableRecordBatchStream> {
+            // Return a batch with partition-specific data
+            let ids = Int32Array::from(vec![
+                partition as i32 * 10 + 1,
+                partition as i32 * 10 + 2,
+                partition as i32 * 10 + 3,
+            ]);
+            let values = Int32Array::from(vec![100, 200, 300]);
+            let batch =
+                RecordBatch::try_new(self.schema.clone(), vec![Arc::new(ids), Arc::new(values)])?;
+
+            Ok(Box::pin(RecordBatchStreamAdapter::new(
+                self.schema.clone(),
+                stream::iter(vec![Ok(batch)]),
+            )))
+        }
+    }
+
+    /// Helper to set up an imported plan from a DummyExec through FFI roundtrip.
+    fn setup_imported_plan() -> (ImportedSedonaCExec, Arc<TaskContext>) {
+        let dummy = Arc::new(DummyExec::new());
+        let runtime = tokio::runtime::Handle::current();
+        let task_ctx = Arc::new(TaskContext::default());
+
+        let exported = ExportedExecutionPlan::new(dummy, task_ctx.clone(), runtime);
+        let ffi_plan: SedonaCExecutionPlan = exported.into();
+        let imported = ImportedSedonaCExec::try_new(ffi_plan).unwrap();
+
+        (imported, task_ctx)
+    }
+
+    fn setup_imported_plan_with(
+        emission_type: EmissionType,
+        boundedness: Boundedness,
+        supports_limit_pushdown: bool,
+    ) -> (ImportedSedonaCExec, Arc<TaskContext>) {
+        let dummy = Arc::new(DummyExec::with_properties(
+            emission_type,
+            boundedness,
+            supports_limit_pushdown,
+        ));
+        let runtime = tokio::runtime::Handle::current();
+        let task_ctx = Arc::new(TaskContext::default());
+
+        let exported = ExportedExecutionPlan::new(dummy, task_ctx.clone(), runtime);
+        let ffi_plan: SedonaCExecutionPlan = exported.into();
+        let imported = ImportedSedonaCExec::try_new(ffi_plan).unwrap();
+
+        (imported, task_ctx)
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_execution_plan_roundtrip_schema() {
+        let (imported, _) = setup_imported_plan();
+
+        // Verify schema matches
+        assert_eq!(imported.schema().fields().len(), 2);
+        assert_eq!(imported.schema().field(0).name(), "id");
+        assert_eq!(imported.schema().field(1).name(), "value");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_execution_plan_roundtrip_name() {
+        let (imported, _) = setup_imported_plan();
+        assert_eq!(imported.name(), "ImportedSedonaCExec<DummyExec>");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_execution_plan_roundtrip_properties() {
+        // Test all EmissionType variants
+        for (emission_type, expected_str) in [
+            (EmissionType::Incremental, "Incremental"),
+            (EmissionType::Final, "Final"),
+            (EmissionType::Both, "Both"),
+        ] {
+            let (imported, _) = setup_imported_plan_with(emission_type, Boundedness::Bounded, true);
+            let props = PlanPropertiesArgs::from_plan(&imported);
+            assert_eq!(
+                props.emission_type, expected_str,
+                "emission_type mismatch for {:?}",
+                emission_type
+            );
+        }
+
+        // Test all Boundedness variants
+        for (boundedness, expected_str) in [
+            (Boundedness::Bounded, "Bounded"),
+            (
+                Boundedness::Unbounded {
+                    requires_infinite_memory: false,
+                },
+                "Unbounded",
+            ),
+            (
+                Boundedness::Unbounded {
+                    requires_infinite_memory: true,
+                },
+                "UnboundedInfiniteMemory",
+            ),
+        ] {
+            let (imported, _) =
+                setup_imported_plan_with(EmissionType::Incremental, boundedness, true);
+            let props = PlanPropertiesArgs::from_plan(&imported);
+            assert_eq!(
+                props.boundedness, expected_str,
+                "boundedness mismatch for {:?}",
+                boundedness
+            );
+        }
+
+        // Test supports_limit_pushdown
+        let (imported_with, _) =
+            setup_imported_plan_with(EmissionType::Incremental, Boundedness::Bounded, true);
+        assert!(imported_with.supports_limit_pushdown());
+
+        let (imported_without, _) =
+            setup_imported_plan_with(EmissionType::Incremental, Boundedness::Bounded, false);
+        assert!(!imported_without.supports_limit_pushdown());
+
+        // Test partition count
+        let (imported, _) = setup_imported_plan();
+        assert_eq!(
+            imported
+                .properties()
+                .output_partitioning()
+                .partition_count(),
+            3
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_execution_plan_roundtrip_display_as() {
+        let (imported, _) = setup_imported_plan();
+
+        // Helper struct to format DisplayAs with a specific format type
+        struct DisplayAsFormat<'a, T: DisplayAs>(&'a T, DisplayFormatType);
+        impl<T: DisplayAs> std::fmt::Display for DisplayAsFormat<'_, T> {
+            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+                self.0.fmt_as(self.1, f)
+            }
+        }
+
+        assert_eq!(
+            format!("{}", DisplayAsFormat(&imported, DisplayFormatType::Default)),
+            "DummyExec: default format"
+        );
+        assert_eq!(
+            format!("{}", DisplayAsFormat(&imported, DisplayFormatType::Verbose)),
+            "DummyExec: verbose format with schema"
+        );
+        assert_eq!(
+            format!(
+                "{}",
+                DisplayAsFormat(&imported, DisplayFormatType::TreeRender)
+            ),
+            "DummyExec: tree render format"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_execution_plan_roundtrip_debug_string() {
+        let (imported, _) = setup_imported_plan();
+
+        let debug_str = imported.get_debug_string().unwrap();
+        assert!(
+            debug_str.contains("DummyExec"),
+            "debug_string should contain 'DummyExec', got: {}",
+            debug_str
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_execution_plan_roundtrip_execute() {
+        let (imported, task_ctx) = setup_imported_plan();
+
+        // Execute partition 0
+        let stream = imported.execute(0, task_ctx.clone()).unwrap();
+        let batches: Vec<RecordBatch> = stream
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
+
+        let expected = [
+            "+----+-------+",
+            "| id | value |",
+            "+----+-------+",
+            "| 1  | 100   |",
+            "| 2  | 200   |",
+            "| 3  | 300   |",
+            "+----+-------+",
+        ];
+        assert_batches_eq!(expected, &batches);
+
+        // Execute partition 1 - needs a fresh import since we consumed the first
+        let stream2 = imported.execute(1, task_ctx).unwrap();
+        let batches2: Vec<RecordBatch> = stream2
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
+
+        let expected2 = [
+            "+----+-------+",
+            "| id | value |",
+            "+----+-------+",
+            "| 11 | 100   |",
+            "| 12 | 200   |",
+            "| 13 | 300   |",
+            "+----+-------+",
+        ];
+        assert_batches_eq!(expected2, &batches2);
+    }
+}

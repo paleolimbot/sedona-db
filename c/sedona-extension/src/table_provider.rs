@@ -97,7 +97,7 @@ impl ExportedTableProvider {
         })
     }
 
-    fn get_property(&self, property: &str) -> Result<Vec<u8>> {
+    fn get_property(&self, property: &str) -> Result<String> {
         match property {
             "table_type" => {
                 let table_type = self.inner.table_type();
@@ -106,7 +106,7 @@ impl ExportedTableProvider {
                     TableType::View => "View",
                     TableType::Temporary => "Temporary",
                 };
-                Ok(type_str.as_bytes().to_vec())
+                Ok(type_str.to_string())
             }
             _ => exec_err!("Unknown property: {}", property),
         }
@@ -118,7 +118,7 @@ impl From<ExportedTableProvider> for SedonaCTableProvider {
         let boxed = Box::new(value);
         Self {
             get_schema: Some(c_table_provider_get_schema),
-            get_property_schema: None,
+            get_property_schema: Some(c_table_provider_get_property_schema),
             get_property: Some(c_table_provider_get_property),
             scan: Some(c_table_provider_scan),
             insert: None,
@@ -142,6 +142,27 @@ unsafe extern "C" fn c_table_provider_get_schema(
     }
 }
 
+unsafe extern "C" fn c_table_provider_get_property_schema(
+    _self_: *const SedonaCTableProvider,
+    _property: *const std::ffi::c_char,
+    out: *mut FFI_ArrowSchema,
+    err: *mut SedonaCError,
+) -> c_int {
+    // All properties are returned as Utf8 strings
+    use arrow_schema::{DataType, Field};
+    let field = Field::new("value", DataType::Utf8, false);
+    match FFI_ArrowSchema::try_from(&field) {
+        Ok(ffi_schema) => {
+            std::ptr::write(out, ffi_schema);
+            ERRNO_OK
+        }
+        Err(e) => {
+            *err = SedonaCError::new(&format!("Failed to convert field to FFI schema: {}", e));
+            libc::EINVAL
+        }
+    }
+}
+
 unsafe extern "C" fn c_table_provider_get_property(
     self_: *const SedonaCTableProvider,
     property: *const std::ffi::c_char,
@@ -153,11 +174,11 @@ unsafe extern "C" fn c_table_provider_get_property(
     let property_str = CStr::from_ptr(property).to_string_lossy();
 
     match provider.get_property(&property_str) {
-        Ok(bytes) => {
-            // Return the bytes as a single-element binary array
-            use arrow_array::{builder::BinaryBuilder, Array};
-            let mut builder = BinaryBuilder::new();
-            builder.append_value(&bytes);
+        Ok(value) => {
+            // Return the string as a single-element string array
+            use arrow_array::{builder::StringBuilder, Array};
+            let mut builder = StringBuilder::new();
+            builder.append_value(&value);
             let array = builder.finish();
             let ffi_array = FFI_ArrowArray::new(&array.to_data());
             std::ptr::write(out, ffi_array);
