@@ -27,7 +27,7 @@ use geo_traits::Dimensions;
 use sedona_common::sedona_internal_err;
 use sedona_geometry::{
     bounding_box::BoundingBox,
-    bounds::wkb_bounds_xy,
+    bounds::{WkbBounder2D, WkbGeometryBounder},
     interval::{Interval, IntervalTrait},
 };
 use sedona_schema::{
@@ -186,20 +186,20 @@ impl SpatialFilter {
 /// Factory for creating [SpatialFilter] objects from expressions
 #[derive(Debug, Clone)]
 pub struct SpatialFilterFactory {
-    literal_bounders: Vec<Arc<dyn LiteralBounder>>,
+    literal_bounders: Vec<LiteralBounder>,
 }
 
 impl Default for SpatialFilterFactory {
     fn default() -> Self {
         Self {
-            literal_bounders: vec![Arc::new(DefaultLiteralBounder)],
+            literal_bounders: vec![LiteralBounder::planar()],
         }
     }
 }
 
 impl SpatialFilterFactory {
-    /// Add a [LiteralBounder] (e.g., that can handle non-planar edges)
-    pub fn with_bounder(mut self, literal_bounder: Arc<dyn LiteralBounder>) -> Self {
+    /// Add a [LiteralBounder] (e.g., one that can handle non-planar edges)
+    pub fn with_bounder(mut self, literal_bounder: LiteralBounder) -> Self {
         self.literal_bounders.push(literal_bounder);
         self
     }
@@ -459,55 +459,65 @@ impl SpatialFilterFactory {
     }
 }
 
-/// Extendable bounder for literal values
+/// Bounder for literal WKB values in filter expressions
 ///
-/// Used to compute the bounds of any literals encountered with pluggable support for extra types.
-pub trait LiteralBounder: Debug {
-    /// Returns true if this bounder can handle the requested type
-    fn can_bound(&self, sedona_type: &SedonaType) -> bool;
-
-    /// Bound a value of the given type
-    fn bound_scalar(
-        &self,
-        value: &ScalarValue,
-        sedona_type: &SedonaType,
-        distance: Option<f64>,
-    ) -> Result<BoundingBox>;
+/// Used to compute the bounds of any WKB literals encountered during filter parsing.
+/// Each instance handles a specific edge type (Planar or Spherical) using the
+/// provided `WkbBounder2D` implementation.
+#[derive(Debug, Clone)]
+pub struct LiteralBounder {
+    edges: Edges,
+    bounder: Arc<dyn WkbBounder2D>,
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct DefaultLiteralBounder;
-
-impl LiteralBounder for DefaultLiteralBounder {
-    fn can_bound(&self, sedona_type: &SedonaType) -> bool {
-        matches!(
-            sedona_type,
-            SedonaType::Wkb(Edges::Planar, _) | SedonaType::WkbView(Edges::Planar, _)
-        )
+impl LiteralBounder {
+    /// Create a new LiteralBounder for the specified edge type
+    pub fn new(edges: Edges, bounder: Arc<dyn WkbBounder2D>) -> Self {
+        Self { edges, bounder }
     }
 
-    fn bound_scalar(
+    /// Create a default planar bounder
+    pub fn planar() -> Self {
+        Self::new(Edges::Planar, Arc::new(WkbGeometryBounder::default()))
+    }
+
+    /// Returns true if this bounder can handle the requested type
+    pub fn can_bound(&self, sedona_type: &SedonaType) -> bool {
+        match sedona_type {
+            SedonaType::Wkb(edges, _) | SedonaType::WkbView(edges, _) => *edges == self.edges,
+            _ => false,
+        }
+    }
+
+    /// Bound a value of the given type
+    pub fn bound_scalar(
         &self,
         value: &ScalarValue,
         sedona_type: &SedonaType,
         distance: Option<f64>,
     ) -> Result<BoundingBox> {
-        match &sedona_type {
-            SedonaType::Wkb(Edges::Planar, _) | SedonaType::WkbView(Edges::Planar, _) => {
+        match sedona_type {
+            SedonaType::Wkb(edges, _) | SedonaType::WkbView(edges, _) if *edges == self.edges => {
                 match value {
                     ScalarValue::Binary(maybe_vec) | ScalarValue::BinaryView(maybe_vec) => {
                         if let Some(vec) = maybe_vec {
-                            let out = wkb_bounds_xy(vec).map_err(|e| {
+                            let mut bounder = self.bounder.create_instance();
+                            bounder.update_wkb_bytes(vec).map_err(|e| {
                                 exec_datafusion_err!(
                                     "Error computing bounds for literal in pruning expression: {e}"
                                 )
                             })?;
 
                             if let Some(distance) = distance {
-                                return Ok(out.expand_by(distance));
-                            } else {
-                                return Ok(out);
+                                bounder.expand_by_distance(distance, None).map_err(|e| {
+                                    exec_datafusion_err!("Error expanding literal bounds: {e}")
+                                })?;
                             }
+
+                            let (x, y) = bounder.finish();
+                            return Ok(BoundingBox::xy(x, y));
+                        } else {
+                            return Ok(BoundingBox::empty());
                         }
                     }
                     _ => {}

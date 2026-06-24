@@ -43,20 +43,23 @@ use parquet::{
     geospatial::statistics::GeospatialStatistics,
 };
 use sedona_expr::{
-    spatial_filter::{SpatialFilter, SpatialFilterFactory, TableGeoStatistics},
+    spatial_filter::{LiteralBounder, SpatialFilter, SpatialFilterFactory, TableGeoStatistics},
     statistics::GeoStatistics,
 };
 use sedona_geometry::{
     bounding_box::BoundingBox,
+    bounds::WkbBounder2D,
     interval::{Interval, IntervalTrait},
     types::{GeometryTypeAndDimensions, GeometryTypeAndDimensionsSet},
 };
-use sedona_schema::{datatypes::SedonaType, matchers::ArgMatcher};
+use sedona_schema::{
+    datatypes::{Edges, SedonaType},
+    matchers::ArgMatcher,
+};
 
 use crate::{
     metadata::{GeoParquetColumnEncoding, GeoParquetMetadata},
     options::TableGeoParquetOptions,
-    statistics_accumulator::GeographyLiteralBounder,
 };
 
 #[derive(Clone)]
@@ -114,6 +117,11 @@ pub(crate) struct GeoParquetFileOpener {
     pub metrics: GeoParquetFileOpenerMetrics,
     pub options: TableGeoParquetOptions,
     pub metadata_cache: Option<Arc<dyn FileMetadataCache>>,
+    /// Optional bounder for spherical edges (geography)
+    ///
+    /// When provided, enables spatial pruning for GEOGRAPHY columns.
+    /// This is typically obtained from `SedonaOptions::runtime.bounder()`.
+    pub spherical_bounder: Option<Arc<dyn WkbBounder2D>>,
 }
 
 impl FileOpener for GeoParquetFileOpener {
@@ -137,8 +145,15 @@ impl FileOpener for GeoParquetFileOpener {
 
             if self_clone.enable_pruning {
                 if let Some(predicate) = self_clone.predicate.as_ref() {
-                    let factory = SpatialFilterFactory::default()
-                        .with_bounder(Arc::new(GeographyLiteralBounder));
+                    let mut factory = SpatialFilterFactory::default();
+
+                    // Add spherical bounder if available for GEOGRAPHY support
+                    if let Some(ref spherical_bounder) = self_clone.spherical_bounder {
+                        factory = factory.with_bounder(LiteralBounder::new(
+                            Edges::Spherical,
+                            spherical_bounder.clone(),
+                        ));
+                    }
 
                     let spatial_filter = factory.try_from_expr(predicate)?;
 

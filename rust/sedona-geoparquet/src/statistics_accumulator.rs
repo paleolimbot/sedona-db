@@ -17,7 +17,7 @@
 
 use std::sync::Arc;
 
-use datafusion_common::{Result, ScalarValue};
+use datafusion_common::Result;
 use parquet::{
     basic::LogicalType,
     geospatial::accumulator::{
@@ -26,9 +26,6 @@ use parquet::{
     },
     schema::types::ColumnDescPtr,
 };
-use sedona_common::sedona_internal_err;
-use sedona_expr::spatial_filter::LiteralBounder;
-use sedona_schema::datatypes::SedonaType;
 
 /// Factory for Parquet GeoStatsAccumulators that can handle Geography
 pub struct SedonaGeoStatsAccumulatorFactory;
@@ -65,89 +62,6 @@ impl GeoStatsAccumulatorFactory for SedonaGeoStatsAccumulatorFactory {
         }
 
         Box::new(VoidGeoStatsAccumulator::default())
-    }
-}
-
-/// LiteralBounder implementation capable of bounding geography scalars
-#[derive(Debug, Default)]
-pub struct GeographyLiteralBounder;
-
-#[cfg(not(feature = "s2geography"))]
-impl LiteralBounder for GeographyLiteralBounder {
-    fn can_bound(&self, _sedona_type: &SedonaType) -> bool {
-        false
-    }
-
-    fn bound_scalar(
-        &self,
-        _value: &ScalarValue,
-        _sedona_type: &SedonaType,
-        _distance: Option<f64>,
-    ) -> Result<sedona_geometry::bounding_box::BoundingBox> {
-        sedona_internal_err!("dummy bound_scalar() should not be called")
-    }
-}
-
-#[cfg(feature = "s2geography")]
-impl LiteralBounder for GeographyLiteralBounder {
-    fn can_bound(&self, sedona_type: &SedonaType) -> bool {
-        matches!(
-            sedona_type,
-            SedonaType::Wkb(sedona_schema::datatypes::Edges::Spherical, _)
-                | SedonaType::WkbView(sedona_schema::datatypes::Edges::Spherical, _)
-        )
-    }
-
-    fn bound_scalar(
-        &self,
-        value: &ScalarValue,
-        sedona_type: &SedonaType,
-        distance: Option<f64>,
-    ) -> Result<sedona_geometry::bounding_box::BoundingBox> {
-        use sedona_geometry::bounds::WkbBounder2D;
-        use sedona_s2geography::rect_bounder::WkbGeographyBounder;
-        use sedona_schema::crs::lnglat;
-
-        match &sedona_type {
-            SedonaType::Wkb(sedona_schema::datatypes::Edges::Spherical, crs)
-            | SedonaType::WkbView(sedona_schema::datatypes::Edges::Spherical, crs) => match value {
-                ScalarValue::Binary(maybe_vec) | ScalarValue::BinaryView(maybe_vec) => {
-                    if let Some(vec) = maybe_vec {
-                        let mut bounder = WkbGeographyBounder::default();
-                        bounder.update_wkb_bytes(vec).map_err(|e| {
-                            datafusion_common::exec_datafusion_err!(
-                                "Error bounding geography literal: {e}"
-                            )
-                        })?;
-
-                        if let Some(distance) = distance {
-                            // When we support custom CRSes for geography fully we can remove this
-                            if crs.is_some() && crs != &lnglat() {
-                                return sedona_internal_err!(
-                                    "Can't expand geography bounds for crs {crs:?}"
-                                );
-                            }
-
-                            bounder.expand_by_distance(distance, None).map_err(|e| {
-                                datafusion_common::exec_datafusion_err!(
-                                    "Error expanding literal bounds: {e}"
-                                )
-                            })?;
-                        }
-
-                        let (x, y) = bounder.finish();
-                        return Ok(sedona_geometry::bounding_box::BoundingBox::xy(x, y));
-                    } else {
-                        // Null scalar
-                        return Ok(sedona_geometry::bounding_box::BoundingBox::empty());
-                    }
-                }
-                _ => {}
-            },
-            _ => {}
-        }
-
-        sedona_internal_err!("Unexpected scalar type in filter expression ({sedona_type:?})")
     }
 }
 
@@ -254,21 +168,30 @@ impl GeoStatsAccumulator for GeographyGeoStatsAccumulator {
 
 #[cfg(test)]
 mod test {
+    #[allow(unused_imports)]
     use super::*;
-    use parquet::geospatial::bounding_box::BoundingBox;
-    use sedona_schema::datatypes::{WKB_GEOGRAPHY, WKB_VIEW_GEOGRAPHY};
-    use sedona_testing::create::create_scalar;
 
-    #[test]
-    fn test_factory() {}
+    #[cfg(feature = "s2geography")]
+    use parquet::geospatial::bounding_box::BoundingBox;
+
+    use sedona_schema::datatypes::{WKB_GEOGRAPHY, WKB_VIEW_GEOGRAPHY};
+
+    #[cfg(feature = "s2geography")]
+    use sedona_testing::create::create_scalar;
 
     #[cfg(feature = "s2geography")]
     #[test]
     fn test_literal_bounder() {
+        use std::sync::Arc;
+
+        use sedona_expr::spatial_filter::LiteralBounder;
         use sedona_geometry::interval::IntervalTrait;
+        use sedona_s2geography::rect_bounder::WkbGeographyBounder;
+        use sedona_schema::datatypes::Edges;
 
         for sedona_type in [WKB_GEOGRAPHY, WKB_VIEW_GEOGRAPHY] {
-            let bounder = GeographyLiteralBounder;
+            let bounder =
+                LiteralBounder::new(Edges::Spherical, Arc::new(WkbGeographyBounder::default()));
             assert!(bounder.can_bound(&sedona_type));
 
             let scalar = create_scalar(Some("MULTIPOINT ((-179 42), (179 43))"), &sedona_type);
@@ -302,13 +225,13 @@ mod test {
     #[cfg(not(feature = "s2geography"))]
     #[test]
     fn test_literal_bounder() {
+        use sedona_expr::spatial_filter::LiteralBounder;
+
         for sedona_type in [WKB_GEOGRAPHY, WKB_VIEW_GEOGRAPHY] {
-            let scalar = create_scalar(Some("MULTIPOINT ((-179 42), (179 43))"), &sedona_type);
-            let bounder = GeographyLiteralBounder;
+            // Without s2geography, we can't create a spherical bounder, so this test
+            // just verifies that the planar bounder doesn't handle geography types
+            let bounder = LiteralBounder::planar();
             assert!(!bounder.can_bound(&sedona_type));
-            bounder
-                .bound_scalar(&scalar, &sedona_type, None)
-                .unwrap_err();
         }
     }
 

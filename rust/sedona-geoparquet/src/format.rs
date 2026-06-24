@@ -55,6 +55,7 @@ use object_store::{ObjectMeta, ObjectStore};
 use sedona_common::{sedona_internal_datafusion_err, sedona_internal_err};
 
 use sedona_expr::metadata_preserving_column::MetadataPreservingColumn;
+use sedona_geometry::bounds::WkbBounder2D;
 use sedona_schema::extension_type::ExtensionType;
 
 use crate::{
@@ -404,6 +405,11 @@ pub struct GeoParquetFileSource {
     predicate: Option<Arc<dyn PhysicalExpr>>,
     options: TableGeoParquetOptions,
     metadata_cache: Option<Arc<dyn FileMetadataCache>>,
+    /// Optional bounder for spherical edges (geography)
+    ///
+    /// When provided, enables spatial pruning for GEOGRAPHY columns.
+    /// This is typically obtained from `SedonaOptions::runtime.bounder()`.
+    spherical_bounder: Option<Arc<dyn WkbBounder2D>>,
 }
 
 impl GeoParquetFileSource {
@@ -416,7 +422,17 @@ impl GeoParquetFileSource {
             predicate: None,
             options,
             metadata_cache: None,
+            spherical_bounder: None,
         }
+    }
+
+    /// Set the spherical bounder for geography support
+    ///
+    /// This bounder is used for spatial pruning of GEOGRAPHY columns.
+    /// Typically obtained from `SedonaOptions::runtime.bounder()`.
+    pub fn with_spherical_bounder(mut self, bounder: Arc<dyn WkbBounder2D>) -> Self {
+        self.spherical_bounder = Some(bounder);
+        self
     }
 
     pub fn with_options(&self, options: TableGeoParquetOptions) -> Self {
@@ -474,6 +490,7 @@ impl GeoParquetFileSource {
                     parquet_source.table_parquet_options().clone(),
                 ),
                 metadata_cache: None,
+                spherical_bounder: None,
             })
         } else {
             sedona_internal_err!("GeoParquetFileSource constructed from non-ParquetSource")
@@ -488,6 +505,7 @@ impl GeoParquetFileSource {
             predicate: Some(predicate),
             options: self.options.clone(),
             metadata_cache: self.metadata_cache.clone(),
+            spherical_bounder: self.spherical_bounder.clone(),
         }
     }
 
@@ -499,6 +517,7 @@ impl GeoParquetFileSource {
             predicate: self.predicate.clone(),
             options: self.options.clone(),
             metadata_cache: self.metadata_cache.clone(),
+            spherical_bounder: self.spherical_bounder.clone(),
         }
     }
 
@@ -513,6 +532,7 @@ impl GeoParquetFileSource {
             predicate: self.predicate.clone(),
             options: self.options.clone(),
             metadata_cache: self.metadata_cache.clone(),
+            spherical_bounder: self.spherical_bounder.clone(),
         }
     }
 }
@@ -544,6 +564,7 @@ impl FileSource for GeoParquetFileSource {
             metrics: GeoParquetFileOpenerMetrics::new(self.inner.metrics()),
             options: self.options.clone(),
             metadata_cache: self.metadata_cache.clone(),
+            spherical_bounder: self.spherical_bounder.clone(),
         }))
     }
 
@@ -563,6 +584,7 @@ impl FileSource for GeoParquetFileSource {
                 )?;
                 updated_inner.options = self.options.clone();
                 updated_inner.metadata_cache = self.metadata_cache.clone();
+                updated_inner.spherical_bounder = self.spherical_bounder.clone();
                 Ok(inner_result.with_updated_node(Arc::new(updated_inner)))
             }
             None => Ok(inner_result),
@@ -581,6 +603,7 @@ impl FileSource for GeoParquetFileSource {
         );
         source.options = self.options.clone();
         source.metadata_cache = self.metadata_cache.clone();
+        source.spherical_bounder = self.spherical_bounder.clone();
         Arc::new(source)
     }
 
@@ -615,6 +638,7 @@ impl FileSource for GeoParquetFileSource {
                 )?;
                 updated_source.options = self.options.clone();
                 updated_source.metadata_cache = self.metadata_cache.clone();
+                updated_source.spherical_bounder = self.spherical_bounder.clone();
                 Ok(Some(Arc::new(updated_source)))
             }
             None => Ok(None),

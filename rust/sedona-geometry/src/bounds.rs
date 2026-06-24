@@ -54,6 +54,12 @@ pub trait WkbBounder2D: std::fmt::Debug + Send + Sync {
 
     /// Compute the memory used by this instance
     fn mem_used(&self) -> usize;
+
+    /// Create a new empty instance of this bounder
+    ///
+    /// This is used to create temporary bounders for computing bounds without
+    /// requiring mutable access to a shared instance.
+    fn create_instance(&self) -> Box<dyn WkbBounder2D>;
 }
 
 #[derive(Debug, Default)]
@@ -107,6 +113,10 @@ impl WkbBounder2D for WkbGeometryBounder {
 
     fn mem_used(&self) -> usize {
         size_of::<Self>()
+    }
+
+    fn create_instance(&self) -> Box<dyn WkbBounder2D> {
+        Box::new(Self::default())
     }
 }
 
