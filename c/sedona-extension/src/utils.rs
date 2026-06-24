@@ -362,14 +362,25 @@ impl Iterator for StreamingRecordBatchReader {
     type Item = std::result::Result<RecordBatch, ArrowError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut stream = self.stream.lock().unwrap();
-        tokio::task::block_in_place(|| {
-            self.runtime.block_on(async {
-                match stream.next().await {
-                    Some(Ok(batch)) => Some(Ok(batch)),
-                    Some(Err(e)) => Some(Err(ArrowError::ExternalError(Box::new(e)))),
-                    None => None,
-                }
+        let stream = &self.stream;
+        let runtime = &self.runtime;
+
+        std::thread::scope(|s| {
+            s.spawn(|| {
+                let mut guard = stream.lock().unwrap();
+                runtime.block_on(async {
+                    match guard.next().await {
+                        Some(Ok(batch)) => Some(Ok(batch)),
+                        Some(Err(e)) => Some(Err(ArrowError::ExternalError(Box::new(e)))),
+                        None => None,
+                    }
+                })
+            })
+            .join()
+            .unwrap_or_else(|_| {
+                Some(Err(ArrowError::InvalidArgumentError(
+                    "Iterator thread panicked".to_string(),
+                )))
             })
         })
     }

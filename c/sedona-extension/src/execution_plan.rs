@@ -758,7 +758,7 @@ mod tests {
         (imported, task_ctx)
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_execution_plan_roundtrip_schema() {
         let (imported, _) = setup_imported_plan();
 
@@ -768,13 +768,13 @@ mod tests {
         assert_eq!(imported.schema().field(1).name(), "value");
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_execution_plan_roundtrip_name() {
         let (imported, _) = setup_imported_plan();
         assert_eq!(imported.name(), "ImportedSedonaCExec<DummyExec>");
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_execution_plan_roundtrip_properties() {
         // Test all EmissionType variants
         for (emission_type, expected_str) in [
@@ -837,7 +837,7 @@ mod tests {
         );
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_execution_plan_roundtrip_display_as() {
         let (imported, _) = setup_imported_plan();
 
@@ -866,7 +866,7 @@ mod tests {
         );
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_execution_plan_roundtrip_debug_string() {
         let (imported, _) = setup_imported_plan();
 
@@ -878,7 +878,7 @@ mod tests {
         );
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_execution_plan_roundtrip_execute() {
         let (imported, task_ctx) = setup_imported_plan();
 

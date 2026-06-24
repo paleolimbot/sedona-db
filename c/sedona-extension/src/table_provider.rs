@@ -76,16 +76,18 @@ impl ExportedTableProvider {
         projection: Option<Vec<usize>>,
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        // Convert projection to the expected format
-        let projection_ref = projection.as_ref();
-
-        // Execute the scan - we use block_in_place to allow blocking within an async context
         let inner = self.inner.clone();
-        let session = self.session.as_ref();
-        tokio::task::block_in_place(|| {
-            self.runtime
-                .block_on(async { inner.scan(session, projection_ref, &[], limit).await })
+        let session = self.session.clone();
+        let runtime = self.runtime.clone();
+
+        std::thread::spawn(move || {
+            let projection_ref = projection.as_ref();
+            runtime.block_on(inner.scan(session.as_ref(), projection_ref, &[], limit))
         })
+        .join()
+        .map_err(|_| {
+            datafusion_common::DataFusionError::Internal("Scan thread panicked".to_string())
+        })?
     }
 
     fn get_property(&self, property: &str) -> Result<String> {
@@ -444,7 +446,7 @@ mod tests {
         Ok(ctx)
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_roundtrip_simple_select() -> Result<()> {
         let ctx = create_test_context().await?;
 
@@ -487,7 +489,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_roundtrip_projection() -> Result<()> {
         let ctx = create_test_context().await?;
 
@@ -528,7 +530,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_roundtrip_filter() -> Result<()> {
         let ctx = create_test_context().await?;
 
@@ -571,7 +573,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_roundtrip_sort() -> Result<()> {
         let ctx = create_test_context().await?;
 
@@ -614,7 +616,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_roundtrip_limit() -> Result<()> {
         let ctx = create_test_context().await?;
 
@@ -649,7 +651,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_roundtrip_all_columns() -> Result<()> {
         let ctx = create_test_context().await?;
 
@@ -742,7 +744,7 @@ mod tests {
         ImportedTableProvider::try_new(ffi_provider).expect("Failed to import table provider")
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_table_provider_roundtrip_schema() -> Result<()> {
         let imported = setup_imported_provider_with(TableType::Base);
 
@@ -757,7 +759,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_table_provider_roundtrip_table_type() -> Result<()> {
         for table_type in [TableType::Base, TableType::View, TableType::Temporary] {
             let imported = setup_imported_provider_with(table_type);
