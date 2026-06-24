@@ -46,16 +46,14 @@ use sedona_expr::{
     spatial_filter::{LiteralBounder, SpatialFilter, SpatialFilterFactory, TableGeoStatistics},
     statistics::GeoStatistics,
 };
+use sedona_geometry::types::Edges;
 use sedona_geometry::{
     bounding_box::BoundingBox,
     bounds::WkbBounder2D,
     interval::{Interval, IntervalTrait},
     types::{GeometryTypeAndDimensions, GeometryTypeAndDimensionsSet},
 };
-use sedona_schema::{
-    datatypes::{Edges, SedonaType},
-    matchers::ArgMatcher,
-};
+use sedona_schema::{datatypes::SedonaType, matchers::ArgMatcher};
 
 use crate::{
     metadata::{GeoParquetColumnEncoding, GeoParquetMetadata},

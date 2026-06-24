@@ -29,11 +29,9 @@ use sedona_geometry::{
     bounding_box::BoundingBox,
     bounds::{WkbBounder2D, WkbGeometryBounder},
     interval::{Interval, IntervalTrait},
+    types::Edges,
 };
-use sedona_schema::{
-    datatypes::{Edges, SedonaType},
-    schema::SedonaSchema,
-};
+use sedona_schema::{datatypes::SedonaType, schema::SedonaSchema};
 
 use crate::{
     metadata_preserving_column::MetadataPreservingColumn,

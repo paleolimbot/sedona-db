@@ -17,6 +17,7 @@
 use arrow_schema::{DataType, Field};
 use datafusion_common::error::Result;
 use sedona_common::{sedona_internal_datafusion_err, sedona_internal_err};
+use sedona_geometry::types::Edges;
 use serde_json::Value;
 use std::fmt::{Debug, Display};
 use std::sync::LazyLock;
@@ -38,19 +39,6 @@ impl From<DataType> for SedonaType {
     fn from(value: DataType) -> Self {
         Self::Arrow(value)
     }
-}
-
-/// Edge interpolations
-///
-/// While at the logical level we refer to geometries and geographies, at the execution
-/// layer we can reuse implementations for structural manipulation more efficiently if
-/// we consider the edge interpolation as a parameter of the physical type. This maps to
-/// the concept of "edges" in GeoArrow and "algorithm" in Parquet and Iceberg (where the
-/// planar case would be resolved to a geometry instead of a geography).
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum Edges {
-    Planar,
-    Spherical,
 }
 
 /// Sentinel for [`SedonaType::Wkb`] with planar edges

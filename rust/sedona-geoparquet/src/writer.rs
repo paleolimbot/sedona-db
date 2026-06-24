@@ -50,13 +50,14 @@ use geo_traits::GeometryTrait;
 use sedona_common::{sedona_internal_err, SedonaOptions, SedonaRuntime};
 use sedona_expr::scalar_udf::{SedonaScalarKernel, SedonaScalarUDF};
 use sedona_functions::executor::WkbExecutor;
+use sedona_geometry::types::Edges;
 use sedona_geometry::{
     bounds::geo_traits_update_xy_bounds,
     interval::{Interval, IntervalTrait},
 };
 use sedona_schema::{
     crs::{deserialize_crs_from_obj, lnglat, Crs},
-    datatypes::{Edges, SedonaType},
+    datatypes::SedonaType,
     matchers::ArgMatcher,
     schema::SedonaSchema,
 };

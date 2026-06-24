@@ -186,8 +186,8 @@ mod test {
 
         use sedona_expr::spatial_filter::LiteralBounder;
         use sedona_geometry::interval::IntervalTrait;
+        use sedona_geometry::types::Edges;
         use sedona_s2geography::rect_bounder::WkbGeographyBounder;
-        use sedona_schema::datatypes::Edges;
 
         for sedona_type in [WKB_GEOGRAPHY, WKB_VIEW_GEOGRAPHY] {
             let bounder =

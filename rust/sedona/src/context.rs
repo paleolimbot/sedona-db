@@ -726,9 +726,10 @@ mod tests {
     use arrow_schema::{DataType, Field, Schema};
     use datafusion::assert_batches_eq;
     use sedona_datasource::spec::{Object, OpenReaderArgs};
+    use sedona_geometry::types::Edges;
     use sedona_schema::{
         crs::{deserialize_crs, lnglat},
-        datatypes::{Edges, SedonaType},
+        datatypes::SedonaType,
         schema::SedonaSchema,
     };
     use sedona_testing::data::test_geoparquet;

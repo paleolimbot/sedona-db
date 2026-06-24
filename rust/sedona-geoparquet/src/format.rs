@@ -725,8 +725,9 @@ mod test {
     use datafusion_physical_expr::PhysicalExpr;
 
     use rstest::rstest;
+    use sedona_geometry::types::Edges;
     use sedona_schema::crs::{deserialize_crs, lnglat};
-    use sedona_schema::datatypes::{Edges, SedonaType, WKB_GEOMETRY};
+    use sedona_schema::datatypes::{SedonaType, WKB_GEOMETRY};
     use sedona_schema::schema::SedonaSchema;
     use sedona_testing::create::create_scalar;
     use sedona_testing::data::{geoarrow_data_dir, test_geoparquet};
