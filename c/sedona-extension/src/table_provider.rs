@@ -39,15 +39,6 @@ use crate::extension::{
 };
 use crate::utils::{get_table_provider_string_property, ERRNO_OK};
 
-/// Arguments for a scan operation, serialized as JSON across FFI.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScanArgs {
-    /// Column indices to project, or None for all columns.
-    pub projection: Option<Vec<usize>>,
-    /// Maximum number of rows to return, or None for unlimited.
-    pub limit: Option<usize>,
-}
-
 /// A TableProvider wrapper that can be exported across FFI.
 ///
 /// This wraps an inner TableProvider and exposes it via the SedonaCTableProvider
@@ -157,7 +148,9 @@ unsafe extern "C" fn c_table_provider_get_property_schema(
             ERRNO_OK
         }
         Err(e) => {
-            *err = SedonaCError::new(&format!("Failed to convert field to FFI schema: {}", e));
+            if !err.is_null() {
+                *err = SedonaCError::new(&format!("Failed to convert field to FFI schema: {}", e));
+            }
             libc::EINVAL
         }
     }
@@ -185,7 +178,9 @@ unsafe extern "C" fn c_table_provider_get_property(
             ERRNO_OK
         }
         Err(e) => {
-            *err = SedonaCError::new(&e.to_string());
+            if !err.is_null() {
+                *err = SedonaCError::new(&e.to_string());
+            }
             libc::EINVAL
         }
     }
@@ -216,7 +211,9 @@ unsafe extern "C" fn c_table_provider_scan(
         match serde_json::from_slice(args_slice) {
             Ok(a) => a,
             Err(e) => {
-                *err = SedonaCError::new(&format!("Failed to parse scan args: {}", e));
+                if !err.is_null() {
+                    *err = SedonaCError::new(&format!("Failed to parse scan args: {}", e));
+                }
                 return libc::EINVAL;
             }
         }
@@ -231,7 +228,9 @@ unsafe extern "C" fn c_table_provider_scan(
             ERRNO_OK
         }
         Err(e) => {
-            *err = SedonaCError::new(&e.to_string());
+            if !err.is_null() {
+                *err = SedonaCError::new(&e.to_string());
+            }
             libc::EINVAL
         }
     }
@@ -356,6 +355,15 @@ impl TableProvider for ImportedTableProvider {
         let exec = ImportedSedonaCExec::try_new(ffi_plan)?;
         Ok(Arc::new(exec))
     }
+}
+
+/// Arguments for a scan operation, serialized as JSON across FFI.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ScanArgs {
+    /// Column indices to project, or None for all columns.
+    pub projection: Option<Vec<usize>>,
+    /// Maximum number of rows to return, or None for unlimited.
+    pub limit: Option<usize>,
 }
 
 #[cfg(test)]

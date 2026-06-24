@@ -196,7 +196,9 @@ unsafe extern "C" fn c_exec_plan_get_property_schema(
             ERRNO_OK
         }
         Err(e) => {
-            *err = SedonaCError::new(&format!("Failed to convert field to FFI schema: {}", e));
+            if !err.is_null() {
+                *err = SedonaCError::new(&format!("Failed to convert field to FFI schema: {}", e));
+            }
             libc::EINVAL
         }
     }
@@ -224,7 +226,9 @@ unsafe extern "C" fn c_exec_plan_get_property(
             ERRNO_OK
         }
         Err(e) => {
-            *err = SedonaCError::new(&e.to_string());
+            if !err.is_null() {
+                *err = SedonaCError::new(&e.to_string());
+            }
             libc::EINVAL
         }
     }
@@ -249,7 +253,9 @@ unsafe extern "C" fn c_exec_plan_execute(
     let execute_args: ExecuteArgs = match serde_json::from_slice(args_slice) {
         Ok(a) => a,
         Err(e) => {
-            *err = SedonaCError::new(&format!("Failed to parse execute args: {}", e));
+            if !err.is_null() {
+                *err = SedonaCError::new(&format!("Failed to parse execute args: {}", e));
+            }
             return libc::EINVAL;
         }
     };
@@ -263,7 +269,9 @@ unsafe extern "C" fn c_exec_plan_execute(
             ERRNO_OK
         }
         Err(e) => {
-            *err = SedonaCError::new(&e.to_string());
+            if !err.is_null() {
+                *err = SedonaCError::new(&e.to_string());
+            }
             libc::EINVAL
         }
     }
