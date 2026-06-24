@@ -17,10 +17,12 @@
 use arrow_schema::{DataType, Field};
 use datafusion_common::error::Result;
 use sedona_common::{sedona_internal_datafusion_err, sedona_internal_err};
-use sedona_geometry::types::Edges;
 use serde_json::Value;
 use std::fmt::{Debug, Display};
 use std::sync::LazyLock;
+
+/// Re-export for external crates that depended on this enum in this crate
+pub use sedona_geometry::types::Edges;
 
 use crate::crs::{deserialize_crs, deserialize_crs_from_obj, lnglat, Crs};
 use crate::extension_type::ExtensionType;
