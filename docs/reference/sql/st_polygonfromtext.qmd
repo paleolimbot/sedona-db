@@ -16,43 +16,33 @@
 # specific language governing permissions and limitations
 # under the License.
 
-title: ST_NPoints
-description: Returns the number of points of the geometry or geography.
+title: ST_PolygonFromText
+description: Constructs a Polygon from Well-Known Text (WKT), erroring if the input is not a Polygon.
 kernels:
-  - returns: integer
-    args: [geometry]
-  - returns: integer
-    args: [geography]
+  - returns: geometry
+    args:
+    - name: wkt
+      type: string
+  - returns: geometry
+    args:
+    - name: wkt
+      type: string
+    - name: srid
+      type: crs
 ---
 
 ## Description
 
-Returns the total number of coordinate points in the geometry, counting all vertices across all components.
-
-Aliases: `ST_NumPoints`.
+Parses a WKT string and returns a geometry. Raises an error if the WKT does not represent a Polygon.
 
 ## Examples
 
 ```sql
-SELECT ST_NPoints(
-  ST_GeomFromWKT('LINESTRING (1 2, 3 4, 5 6)')
-);
+SELECT ST_PolygonFromText('POLYGON ((0 0, 4 0, 4 4, 0 4, 0 0))');
 ```
 
-```sql
-SELECT ST_NPoints(
-  ST_GeomFromWKT('POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))')
-);
-```
+With an SRID or CRS:
 
 ```sql
-SELECT ST_NPoints(
-  ST_GeogFromWKT('LINESTRING (1 2, 3 4, 5 6)')
-);
-```
-
-```sql
-SELECT ST_NPoints(
-  ST_GeogFromWKT('POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))')
-);
+SELECT ST_PolygonFromText('POLYGON ((0 0, 4 0, 4 4, 0 4, 0 0))', 4326);
 ```
