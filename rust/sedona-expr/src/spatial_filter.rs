@@ -27,7 +27,7 @@ use geo_traits::Dimensions;
 use sedona_common::sedona_internal_err;
 use sedona_geometry::{
     bounding_box::BoundingBox,
-    bounds::{WkbBounder2DFactory},
+    bounds::WkbBounder2DFactory,
     interval::{Interval, IntervalTrait},
 };
 use sedona_schema::{datatypes::SedonaType, schema::SedonaSchema};
@@ -445,12 +445,14 @@ impl SpatialFilterFactory {
         let edges = match sedona_type {
             SedonaType::Wkb(edges, _) | SedonaType::WkbView(edges, _) => edges,
             _ => {
-                return sedona_internal_err!("Unexpected scalar type in filter expression ({sedona_type:?})")
+                return sedona_internal_err!(
+                    "Unexpected scalar type in filter expression ({sedona_type:?})"
+                )
             }
         };
 
         let Some(bounder_arc) = self.bounder_factory.bounder(edges) else {
-            return sedona_internal_err!("Can't resolve bounder for edge type {edges:?}")
+            return sedona_internal_err!("Can't resolve bounder for edge type {edges:?}");
         };
 
         let wkb_bytes = match literal.value() {
@@ -462,7 +464,9 @@ impl SpatialFilterFactory {
                 }
             }
             _ => {
-                return sedona_internal_err!("Unexpected scalar type in filter expression ({sedona_type:?})")
+                return sedona_internal_err!(
+                    "Unexpected scalar type in filter expression ({sedona_type:?})"
+                )
             }
         };
 
@@ -472,9 +476,9 @@ impl SpatialFilterFactory {
         })?;
 
         if let Some(distance) = distance {
-            bounder.expand_by_distance(distance, None).map_err(|e| {
-                exec_datafusion_err!("Error expanding literal bounds: {e}")
-            })?;
+            bounder
+                .expand_by_distance(distance, None)
+                .map_err(|e| exec_datafusion_err!("Error expanding literal bounds: {e}"))?;
         }
 
         let (x, y) = bounder.finish();
