@@ -43,13 +43,12 @@ use parquet::{
     geospatial::statistics::GeospatialStatistics,
 };
 use sedona_expr::{
-    spatial_filter::{LiteralBounder, SpatialFilter, SpatialFilterFactory, TableGeoStatistics},
+    spatial_filter::{SpatialFilter, SpatialFilterFactory, TableGeoStatistics},
     statistics::GeoStatistics,
 };
-use sedona_geometry::types::Edges;
 use sedona_geometry::{
     bounding_box::BoundingBox,
-    bounds::WkbBounder2D,
+    bounds::WkbBounder2DFactory,
     interval::{Interval, IntervalTrait},
     types::{GeometryTypeAndDimensions, GeometryTypeAndDimensionsSet},
 };
@@ -115,11 +114,11 @@ pub(crate) struct GeoParquetFileOpener {
     pub metrics: GeoParquetFileOpenerMetrics,
     pub options: TableGeoParquetOptions,
     pub metadata_cache: Option<Arc<dyn FileMetadataCache>>,
-    /// Optional bounder for spherical edges (geography)
+    /// Factory for creating bounders used for spatial pruning
     ///
-    /// When provided, enables spatial pruning for GEOGRAPHY columns.
-    /// This is typically obtained from `SedonaOptions::runtime.bounder()`.
-    pub spherical_bounder: Option<Arc<dyn WkbBounder2D>>,
+    /// Enables spatial pruning for both GEOMETRY and GEOGRAPHY columns.
+    /// This is typically obtained from `SedonaOptions::runtime.bounder_factory()`.
+    pub bounder_factory: WkbBounder2DFactory,
 }
 
 impl FileOpener for GeoParquetFileOpener {
@@ -143,15 +142,8 @@ impl FileOpener for GeoParquetFileOpener {
 
             if self_clone.enable_pruning {
                 if let Some(predicate) = self_clone.predicate.as_ref() {
-                    let mut factory = SpatialFilterFactory::default();
-
-                    // Add spherical bounder if available for GEOGRAPHY support
-                    if let Some(ref spherical_bounder) = self_clone.spherical_bounder {
-                        factory = factory.with_bounder(LiteralBounder::new(
-                            Edges::Spherical,
-                            spherical_bounder.clone(),
-                        ));
-                    }
+                    let factory = SpatialFilterFactory::default()
+                        .with_bounder_factory(self_clone.bounder_factory.clone());
 
                     let spatial_filter = factory.try_from_expr(predicate)?;
 

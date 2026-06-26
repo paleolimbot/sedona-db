@@ -27,17 +27,20 @@ use parquet::{
     schema::types::ColumnDescPtr,
 };
 use sedona_common::SedonaRuntime;
-use sedona_geometry::{bounds::WkbBounder2D, types::Edges};
+use sedona_geometry::{
+    bounds::{WkbBounder2D, WkbBounder2DFactory},
+    types::Edges,
+};
 
 /// Factory for Parquet [GeoStatsAccumulator]s that can handle Geography
 pub struct SedonaGeoStatsAccumulatorFactory {
-    spherical_bounder: Option<Arc<dyn WkbBounder2D>>,
+    bounder_factory: WkbBounder2DFactory,
 }
 
 impl SedonaGeoStatsAccumulatorFactory {
     pub fn try_init(runtime: &SedonaRuntime) -> Result<()> {
-        let spherical_bounder = runtime.bounder(Edges::Spherical).ok().cloned();
-        init_geo_stats_accumulator_factory(Arc::new(Self { spherical_bounder }))?;
+        let bounder_factory = runtime.bounder_factory().clone();
+        init_geo_stats_accumulator_factory(Arc::new(Self { bounder_factory }))?;
         Ok(())
     }
 }
@@ -53,10 +56,8 @@ impl GeoStatsAccumulatorFactory for SedonaGeoStatsAccumulatorFactory {
             algorithm: None,
         }) = descr.logical_type_ref()
         {
-            if let Some(ref spherical_bounder) = self.spherical_bounder {
-                return Box::new(GeographyGeoStatsAccumulator::new(
-                    spherical_bounder.create_instance(),
-                ));
+            if let Some(bounder) = self.bounder_factory.bounder_for_edge_type(Edges::Spherical) {
+                return Box::new(GeographyGeoStatsAccumulator::new(bounder));
             }
         }
 
@@ -65,10 +66,8 @@ impl GeoStatsAccumulatorFactory for SedonaGeoStatsAccumulatorFactory {
             algorithm: Some(parquet::basic::EdgeInterpolationAlgorithm::SPHERICAL),
         }) = descr.logical_type_ref()
         {
-            if let Some(ref spherical_bounder) = self.spherical_bounder {
-                return Box::new(GeographyGeoStatsAccumulator::new(
-                    spherical_bounder.create_instance(),
-                ));
+            if let Some(bounder) = self.bounder_factory.bounder_for_edge_type(Edges::Spherical) {
+                return Box::new(GeographyGeoStatsAccumulator::new(bounder));
             }
         }
 
@@ -176,67 +175,6 @@ mod test {
 
     #[cfg(feature = "s2geography")]
     use parquet::geospatial::bounding_box::BoundingBox;
-
-    use sedona_schema::datatypes::{WKB_GEOGRAPHY, WKB_VIEW_GEOGRAPHY};
-
-    #[cfg(feature = "s2geography")]
-    use sedona_testing::create::create_scalar;
-
-    #[cfg(feature = "s2geography")]
-    #[test]
-    fn test_literal_bounder() {
-        use std::sync::Arc;
-
-        use sedona_expr::spatial_filter::LiteralBounder;
-        use sedona_geometry::interval::IntervalTrait;
-        use sedona_geometry::types::Edges;
-        use sedona_s2geography::rect_bounder::WkbGeographyBounder;
-
-        for sedona_type in [WKB_GEOGRAPHY, WKB_VIEW_GEOGRAPHY] {
-            let bounder =
-                LiteralBounder::new(Edges::Spherical, Arc::new(WkbGeographyBounder::default()));
-            assert!(bounder.can_bound(&sedona_type));
-
-            let scalar = create_scalar(Some("MULTIPOINT ((-179 42), (179 43))"), &sedona_type);
-
-            // Check approximate raw bounds
-            let raw_bounds = bounder.bound_scalar(&scalar, &sedona_type, None).unwrap();
-            assert!(raw_bounds.x().is_wraparound());
-            assert!(raw_bounds.x().lo() > 178.99999 && raw_bounds.x().lo() <= 179.0);
-            assert!(raw_bounds.x().hi() >= -179.0 && raw_bounds.x().hi() < -178.99999);
-            assert!(raw_bounds.y().lo() > 41.0 && raw_bounds.y().lo() <= 42.0);
-            assert!(raw_bounds.y().hi() >= 43.0 && raw_bounds.y().hi() < 44.0);
-
-            // Check that expanded bounds are bigger (100 km ~ 0.9 degrees)
-            let expanded_bounds = bounder
-                .bound_scalar(&scalar, &sedona_type, Some(100000.0))
-                .unwrap();
-            assert!(expanded_bounds.x().is_wraparound());
-            assert!(raw_bounds.x().lo() - expanded_bounds.x().lo() > 0.5);
-            assert!(expanded_bounds.x().hi() - raw_bounds.x().hi() > 0.5);
-            assert!(raw_bounds.y().lo() - expanded_bounds.y().lo() > 0.5);
-            assert!(expanded_bounds.y().hi() - raw_bounds.y().hi() > 0.5);
-
-            let null_scalar = create_scalar(None, &sedona_type);
-            let null_bounds = bounder
-                .bound_scalar(&null_scalar, &sedona_type, None)
-                .unwrap();
-            assert!(null_bounds.is_empty());
-        }
-    }
-
-    #[cfg(not(feature = "s2geography"))]
-    #[test]
-    fn test_literal_bounder() {
-        use sedona_expr::spatial_filter::LiteralBounder;
-
-        for sedona_type in [WKB_GEOGRAPHY, WKB_VIEW_GEOGRAPHY] {
-            // Without s2geography, we can't create a spherical bounder, so this test
-            // just verifies that the planar bounder doesn't handle geography types
-            let bounder = LiteralBounder::planar();
-            assert!(!bounder.can_bound(&sedona_type));
-        }
-    }
 
     #[cfg(feature = "s2geography")]
     fn assert_bbox_contains(actual: &BoundingBox, expected: &BoundingBox, epsilon: f64) {

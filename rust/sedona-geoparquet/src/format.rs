@@ -55,7 +55,7 @@ use object_store::{ObjectMeta, ObjectStore};
 use sedona_common::{sedona_internal_datafusion_err, sedona_internal_err, SedonaOptions};
 
 use sedona_expr::metadata_preserving_column::MetadataPreservingColumn;
-use sedona_geometry::{bounds::WkbBounder2D, types::Edges};
+use sedona_geometry::bounds::WkbBounder2DFactory;
 use sedona_schema::extension_type::ExtensionType;
 
 use crate::{
@@ -352,11 +352,9 @@ impl FileFormat for GeoParquetFormat {
             CachedParquetFileReaderFactory::new(object_store, file_metadata_cache),
         ));
 
-        // Inject the spherical bounder from SedonaOptions for geography pruning support
+        // Inject bounder factory from SedonaOptions for geography pruning support
         if let Some(sedona_options) = state.config().options().extensions.get::<SedonaOptions>() {
-            if let Ok(bounder) = sedona_options.runtime.bounder(Edges::Spherical) {
-                source.spherical_bounder = Some(bounder.clone());
-            }
+            source.bounder_factory = sedona_options.runtime.bounder_factory().clone();
         }
 
         let conf = FileScanConfigBuilder::from(config)
@@ -412,11 +410,11 @@ pub struct GeoParquetFileSource {
     predicate: Option<Arc<dyn PhysicalExpr>>,
     options: TableGeoParquetOptions,
     metadata_cache: Option<Arc<dyn FileMetadataCache>>,
-    /// Optional bounder for spherical edges (geography)
+    /// Factory for creating bounders used for spatial pruning
     ///
-    /// When provided, enables spatial pruning for GEOGRAPHY columns.
-    /// This is typically obtained from `SedonaOptions::runtime.bounder()`.
-    spherical_bounder: Option<Arc<dyn WkbBounder2D>>,
+    /// Enables spatial pruning for both GEOMETRY and GEOGRAPHY columns.
+    /// This is typically obtained from `SedonaOptions::runtime.bounder_factory()`.
+    bounder_factory: WkbBounder2DFactory,
 }
 
 impl GeoParquetFileSource {
@@ -429,16 +427,16 @@ impl GeoParquetFileSource {
             predicate: None,
             options,
             metadata_cache: None,
-            spherical_bounder: None,
+            bounder_factory: WkbBounder2DFactory::default(),
         }
     }
 
-    /// Set the spherical bounder for geography support
+    /// Set the bounder factory for spatial pruning support
     ///
-    /// This bounder is used for spatial pruning of GEOGRAPHY columns.
-    /// Typically obtained from `SedonaOptions::runtime.bounder()`.
-    pub fn with_spherical_bounder(mut self, bounder: Arc<dyn WkbBounder2D>) -> Self {
-        self.spherical_bounder = Some(bounder);
+    /// This factory is used for spatial pruning of GEOMETRY and GEOGRAPHY columns.
+    /// Typically obtained from `SedonaOptions::runtime.bounder_factory()`.
+    pub fn with_bounder_factory(mut self, factory: WkbBounder2DFactory) -> Self {
+        self.bounder_factory = factory;
         self
     }
 
@@ -497,7 +495,7 @@ impl GeoParquetFileSource {
                     parquet_source.table_parquet_options().clone(),
                 ),
                 metadata_cache: None,
-                spherical_bounder: None,
+                bounder_factory: WkbBounder2DFactory::default(),
             })
         } else {
             sedona_internal_err!("GeoParquetFileSource constructed from non-ParquetSource")
@@ -512,7 +510,7 @@ impl GeoParquetFileSource {
             predicate: Some(predicate),
             options: self.options.clone(),
             metadata_cache: self.metadata_cache.clone(),
-            spherical_bounder: self.spherical_bounder.clone(),
+            bounder_factory: self.bounder_factory.clone(),
         }
     }
 
@@ -524,7 +522,7 @@ impl GeoParquetFileSource {
             predicate: self.predicate.clone(),
             options: self.options.clone(),
             metadata_cache: self.metadata_cache.clone(),
-            spherical_bounder: self.spherical_bounder.clone(),
+            bounder_factory: self.bounder_factory.clone(),
         }
     }
 
@@ -539,7 +537,7 @@ impl GeoParquetFileSource {
             predicate: self.predicate.clone(),
             options: self.options.clone(),
             metadata_cache: self.metadata_cache.clone(),
-            spherical_bounder: self.spherical_bounder.clone(),
+            bounder_factory: self.bounder_factory.clone(),
         }
     }
 }
@@ -571,7 +569,7 @@ impl FileSource for GeoParquetFileSource {
             metrics: GeoParquetFileOpenerMetrics::new(self.inner.metrics()),
             options: self.options.clone(),
             metadata_cache: self.metadata_cache.clone(),
-            spherical_bounder: self.spherical_bounder.clone(),
+            bounder_factory: self.bounder_factory.clone(),
         }))
     }
 
@@ -591,7 +589,7 @@ impl FileSource for GeoParquetFileSource {
                 )?;
                 updated_inner.options = self.options.clone();
                 updated_inner.metadata_cache = self.metadata_cache.clone();
-                updated_inner.spherical_bounder = self.spherical_bounder.clone();
+                updated_inner.bounder_factory = self.bounder_factory.clone();
                 Ok(inner_result.with_updated_node(Arc::new(updated_inner)))
             }
             None => Ok(inner_result),
@@ -610,7 +608,7 @@ impl FileSource for GeoParquetFileSource {
         );
         source.options = self.options.clone();
         source.metadata_cache = self.metadata_cache.clone();
-        source.spherical_bounder = self.spherical_bounder.clone();
+        source.bounder_factory = self.bounder_factory.clone();
         Arc::new(source)
     }
 
@@ -645,7 +643,7 @@ impl FileSource for GeoParquetFileSource {
                 )?;
                 updated_source.options = self.options.clone();
                 updated_source.metadata_cache = self.metadata_cache.clone();
-                updated_source.spherical_bounder = self.spherical_bounder.clone();
+                updated_source.bounder_factory = self.bounder_factory.clone();
                 Ok(Some(Arc::new(updated_source)))
             }
             None => Ok(None),
