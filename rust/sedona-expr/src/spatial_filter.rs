@@ -432,7 +432,7 @@ impl SpatialFilterFactory {
 
         match sedona_type {
             SedonaType::Wkb(edges, _) | SedonaType::WkbView(edges, _) => {
-                self.bounder_factory.bounder(edges).is_some()
+                self.bounder_factory.bounder_for_edge_type(edges).is_some()
             }
             _ => false,
         }
@@ -451,7 +451,7 @@ impl SpatialFilterFactory {
             }
         };
 
-        let Some(bounder_arc) = self.bounder_factory.bounder(edges) else {
+        let Some(mut bounder) = self.bounder_factory.bounder_for_edge_type(edges) else {
             return sedona_internal_err!("Can't resolve bounder for edge type {edges:?}");
         };
 
@@ -470,7 +470,6 @@ impl SpatialFilterFactory {
             }
         };
 
-        let mut bounder = bounder_arc.create_instance();
         bounder.update_wkb_bytes(wkb_bytes).map_err(|e| {
             exec_datafusion_err!("Error computing bounds for literal in pruning expression: {e}")
         })?;

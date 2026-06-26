@@ -61,14 +61,6 @@ impl WkbBounder2DFactory {
             Edges::Spherical => self.spherical_bounder.as_ref().map(|b| b.create_instance()),
         }
     }
-
-    /// Get a reference to the bounder Arc for a specific edge type
-    pub fn bounder(&self, edges: Edges) -> Option<&Arc<dyn WkbBounder2D>> {
-        match edges {
-            Edges::Planar => self.planar_bounder.as_ref(),
-            Edges::Spherical => self.spherical_bounder.as_ref(),
-        }
-    }
 }
 
 /// Trait defining an abstract bounder
