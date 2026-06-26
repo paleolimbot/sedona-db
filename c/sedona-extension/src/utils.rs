@@ -565,8 +565,8 @@ mod tests {
         assert_eq!(batches.len(), 4);
 
         // First 3 should be Ok
-        for i in 0..3 {
-            assert!(batches[i].is_ok(), "batch {} should be Ok", i);
+        for (i, batch) in batches.iter().enumerate().take(3) {
+            assert!(batch.is_ok(), "batch {} should be Ok", i);
         }
 
         // Last one should be a cancellation error
@@ -648,8 +648,8 @@ mod tests {
         assert_eq!(batches.len(), 4);
 
         // First 3 should be Ok
-        for i in 0..3 {
-            assert!(batches[i].is_ok(), "batch {} should be Ok", i);
+        for (i, batch) in batches.iter().enumerate().take(3) {
+            assert!(batch.is_ok(), "batch {} should be Ok", i);
         }
 
         // Last one should be a cancellation error
