@@ -52,10 +52,10 @@ use datafusion_physical_plan::{
 use futures::{StreamExt, TryStreamExt};
 use object_store::{ObjectMeta, ObjectStore};
 
-use sedona_common::{sedona_internal_datafusion_err, sedona_internal_err};
+use sedona_common::{sedona_internal_datafusion_err, sedona_internal_err, SedonaOptions};
 
 use sedona_expr::metadata_preserving_column::MetadataPreservingColumn;
-use sedona_geometry::bounds::WkbBounder2D;
+use sedona_geometry::{bounds::WkbBounder2D, types::Edges};
 use sedona_schema::extension_type::ExtensionType;
 
 use crate::{
@@ -351,6 +351,13 @@ impl FileFormat for GeoParquetFormat {
         source = source.with_parquet_file_reader_factory(Arc::new(
             CachedParquetFileReaderFactory::new(object_store, file_metadata_cache),
         ));
+
+        // Inject the spherical bounder from SedonaOptions for geography pruning support
+        if let Some(sedona_options) = state.config().options().extensions.get::<SedonaOptions>() {
+            if let Ok(bounder) = sedona_options.runtime.bounder(Edges::Spherical) {
+                source.spherical_bounder = Some(bounder.clone());
+            }
+        }
 
         let conf = FileScanConfigBuilder::from(config)
             .with_source(Arc::new(source))
