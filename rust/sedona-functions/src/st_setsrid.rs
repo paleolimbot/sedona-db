@@ -1040,5 +1040,14 @@ mod test {
         ) -> Result<Rc<dyn CrsTransform>, SedonaGeometryError> {
             Err(SedonaGeometryError::Unknown)
         }
+
+        fn to_projjson(
+            &self,
+            _crs_string: &str,
+        ) -> std::prelude::v1::Result<String, SedonaGeometryError> {
+            Err(SedonaGeometryError::Invalid(
+                "don't even think about it".to_string(),
+            ))
+        }
     }
 }
