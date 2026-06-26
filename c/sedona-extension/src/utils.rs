@@ -24,7 +24,7 @@ use arrow_array::ffi_stream::FFI_ArrowArrayStream;
 use arrow_array::{RecordBatch, RecordBatchReader};
 use arrow_schema::ffi::FFI_ArrowSchema;
 use arrow_schema::{ArrowError, DataType, Field, SchemaRef};
-use datafusion_common::{Result, exec_err};
+use datafusion_common::{exec_err, Result};
 use datafusion_physical_plan::SendableRecordBatchStream;
 use futures::StreamExt;
 use sedona_common::{sedona_internal_datafusion_err, sedona_internal_err};
@@ -496,7 +496,11 @@ mod tests {
         num_batches: usize,
         delay_ms: u64,
     ) -> (SchemaRef, SendableRecordBatchStream) {
-        let schema = Arc::new(Schema::new(vec![Field::new("value", DataType::Int32, false)]));
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "value",
+            DataType::Int32,
+            false,
+        )]));
         let schema_clone = schema.clone();
 
         let stream = futures::stream::iter(0..num_batches).then(move |i| {
@@ -514,9 +518,9 @@ mod tests {
 
         (
             schema.clone(),
-            Box::pin(datafusion_physical_plan::stream::RecordBatchStreamAdapter::new(
-                schema, stream,
-            )),
+            Box::pin(
+                datafusion_physical_plan::stream::RecordBatchStreamAdapter::new(schema, stream),
+            ),
         )
     }
 
@@ -553,7 +557,8 @@ mod tests {
             count >= 3
         });
 
-        let reader = StreamingRecordBatchReader::with_cancel_checker(stream, runtime, cancel_checker);
+        let reader =
+            StreamingRecordBatchReader::with_cancel_checker(stream, runtime, cancel_checker);
         let batches: Vec<_> = reader.collect();
 
         // Should have 3 successful batches + 1 cancellation error
