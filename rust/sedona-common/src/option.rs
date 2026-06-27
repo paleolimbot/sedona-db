@@ -645,7 +645,7 @@ mod tests {
     }
 
     #[test]
-    fn test_default_crs_provider_returns_error() {
+    fn test_default_crs_engine_returns_error() {
         let provider = SedonaRuntime::default();
         let result = provider.crs_engine().to_projjson("EPSG:4326");
         assert!(result.is_err());

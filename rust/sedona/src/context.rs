@@ -119,7 +119,7 @@ impl SedonaContext {
         let mut session_config = session_config.with_option_extension(SedonaOptions::default());
         let target_partitions = session_config.target_partitions();
 
-        // Always register the PROJ CrsProvider by default (if PROJ is not configured
+        // Always register the PROJ LazyProjEngine by default (if PROJ is not configured
         // before it is used an error will be raised).
         let opts = session_config
             .options_mut()
@@ -252,7 +252,7 @@ impl SedonaContext {
         // `AsyncScalarUDFImpl::invoke_async_with_args` only receives
         // `Arc<ConfigOptions>`, so this is the path that keeps the
         // registry reachable at the UDF's invocation site. Mirrors how
-        // `CrsProviderOption` works inside `SedonaOptions`.
+        // `SedonaRuntime` works inside `SedonaOptions`.
         //
         // Writes through `SedonaContext::register_raster_loader` (which
         // mutates the Arc held in `out.raster_loader_registry`) are immediately
