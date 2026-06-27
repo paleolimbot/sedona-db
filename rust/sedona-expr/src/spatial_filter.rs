@@ -672,7 +672,7 @@ mod test {
             .unwrap_err();
         assert!(
             err.message()
-                .contains("Can't resolve bounder for type Null"),
+                .contains("Unexpected scalar type in filter expression"),
             "Actual error was:\n{}",
             err.message()
         );
