@@ -355,8 +355,9 @@ impl DisplayAs for ImportedSedonaCExec {
             DisplayFormatType::TreeRender => "display_tree_render",
         };
 
+        // Always show the wrapper name, with the inner plan's display info
         if let Ok(display_str) = get_plan_string_property(&self.inner, property) {
-            write!(f, "{}", display_str)
+            write!(f, "ImportedSedonaCExec: {}", display_str)
         } else {
             write!(f, "ImportedSedonaCExec")
         }
@@ -851,20 +852,21 @@ mod tests {
             }
         }
 
+        // ImportedSedonaCExec shows itself with the inner plan's display
         assert_eq!(
             format!("{}", DisplayAsFormat(&imported, DisplayFormatType::Default)),
-            "DummyExec: default format"
+            "ImportedSedonaCExec: DummyExec: default format"
         );
         assert_eq!(
             format!("{}", DisplayAsFormat(&imported, DisplayFormatType::Verbose)),
-            "DummyExec: verbose format with schema"
+            "ImportedSedonaCExec: DummyExec: verbose format with schema"
         );
         assert_eq!(
             format!(
                 "{}",
                 DisplayAsFormat(&imported, DisplayFormatType::TreeRender)
             ),
-            "DummyExec: tree render format"
+            "ImportedSedonaCExec: DummyExec: tree render format"
         );
     }
 
