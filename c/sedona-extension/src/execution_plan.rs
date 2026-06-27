@@ -393,8 +393,10 @@ impl ExecutionPlan for ImportedSedonaCExec {
     }
 
     fn maintains_input_order(&self) -> Vec<bool> {
-        get_plan_property::<Vec<bool>, ()>(&self.inner, "maintains_input_order", None)
-            .unwrap_or_default()
+        // ImportedSedonaCExec has no children (it's a leaf node), so we return
+        // an empty Vec. The inner plan's maintains_input_order doesn't apply
+        // since we don't expose the inner plan's children.
+        vec![]
     }
 
     fn metrics(&self) -> Option<MetricsSet> {

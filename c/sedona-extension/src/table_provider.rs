@@ -59,6 +59,9 @@ impl Debug for ExportedTableProvider {
 
 impl ExportedTableProvider {
     /// Create a new ExportedTableProvider from a TableProvider.
+    ///
+    /// The session is used during scan operations and must support physical planning
+    /// if the inner TableProvider requires it (e.g., for Views).
     pub fn new(
         inner: Arc<dyn TableProvider>,
         session: Arc<dyn Session>,
