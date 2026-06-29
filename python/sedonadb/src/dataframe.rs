@@ -96,7 +96,7 @@ impl InternalDataFrame {
         Ok(names)
     }
 
-    fn qualified_column_expr(&self, py: Python<'_>, key: PyObject) -> Result<PyExpr, PyErr> {
+    fn qualified_column_expr(&self, py: Python<'_>, key: Py<PyAny>) -> Result<PyExpr, PyErr> {
         let num_fields = self.inner.schema().fields().len();
         let all_names = || self.inner.schema().field_names();
 
@@ -340,6 +340,33 @@ impl InternalDataFrame {
         Ok(InternalDataFrame::new(inner, self.runtime.clone()))
     }
 
+    /// `INTERSECT ALL` — rows present in both DataFrames, preserving
+    /// multiplicity.
+    fn intersect(&self, other: &InternalDataFrame) -> Result<InternalDataFrame, PySedonaError> {
+        let inner = self.inner.clone().intersect(other.inner.clone())?;
+        Ok(InternalDataFrame::new(inner, self.runtime.clone()))
+    }
+
+    /// `INTERSECT` — rows present in both DataFrames, de-duplicated.
+    fn intersect_distinct(
+        &self,
+        other: &InternalDataFrame,
+    ) -> Result<InternalDataFrame, PySedonaError> {
+        let inner = self.inner.clone().intersect_distinct(other.inner.clone())?;
+        Ok(InternalDataFrame::new(inner, self.runtime.clone()))
+    }
+
+    /// `EXCEPT` (distinct) — the distinct rows in this DataFrame that are
+    /// not in the other. Multiplicity-preserving `EXCEPT ALL` is not
+    /// currently supported by the engine, hence only the distinct variant.
+    fn except_distinct(
+        &self,
+        other: &InternalDataFrame,
+    ) -> Result<InternalDataFrame, PySedonaError> {
+        let inner = self.inner.clone().except_distinct(other.inner.clone())?;
+        Ok(InternalDataFrame::new(inner, self.runtime.clone()))
+    }
+
     fn execute<'py>(&self, py: Python<'py>) -> Result<usize, PySedonaError> {
         let df = self.inner.clone();
         let count = wait_for_future(py, &self.runtime, async move {
@@ -385,12 +412,13 @@ impl InternalDataFrame {
         let schema = self.inner.schema();
         let partitions =
             wait_for_future(py, &self.runtime, self.inner.clone().collect_partitioned())??;
-        let provider = MemTable::try_new(schema.as_arrow().clone().into(), partitions)?;
+        let provider = Arc::new(MemTable::try_new(
+            schema.as_arrow().clone().into(),
+            partitions,
+        )?);
+        let df = ctx.inner.ctx.read_table(provider)?;
 
-        Ok(Self::new(
-            ctx.inner.ctx.read_table(Arc::new(provider))?,
-            self.runtime.clone(),
-        ))
+        Ok(Self::new(df, self.runtime.clone()))
     }
 
     fn to_batches<'py>(
@@ -460,36 +488,54 @@ impl InternalDataFrame {
         #[cfg(not(feature = "s2geography"))]
         let has_geography = false;
 
-        let sort_by_expr = sort_by
-            .into_iter()
-            .map(|name| {
-                let column = Expr::Column(Column::new_unqualified(name.clone()));
-                if geometry_column_names.contains(name.as_str()) {
-                    // Create the call sd_order(column). If we're ordering by geometry but don't have
-                    // the required feature for high quality sort output, give an error. This is mostly
-                    // an issue when using maturin develop because geography is not a default feature.
-                    if has_geography {
-                        let state = ctx.inner.ctx.state();
-                        let order_udf_opt = state.scalar_functions().get("sd_order");
-                        if let Some(order_udf) = order_udf_opt {
-                            Ok(SortExpr::new(order_udf.call(vec![column]), true, false))
-                        } else {
-                            Err(PySedonaError::SedonaPython(
-                                "Can't order by geometry field when sd_order() is not available"
-                                    .to_string(),
-                            ))
-                        }
-                    } else {
-                        Err(PySedonaError::SedonaPython(
-                                "Use maturin develop --features 's2geography,pyo3/extension-module' for dev geography support"
-                                    .to_string(),
-                            ))
-                    }
+        let mut sort_by_expr = Vec::with_capacity(sort_by.len());
+        let mut needs_sd_order = false;
+        for name in sort_by {
+            let column = Expr::Column(Column::new_unqualified(name.clone()));
+            if geometry_column_names.contains(name.as_str()) {
+                if has_geography {
+                    needs_sd_order = true;
+                    sort_by_expr.push((Some(name), column));
                 } else {
-                    Ok(SortExpr::new(column, true, false))
+                    return Err(PySedonaError::SedonaPython(
+                        "Use maturin develop --features 's2geography,pyo3/extension-module' for dev geography support"
+                            .to_string(),
+                    ));
+                }
+            } else {
+                sort_by_expr.push((None, column));
+            }
+        }
+
+        let order_udf = if needs_sd_order {
+            Some(
+                ctx.inner
+                    .ctx
+                    .state()
+                    .scalar_functions()
+                    .get("sd_order")
+                    .cloned()
+                    .ok_or_else(|| {
+                        PySedonaError::SedonaPython(
+                            "Can't order by geometry field when sd_order() is not available"
+                                .to_string(),
+                        )
+                    })?,
+            )
+        } else {
+            None
+        };
+
+        let sort_by_expr = sort_by_expr
+            .into_iter()
+            .map(|(geometry_name, column)| {
+                if geometry_name.is_some() {
+                    SortExpr::new(order_udf.as_ref().unwrap().call(vec![column]), true, false)
+                } else {
+                    SortExpr::new(column, true, false)
                 }
             })
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Vec<_>>();
 
         let write_options = SedonaWriteOptions::new()
             .with_partition_by(partition_by)

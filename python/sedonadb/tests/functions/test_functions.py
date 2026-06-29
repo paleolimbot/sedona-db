@@ -2415,6 +2415,113 @@ def test_st_length(eng, geom, expected):
 
 @pytest.mark.parametrize("eng", [SedonaDB, PostGIS])
 @pytest.mark.parametrize(
+    ("line", "point", "expected"),
+    [
+        (None, None, None),
+        ("LINESTRING (0 0, 0 1)", "POINT (0 0.5)", 0.5),
+        ("LINESTRING (0 0, 0 10)", "POINT (0 0)", 0.0),
+        ("LINESTRING (0 0, 0 10)", "POINT (0 10)", 1.0),
+        ("LINESTRING (0 0, 0 10)", "POINT (0 5)", 0.5),
+        # Point off line — projects to nearest point
+        ("LINESTRING (0 0, 10 0)", "POINT (5 5)", 0.5),
+    ],
+)
+def test_st_linelocatepoint(eng, line, point, expected):
+    eng = eng.create_or_skip()
+    eng.assert_query_result(
+        f"SELECT ST_LineLocatePoint({geom_or_null(line)}, {geom_or_null(point)})",
+        expected,
+        numeric_epsilon=1e-10,
+    )
+
+
+@pytest.mark.parametrize("eng", [SedonaDB])
+@pytest.mark.parametrize(
+    ("line", "point", "expected"),
+    [
+        ("LINESTRING EMPTY", "POINT (0 0)", None),
+        ("LINESTRING (0 0, 1 1)", "POINT EMPTY", None),
+    ],
+)
+def test_st_linelocatepoint_empty_inputs(eng, line, point, expected):
+    eng = eng.create_or_skip()
+    eng.assert_query_result(
+        f"SELECT ST_LineLocatePoint({geom_or_null(line)}, {geom_or_null(point)})",
+        expected,
+    )
+
+
+@pytest.mark.parametrize("eng", [SedonaDB, PostGIS])
+def test_st_linelocatepoint_non_linestring_errors(eng):
+    eng = eng.create_or_skip()
+    with pytest.raises(Exception, match="(LineString)|(linestring)|(line)"):
+        eng.execute_and_collect(
+            "SELECT ST_LineLocatePoint(ST_GeomFromText('POLYGON ((0 0, 1 0, 1 1, 0 0))'), ST_GeomFromText('POINT (0.5 0.5)'))"
+        )
+
+
+@pytest.mark.parametrize("eng", [SedonaDB, PostGIS])
+@pytest.mark.parametrize(
+    ("geom1", "geom2", "expected"),
+    [
+        (None, None, None),
+        ("POINT (0 0)", "POINT (3 4)", 5.0),
+        ("POINT (0 0)", "LINESTRING (0 0, 3 4)", 5.0),
+        ("LINESTRING (0 0, 10 0)", "LINESTRING (0 10, 10 10)", 200.0**0.5),
+        ("POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))", "POINT (5 0)", 26.0**0.5),
+        (
+            "MULTIPOINT ((0 0), (10 0))",
+            "MULTIPOINT ((0 10), (10 10))",
+            200.0**0.5,
+        ),
+        ("LINESTRING EMPTY", "POINT (0 0)", None),
+        ("POINT EMPTY", "POINT (0 0)", None),
+        ("POINT (0 0)", "LINESTRING EMPTY", None),
+        ("POINT (0 0)", "POINT EMPTY", None),
+        ("LINESTRING EMPTY", "LINESTRING EMPTY", None),
+    ],
+)
+def test_st_maxdistance(eng, geom1, geom2, expected):
+    eng = eng.create_or_skip()
+    eng.assert_query_result(
+        f"SELECT ST_MaxDistance({geom_or_null(geom1)}, {geom_or_null(geom2)})",
+        expected,
+        numeric_epsilon=1e-10,
+    )
+
+
+@pytest.mark.parametrize("eng", [SedonaDB, PostGIS])
+@pytest.mark.parametrize(
+    ("geom", "grid_size", "expected"),
+    [
+        (None, 0.001, None),
+        ("POINT (1.123456789 2.987654321)", 0.001, "POINT (1.123 2.988)"),
+        ("POINT (0.1 0.2)", 1.0, "POINT (0 0)"),
+        ("LINESTRING (1.3 2.7, 3.2 4.8)", 1.0, "LINESTRING (1 3, 3 5)"),
+        (
+            "POLYGON ((0.1 0.1, 0.9 0.1, 0.9 0.9, 0.1 0.9, 0.1 0.1))",
+            1.0,
+            "POLYGON ((0 1, 1 1, 1 0, 0 0, 0 1))",
+        ),
+        # Empty geometry input is a no-op: empty in -> empty out, input
+        # dimensionality preserved (no Z promotion). POINT EMPTY renders as
+        # "POINT (nan nan)" due to a geoarrow-c serialisation quirk shared by
+        # both engines.
+        ("POINT EMPTY", 1.0, "POINT (nan nan)"),
+        ("LINESTRING EMPTY", 1.0, "LINESTRING EMPTY"),
+        ("POLYGON EMPTY", 1.0, "POLYGON EMPTY"),
+    ],
+)
+def test_st_reduceprecision(eng, geom, grid_size, expected):
+    eng = eng.create_or_skip()
+    eng.assert_query_result(
+        f"SELECT ST_ReducePrecision({geom_or_null(geom)}, {val_or_null(grid_size)})",
+        expected,
+    )
+
+
+@pytest.mark.parametrize("eng", [SedonaDB, PostGIS])
+@pytest.mark.parametrize(
     ("geom", "expected"),
     [
         (None, None),
