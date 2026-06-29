@@ -43,7 +43,7 @@ use crate::context::InternalContext;
 use crate::error::PySedonaError;
 use crate::expr::{PyExpr, PySortExpr};
 use crate::import_from::{import_arrow_scalar, import_arrow_schema};
-use crate::reader::PySedonaStreamReader;
+use crate::reader::new_py_streaming_reader;
 use crate::runtime::wait_for_future;
 use crate::schema::PySedonaSchema;
 
@@ -422,7 +422,7 @@ impl InternalDataFrame {
         simplify: Option<bool>,
     ) -> Result<StreamingResult, PySedonaError> {
         let stream = wait_for_future(py, &self.runtime, self.inner.clone().execute_stream())??;
-        let reader = PySedonaStreamReader::new(self.runtime.clone(), stream);
+        let reader = new_py_streaming_reader(stream, self.runtime.handle().clone());
         let mut reader: Box<dyn RecordBatchReader + Send> = Box::new(reader);
 
         if simplify.unwrap_or(false) {
