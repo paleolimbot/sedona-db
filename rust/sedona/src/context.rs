@@ -45,9 +45,9 @@ use sedona_common::{
 use sedona_datasource::provider::external_table;
 use sedona_datasource::spec::ExternalFormatSpec;
 use sedona_expr::{
-    scalar_udf::{IntoScalarKernelRefs, SedonaScalarUDF},
     aggregate_udf::{IntoSedonaAccumulatorRefs, SedonaAggregateUDF},
     function_set::FunctionSet,
+    scalar_udf::{IntoScalarKernelRefs, SedonaScalarUDF},
 };
 use sedona_geoparquet::options::TableGeoParquetOptions;
 use sedona_geoparquet::{
