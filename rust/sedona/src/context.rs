@@ -36,7 +36,7 @@ use datafusion::{
     sql::parser::{DFParser, Statement},
 };
 use datafusion_expr::sqlparser::dialect::{dialect_from_str, Dialect};
-use datafusion_expr::{AggregateUDFImpl, LogicalPlan, LogicalPlanBuilder, ScalarUDFImpl, SortExpr};
+use datafusion_expr::{AggregateUDFImpl, ScalarUDFImpl};
 use parking_lot::Mutex;
 use sedona_common::{
     option::add_sedona_option_extension, sedona_internal_datafusion_err, CrsProviderOption,
@@ -49,7 +49,6 @@ use sedona_expr::{
     function_set::FunctionSet,
     scalar_udf::{IntoScalarKernelRefs, SedonaScalarUDF},
 };
-use sedona_geoparquet::options::TableGeoParquetOptions;
 use sedona_geoparquet::{
     format::GeoParquetFormatFactory,
     provider::{geoparquet_listing_table, GeoParquetReadOptions},

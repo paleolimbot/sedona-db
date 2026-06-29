@@ -18,7 +18,7 @@ use adbc_core::PartitionedResult;
 use arrow_array::{RecordBatch, RecordBatchReader};
 use arrow_schema::Schema;
 use sedona::context::SedonaContext;
-use sedona_extension::utils::StreamingRecordBatchReader;
+use sedona_extension::streaming::StreamingRecordBatchReader;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 

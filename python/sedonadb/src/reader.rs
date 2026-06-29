@@ -18,7 +18,7 @@ use std::time::Duration;
 
 use datafusion::execution::SendableRecordBatchStream;
 use pyo3::Python;
-use sedona_extension::utils::StreamingRecordBatchReader;
+use sedona_extension::streaming::StreamingRecordBatchReader;
 
 /// Interval for checking Python signals during batch fetches.
 const INTERVAL_CHECK_SIGNALS: Duration = Duration::from_millis(2_000);
@@ -35,7 +35,7 @@ pub fn new_py_streaming_reader(
 ) -> StreamingRecordBatchReader {
     // Create a cancel checker that checks Python signals
     let cancel_checker: Box<dyn Fn() -> bool + Send + Sync> = Box::new(|| {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             // Run `pass` to process any pending signals, then check for errors
             if py.run(cr"pass", None, None).is_err() {
                 return true;
