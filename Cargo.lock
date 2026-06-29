@@ -5693,6 +5693,7 @@ dependencies = [
  "datafusion",
  "futures",
  "sedona",
+ "sedona-extension",
  "tokio",
 ]
 
