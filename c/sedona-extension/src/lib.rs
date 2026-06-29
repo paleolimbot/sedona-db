@@ -19,5 +19,6 @@ pub mod execution_plan;
 pub mod expr;
 pub mod extension;
 pub mod scalar_kernel;
+pub mod streaming;
 pub mod table_provider;
 pub mod utils;
