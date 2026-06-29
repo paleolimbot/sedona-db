@@ -46,7 +46,7 @@ sedona-schema = { workspace = true }
 sedona-testing = { path = "../../rust/sedona-testing" }
 serde = { workspace = true }
 serde_json = { workspace = true }
-tokio = { workspace = true, features = ["rt-multi-thread"] }
+tokio = { workspace = true }
 
 [dev-dependencies]
 datafusion = { workspace = true, features = ["sql"] }

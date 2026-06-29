@@ -29,27 +29,23 @@ use crate::{
 use arrow_array::RecordBatch;
 use arrow_schema::DataType;
 use async_trait::async_trait;
+use datafusion::datasource::file_format::format_as_file_type;
 use datafusion::{
     common::plan_err,
-    dataframe::DataFrameWriteOptions,
-    datasource::file_format::format_as_file_type,
     error::{DataFusionError, Result},
     execution::{
         context::DataFilePaths,
-        memory_pool::MemoryLimit,
         runtime_env::{RuntimeEnv, RuntimeEnvBuilder},
         SessionStateBuilder,
     },
     prelude::{DataFrame, SessionConfig, SessionContext},
     sql::parser::{DFParser, Statement},
 };
-
+use datafusion::{dataframe::DataFrameWriteOptions, execution::memory_pool::MemoryLimit};
 use datafusion_common::not_impl_err;
-use datafusion_expr::{
-    dml::InsertOp,
-    sqlparser::dialect::{dialect_from_str, Dialect},
-    AggregateUDFImpl, LogicalPlan, LogicalPlanBuilder, ScalarUDFImpl, SortExpr,
-};
+use datafusion_expr::dml::InsertOp;
+use datafusion_expr::sqlparser::dialect::{dialect_from_str, Dialect};
+use datafusion_expr::{AggregateUDFImpl, LogicalPlan, LogicalPlanBuilder, ScalarUDFImpl, SortExpr};
 use parking_lot::Mutex;
 use sedona_common::{
     option::add_sedona_option_extension, sedona_internal_datafusion_err, CrsProviderOption,
@@ -57,10 +53,10 @@ use sedona_common::{
 };
 use sedona_datasource::provider::external_table;
 use sedona_datasource::spec::ExternalFormatSpec;
+use sedona_expr::scalar_udf::{IntoScalarKernelRefs, SedonaScalarUDF};
 use sedona_expr::{
     aggregate_udf::{IntoSedonaAccumulatorRefs, SedonaAggregateUDF},
     function_set::FunctionSet,
-    scalar_udf::{IntoScalarKernelRefs, SedonaScalarUDF},
 };
 use sedona_geoparquet::options::TableGeoParquetOptions;
 use sedona_geoparquet::{
@@ -90,7 +86,7 @@ use sedona_raster::raster_loader::{AsyncRasterLoader, RasterLoaderConfig, Raster
 /// interface for configuring the behaviour of
 pub struct SedonaContext {
     pub ctx: SessionContext,
-    pub functions: RwLock<FunctionSet>,
+    functions: RwLock<FunctionSet>,
     /// Per-session registry of async raster byte loaders, keyed by
     /// `outdb_format`. Held behind an `Arc<RwLock<…>>` so the registered
     /// `RS_EnsureLoaded` UDF instance and any extension crates' `register(&ctx)`
