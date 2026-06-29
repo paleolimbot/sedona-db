@@ -65,13 +65,16 @@ pub fn import_sedona_ffi_table_provider(
     let capsule = obj.getattr("__sedonadb_table_provider__")?.call0()?;
     let contents =
         check_pycapsule(&capsule, "sedonadb_table_provider")? as *mut SedonaCTableProvider;
+
     // Move the SedonaCTableProvider out of the capsule into our ImportedTableProvider.
-    // We null out the release function to prevent double-free when the capsule is dropped.
+    // Clear the structure after reading to prevent double-free when the capsule is dropped.
     let ffi_provider = unsafe {
         let provider = std::ptr::read(contents);
-        (*contents).release = None;
+        // Clear the entire structure to prevent any accidental use
+        std::ptr::write_bytes(contents, 0, 1);
         provider
     };
+    // try_new validates the release callback
     let provider = ImportedTableProvider::try_new(ffi_provider)?;
     Ok(Arc::new(provider))
 }

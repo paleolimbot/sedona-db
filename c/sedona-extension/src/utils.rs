@@ -517,8 +517,12 @@ impl Iterator for StreamingRecordBatchReader {
                 }
                 Some(Err(e)) => {
                     // Check if this was a cancellation error from periodic checking
-                    if e.to_string().contains("Operation cancelled") {
-                        self.cancelled = true;
+                    if let ArrowError::ExternalError(box_err) = &e {
+                        if let Some(io_err) = box_err.downcast_ref::<std::io::Error>() {
+                            if io_err.kind() == std::io::ErrorKind::Interrupted {
+                                self.cancelled = true;
+                            }
+                        }
                     }
                     return Some(Err(e));
                 }

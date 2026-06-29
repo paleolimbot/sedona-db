@@ -315,6 +315,11 @@ impl ImportedSedonaCExec {
     ///
     /// This will query the plan for its schema and properties.
     pub fn try_new(inner: SedonaCExecutionPlan) -> Result<Self> {
+        // Refuse to import a structure without a valid release callback
+        if inner.release.is_none() {
+            return sedona_internal_err!("SedonaCExecutionPlan does not have a release callback");
+        }
+
         // Get schema
         let Some(get_schema) = inner.get_schema else {
             return sedona_internal_err!("SedonaCExecutionPlan does not have get_schema");

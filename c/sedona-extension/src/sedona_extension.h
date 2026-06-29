@@ -229,7 +229,7 @@ struct SedonaCExpr {
   /// \brief Release this instance
   ///
   /// Implementations of this callback must set self->release to NULL.
-  void (*release)(struct SedonaCExecutionPlan* self);
+  void (*release)(struct SedonaCExpr* self);
 
   /// \brief Opaque implementation-specific data
   void* private_data;

@@ -28,7 +28,7 @@ use datafusion_expr::JoinType;
 use datafusion_expr::{select_expr::SelectExpr, Expr, SortExpr};
 use datafusion_ffi::table_provider::FFI_TableProvider;
 use savvy::{savvy, savvy_err, sexp, IntoExtPtrSexp, Result};
-use sedona::context::{SedonaDataFrame, SedonaWriteOptions};
+use sedona::dataframe::{SedonaDataFrame, SedonaWriteOptions};
 use sedona::show::{DisplayMode, DisplayTableOptions};
 use sedona_extension::utils::StreamingRecordBatchReader;
 use sedona_geoparquet::options::TableGeoParquetOptions;

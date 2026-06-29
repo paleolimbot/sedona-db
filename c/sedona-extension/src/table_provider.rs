@@ -268,6 +268,11 @@ impl Debug for ImportedTableProvider {
 impl ImportedTableProvider {
     /// Create a new ImportedTableProvider from a SedonaCTableProvider.
     pub fn try_new(inner: SedonaCTableProvider) -> Result<Self> {
+        // Refuse to import a structure without a valid release callback
+        if inner.release.is_none() {
+            return sedona_internal_err!("SedonaCTableProvider does not have a release callback");
+        }
+
         // Get schema via Arrow C Data Interface
         let Some(get_schema) = inner.get_schema else {
             return sedona_internal_err!("SedonaCTableProvider does not have get_schema");
