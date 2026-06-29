@@ -17,7 +17,6 @@
 mod catalog;
 pub mod context;
 pub mod context_builder;
-pub mod dataframe;
 mod exec;
 pub mod memory_pool;
 mod object_storage;
