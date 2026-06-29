@@ -37,10 +37,8 @@ use sedona_common::{sedona_internal_datafusion_err, sedona_internal_err};
 use serde::{Deserialize, Serialize};
 
 use crate::extension::{SedonaCError, SedonaCExecutionPlan, SedonaCExecutionPlanArgs};
-use crate::utils::{
-    ffi_stream_to_sendable, get_plan_property, get_plan_string_property,
-    StreamingRecordBatchReader, ERRNO_OK,
-};
+use crate::streaming::{ffi_stream_to_sendable, StreamingRecordBatchReader};
+use crate::utils::{get_plan_property, get_plan_string_property, ERRNO_OK};
 
 /// Wrapper around an [ExecutionPlan] that can be exported across FFI.
 pub struct ExportedExecutionPlan {
