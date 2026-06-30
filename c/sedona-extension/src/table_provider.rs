@@ -17,7 +17,7 @@
 
 use std::{
     any::Any,
-    ffi::{c_int, c_void, CStr},
+    ffi::{c_int, c_void},
     fmt::Debug,
     ptr::null_mut,
     sync::Arc,
@@ -37,7 +37,7 @@ use crate::execution_plan::{ExportedExecutionPlan, ImportedSedonaCExec};
 use crate::extension::{
     SedonaCError, SedonaCExecutionPlan, SedonaCExecutionPlanArgs, SedonaCTableProvider,
 };
-use crate::utils::{get_table_provider_string_property, ERRNO_OK};
+use crate::utils::{cstr_from_ptr_or_empty, get_table_provider_string_property, ERRNO_OK};
 
 /// A TableProvider wrapper that can be exported across FFI.
 ///
@@ -131,7 +131,12 @@ unsafe extern "C" fn c_table_provider_get_schema(
     self_: *const SedonaCTableProvider,
     out: *mut FFI_ArrowSchema,
 ) {
-    let provider = &*((*self_).private_data as *const ExportedTableProvider);
+    debug_assert!(!self_.is_null(), "self pointer is null");
+    debug_assert!(!out.is_null(), "out pointer is null");
+    let self_ref = &*self_;
+    debug_assert!(!self_ref.private_data.is_null(), "private_data is null");
+    let provider = &*(self_ref.private_data as *const ExportedTableProvider);
+
     let schema = provider.inner.schema();
     if let Ok(ffi_schema) = FFI_ArrowSchema::try_from(schema.as_ref()) {
         std::ptr::write(out, ffi_schema);
@@ -144,6 +149,7 @@ unsafe extern "C" fn c_table_provider_get_property_schema(
     out: *mut FFI_ArrowSchema,
     err: *mut SedonaCError,
 ) -> c_int {
+    debug_assert!(!out.is_null(), "out pointer is null");
     // All properties are returned as Utf8 strings
     use arrow_schema::{DataType, Field};
     let field = Field::new("value", DataType::Utf8, false);
@@ -168,8 +174,12 @@ unsafe extern "C" fn c_table_provider_get_property(
     out: *mut FFI_ArrowArray,
     err: *mut SedonaCError,
 ) -> c_int {
-    let provider = &*((*self_).private_data as *const ExportedTableProvider);
-    let property_str = CStr::from_ptr(property).to_string_lossy();
+    debug_assert!(!self_.is_null(), "self pointer is null");
+    debug_assert!(!out.is_null(), "out pointer is null");
+    let self_ref = &*self_;
+    debug_assert!(!self_ref.private_data.is_null(), "private_data is null");
+    let provider = &*(self_ref.private_data as *const ExportedTableProvider);
+    let property_str = cstr_from_ptr_or_empty(property);
 
     match provider.get_property(&property_str) {
         Ok(value) => {
@@ -197,10 +207,15 @@ unsafe extern "C" fn c_table_provider_scan(
     out: *mut SedonaCExecutionPlan,
     err: *mut SedonaCError,
 ) -> c_int {
-    let provider = &*((*self_).private_data as *const ExportedTableProvider);
+    debug_assert!(!self_.is_null(), "self pointer is null");
+    debug_assert!(!args.is_null(), "args pointer is null");
+    debug_assert!(!out.is_null(), "out pointer is null");
+    let self_ref = &*self_;
+    let args_ref = &*args;
+    debug_assert!(!self_ref.private_data.is_null(), "private_data is null");
+    let provider = &*(self_ref.private_data as *const ExportedTableProvider);
 
     // Parse scan args
-    let args_ref = &*args;
     let args_slice = if args_ref.args.is_null() || args_ref.args_len == 0 {
         &[]
     } else {
@@ -242,11 +257,13 @@ unsafe extern "C" fn c_table_provider_scan(
 }
 
 unsafe extern "C" fn c_table_provider_release(self_: *mut SedonaCTableProvider) {
-    if !(*self_).private_data.is_null() {
-        let _ = Box::from_raw((*self_).private_data as *mut ExportedTableProvider);
-        (*self_).private_data = null_mut();
+    debug_assert!(!self_.is_null(), "self pointer is null");
+    let self_ref = &mut *self_;
+    if !self_ref.private_data.is_null() {
+        let _ = Box::from_raw(self_ref.private_data as *mut ExportedTableProvider);
+        self_ref.private_data = null_mut();
     }
-    (*self_).release = None;
+    self_ref.release = None;
 }
 
 /// A TableProvider that wraps an imported SedonaCTableProvider.

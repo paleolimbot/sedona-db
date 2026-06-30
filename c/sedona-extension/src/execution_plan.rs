@@ -17,7 +17,7 @@
 
 use std::{
     any::Any,
-    ffi::{c_int, c_void, CStr},
+    ffi::{c_int, c_void},
     fmt::{Debug, Display, Formatter},
     ptr::null_mut,
     sync::Arc,
@@ -38,7 +38,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::extension::{SedonaCError, SedonaCExecutionPlan, SedonaCExecutionPlanArgs};
 use crate::streaming::{ffi_stream_to_sendable, StreamingRecordBatchReader};
-use crate::utils::{get_plan_property, get_plan_string_property, ERRNO_OK};
+use crate::utils::{cstr_from_ptr_or_empty, get_plan_property, get_plan_string_property, ERRNO_OK};
 
 /// Wrapper around an [ExecutionPlan] that can be exported across FFI.
 pub struct ExportedExecutionPlan {
@@ -172,7 +172,12 @@ unsafe extern "C" fn c_exec_plan_get_schema(
     self_: *const SedonaCExecutionPlan,
     out: *mut FFI_ArrowSchema,
 ) {
-    let plan = &*((*self_).private_data as *const ExportedExecutionPlan);
+    debug_assert!(!self_.is_null(), "self pointer is null");
+    debug_assert!(!out.is_null(), "out pointer is null");
+    let self_ref = &*self_;
+    debug_assert!(!self_ref.private_data.is_null(), "private_data is null");
+    let plan = &*(self_ref.private_data as *const ExportedExecutionPlan);
+
     let schema = plan.schema();
     if let Ok(ffi_schema) = FFI_ArrowSchema::try_from(schema.as_ref()) {
         std::ptr::write(out, ffi_schema);
@@ -185,6 +190,7 @@ unsafe extern "C" fn c_exec_plan_get_property_schema(
     out: *mut FFI_ArrowSchema,
     err: *mut SedonaCError,
 ) -> c_int {
+    debug_assert!(!out.is_null(), "out pointer is null");
     // All properties are returned as Utf8 strings (including JSON)
     use arrow_schema::{DataType, Field};
     let field = Field::new("value", DataType::Utf8, false);
@@ -209,8 +215,12 @@ unsafe extern "C" fn c_exec_plan_get_property(
     out: *mut arrow_array::ffi::FFI_ArrowArray,
     err: *mut SedonaCError,
 ) -> c_int {
-    let plan = &*((*self_).private_data as *const ExportedExecutionPlan);
-    let property_str = CStr::from_ptr(property).to_string_lossy();
+    debug_assert!(!self_.is_null(), "self pointer is null");
+    debug_assert!(!out.is_null(), "out pointer is null");
+    let self_ref = &*self_;
+    debug_assert!(!self_ref.private_data.is_null(), "private_data is null");
+    let plan = &*(self_ref.private_data as *const ExportedExecutionPlan);
+    let property_str = cstr_from_ptr_or_empty(property);
 
     match plan.get_property(&property_str) {
         Ok(value) => {
@@ -238,10 +248,14 @@ unsafe extern "C" fn c_exec_plan_execute(
     out: *mut FFI_ArrowArrayStream,
     err: *mut SedonaCError,
 ) -> c_int {
-    let plan = &*((*self_).private_data as *const ExportedExecutionPlan);
-
-    // Parse the execute args
+    debug_assert!(!self_.is_null(), "self pointer is null");
+    debug_assert!(!args.is_null(), "args pointer is null");
+    debug_assert!(!out.is_null(), "out pointer is null");
+    let self_ref = &*self_;
     let args_ref = &*args;
+    debug_assert!(!self_ref.private_data.is_null(), "private_data is null");
+    let plan = &*(self_ref.private_data as *const ExportedExecutionPlan);
+
     let args_slice = if args_ref.args.is_null() || args_ref.args_len == 0 {
         &[]
     } else {
@@ -276,11 +290,13 @@ unsafe extern "C" fn c_exec_plan_execute(
 }
 
 unsafe extern "C" fn c_exec_plan_release(self_: *mut SedonaCExecutionPlan) {
-    if !(*self_).private_data.is_null() {
-        let _ = Box::from_raw((*self_).private_data as *mut ExportedExecutionPlan);
-        (*self_).private_data = null_mut();
+    debug_assert!(!self_.is_null(), "self pointer is null");
+    let self_ref = &mut *self_;
+    if !self_ref.private_data.is_null() {
+        let _ = Box::from_raw(self_ref.private_data as *mut ExportedExecutionPlan);
+        self_ref.private_data = null_mut();
     }
-    (*self_).release = None;
+    self_ref.release = None;
 }
 
 /// An [ExecutionPlan] that wraps an imported [SedonaCExecutionPlan].

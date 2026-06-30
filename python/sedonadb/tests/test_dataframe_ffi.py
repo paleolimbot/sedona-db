@@ -22,7 +22,7 @@ import sedonadb
 from sedonadb.testing import skip_if_not_exists
 
 
-# Test cases: (producer_sql, consumer_sql, description)
+# Test cases: (producer_sql, consumer_sql)
 FFI_TEST_CASES = [
     # Simple select all
     pytest.param(

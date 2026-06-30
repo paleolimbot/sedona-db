@@ -17,7 +17,8 @@
 
 //! Utilities for FFI property access and conversion.
 
-use std::ffi::{c_int, CString};
+use std::borrow::Cow;
+use std::ffi::{c_char, c_int, CStr, CString};
 use std::ptr::null_mut;
 
 use arrow_schema::ffi::FFI_ArrowSchema;
@@ -33,6 +34,21 @@ use crate::extension::{
 
 /// Success return code for FFI functions.
 pub const ERRNO_OK: c_int = 0;
+
+/// Safely convert a C string pointer to a Rust string, treating null as empty.
+///
+/// # Safety
+///
+/// The pointer, if non-null, must point to a valid null-terminated C string.
+/// The string must remain valid for the duration of the returned `Cow`.
+#[inline]
+pub unsafe fn cstr_from_ptr_or_empty(ptr: *const c_char) -> Cow<'static, str> {
+    if ptr.is_null() {
+        Cow::Borrowed("")
+    } else {
+        CStr::from_ptr(ptr).to_string_lossy()
+    }
+}
 
 /// Get the schema for a property from a [SedonaCExecutionPlan].
 ///
@@ -163,6 +179,12 @@ fn parse_ffi_array_to_bytes(
 ) -> Result<Vec<u8>> {
     let data = unsafe { arrow_array::ffi::from_ffi_and_data_type(ffi_array, data_type.clone())? };
     let array = arrow_array::make_array(data);
+
+    if array.len() != 1 || array.null_count() != 0 {
+        return sedona_internal_err!(
+            "Expected get_property() to return non-null array of length 1"
+        );
+    }
 
     // Handle different array types
     match data_type {

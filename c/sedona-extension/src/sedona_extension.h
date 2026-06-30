@@ -231,7 +231,7 @@ struct SedonaCExpr {
   /// \brief Extract a serializable property from this expression
   ///
   /// This is used to implement PlanProperties and other values that can be
-  /// easily retreived and serialized. The data type associated with the out
+  /// easily retrieved and serialized. The data type associated with the out
   /// array may be retrieved with the get_property_schema callback.
   int (*get_property)(const struct SedonaCExpr* self, const char* property,
                       const char* args, struct ArrowArray* out, struct SedonaCError* err);
@@ -287,7 +287,7 @@ struct SedonaCExecutionPlan {
   /// \brief Extract a serializable property from this plan
   ///
   /// This is used to implement PlanProperties and other values that can be
-  /// easily retreived and serialized. The data type associated with the out
+  /// easily retrieved and serialized. The data type associated with the out
   /// array may be retrieved with the get_property_schema callback.
   int (*get_property)(const struct SedonaCExecutionPlan* self, const char* property,
                       struct SedonaCExecutionPlanArgs* args, struct ArrowArray* out,
@@ -345,7 +345,7 @@ struct SedonaCTableProvider {
   /// \brief Extract a serializable property from this table provider
   ///
   /// This is used to implement PlanProperties and other values that can be
-  /// easily retreived and serialized. The data type associated with the out
+  /// easily retrieved and serialized. The data type associated with the out
   /// array may be retrieved with the get_property_schema callback.
   int (*get_property)(const struct SedonaCTableProvider* self, const char* property,
                       struct SedonaCExecutionPlanArgs* args, struct ArrowArray* out,
