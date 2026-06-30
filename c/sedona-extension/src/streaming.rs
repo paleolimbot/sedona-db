@@ -137,7 +137,9 @@ impl StreamingRecordBatchReader {
         // Create channels for communication
         // Use bounded channel with size 0 (rendezvous) for backpressure
         let (request_tx, request_rx) = std::sync::mpsc::sync_channel::<()>(0);
-        let (response_tx, response_rx) = std::sync::mpsc::sync_channel::<BatchResult>(0);
+        // Use bounded channel with size 1 for response to prevent deadlock if reader
+        // stops early due to periodic cancellation before receiving the response
+        let (response_tx, response_rx) = std::sync::mpsc::sync_channel::<BatchResult>(1);
 
         // Spawn the worker thread
         let handle = std::thread::spawn(move || {

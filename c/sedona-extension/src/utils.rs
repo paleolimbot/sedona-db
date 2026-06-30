@@ -41,8 +41,7 @@ pub const ERRNO_OK: c_int = 0;
 ///
 /// The pointer, if non-null, must point to a valid null-terminated C string.
 /// The string must remain valid for the duration of the returned `Cow`.
-#[inline]
-pub unsafe fn cstr_from_ptr_or_empty(ptr: *const c_char) -> Cow<'static, str> {
+pub unsafe fn cstr_from_ptr_or_empty<'a>(ptr: *const c_char) -> Cow<'a, str> {
     if ptr.is_null() {
         Cow::Borrowed("")
     } else {
