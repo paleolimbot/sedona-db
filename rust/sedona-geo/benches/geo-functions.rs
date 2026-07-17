@@ -103,6 +103,22 @@ fn criterion_benchmark(c: &mut Criterion) {
         "st_dwithin",
         ArrayArrayScalar(Point, Polygon(10), Float64(1.0, 2.0)),
     );
+
+    // Hausdorff distance (discrete/vertices)
+    benchmark::scalar(
+        c,
+        &f,
+        "geo",
+        "st_hausdorffdistancevertices",
+        ArrayScalar(Polygon(10), Polygon(10)),
+    );
+    benchmark::scalar(
+        c,
+        &f,
+        "geo",
+        "st_hausdorffdistancevertices",
+        ArrayScalar(Polygon(10), Polygon(500)),
+    );
 }
 
 fn criterion_benchmark_aggr(c: &mut Criterion) {

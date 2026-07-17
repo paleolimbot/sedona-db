@@ -194,6 +194,22 @@ fn criterion_benchmark(c: &mut Criterion) {
         ArrayScalar(Polygon(10), Polygon(500)),
     );
 
+    // Hausdorff distance (continuous)
+    benchmark::scalar(
+        c,
+        &f,
+        "geos",
+        "st_hausdorffdistance",
+        ArrayScalar(Polygon(10), Polygon(10)),
+    );
+    benchmark::scalar(
+        c,
+        &f,
+        "geos",
+        "st_hausdorffdistance",
+        ArrayScalar(Polygon(10), Polygon(500)),
+    );
+
     benchmark::scalar(
         c,
         &f,
