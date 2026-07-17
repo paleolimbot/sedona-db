@@ -24,6 +24,7 @@ pub mod st_concavehull;
 mod st_convexhull_agg;
 mod st_distance;
 mod st_dwithin;
+mod st_hausdorff_distance_vertices;
 mod st_intersection_agg;
 mod st_intersects;
 mod st_length;
