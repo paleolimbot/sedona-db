@@ -32,7 +32,8 @@ result_large_err = "allow"
 
 [dev-dependencies]
 rstest = { workspace = true }
-sedona-testing = { workspace = true }
+# sedona-testing removed to break circular dependency for crates.io publishing
+# sedona-testing = { workspace = true }
 
 [dependencies]
 arrow-array = { workspace = true }

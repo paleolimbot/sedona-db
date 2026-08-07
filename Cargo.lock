@@ -5770,7 +5770,6 @@ dependencies = [
  "sedona-common",
  "sedona-geometry",
  "sedona-schema",
- "sedona-testing",
  "serde",
  "serde_json",
 ]
@@ -5918,7 +5917,6 @@ dependencies = [
  "geo-types",
  "lru 0.18.0",
  "rstest",
- "sedona-testing",
  "serde",
  "serde_json",
  "serde_with",
@@ -6039,7 +6037,6 @@ dependencies = [
  "laz",
  "object_store",
  "rayon",
- "sedona",
  "sedona-expr",
  "sedona-geometry",
  "tempfile",
@@ -6104,7 +6101,6 @@ dependencies = [
  "datafusion-common",
  "sedona-common",
  "sedona-schema",
- "sedona-testing",
  "tokio",
 ]
 

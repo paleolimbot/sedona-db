@@ -40,7 +40,8 @@ sedona-common = { workspace = true }
 sedona-schema = { workspace = true }
 
 [dev-dependencies]
-sedona-testing = { workspace = true }
+# sedona-testing removed to break circular dependency for crates.io publishing
+# sedona-testing = { workspace = true }
 approx = { workspace = true }
 arrow-ipc = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt"] }
