@@ -5809,7 +5809,6 @@ dependencies = [
  "sedona-geometry",
  "sedona-raster",
  "sedona-schema",
- "sedona-testing",
  "serde_json",
  "tokio",
  "wkb",
@@ -5822,7 +5821,6 @@ version = "0.4.0"
 dependencies = [
  "gdal-sys",
  "libloading 0.9.0",
- "sedona-testing",
  "thiserror 2.0.17",
 ]
 
@@ -5871,7 +5869,6 @@ dependencies = [
  "robust",
  "rstar 0.13.0",
  "sedona-geo-traits-ext",
- "sedona-testing",
  "wkb",
  "wkt 0.14.0",
 ]
@@ -5901,11 +5898,9 @@ dependencies = [
  "datafusion-expr",
  "errno",
  "rstest",
- "sedona",
  "sedona-expr",
  "sedona-functions",
  "sedona-schema",
- "sedona-testing",
  "thiserror 2.0.17",
 ]
 
@@ -5980,13 +5975,11 @@ dependencies = [
  "geo-types",
  "geos",
  "rstest",
- "sedona",
  "sedona-common",
  "sedona-expr",
  "sedona-functions",
  "sedona-geometry",
  "sedona-schema",
- "sedona-testing",
  "wkb",
 ]
 
@@ -6194,14 +6187,12 @@ dependencies = [
  "paste",
  "regex",
  "rstest",
- "sedona",
  "sedona-common",
  "sedona-expr",
  "sedona-extension",
  "sedona-functions",
  "sedona-geometry",
  "sedona-schema",
- "sedona-testing",
  "thiserror 2.0.17",
 ]
 
@@ -6368,11 +6359,9 @@ dependencies = [
  "datafusion-expr",
  "geo",
  "rstest",
- "sedona",
  "sedona-expr",
  "sedona-functions",
  "sedona-schema",
- "sedona-testing",
  "thiserror 2.0.17",
  "wkb",
 ]

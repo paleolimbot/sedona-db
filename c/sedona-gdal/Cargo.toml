@@ -42,4 +42,5 @@ gdal-sys = ["dep:gdal-sys"]
 bindgen = ["gdal-sys/bindgen"]
 
 [dev-dependencies]
-sedona-testing = { workspace = true }
+# sedona-testing removed to break circular dependency for crates.io publishing
+# sedona-testing = { workspace = true }

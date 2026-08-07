@@ -35,8 +35,9 @@ regex = { workspace = true }
 [dev-dependencies]
 criterion = { workspace = true }
 rstest = { workspace = true }
-sedona = { workspace = true }
-sedona-testing = { workspace = true, features = ["criterion"] }
+# sedona and sedona-testing removed to break circular dependency for crates.io publishing
+# sedona = { workspace = true }
+# sedona-testing = { workspace = true, features = ["criterion"] }
 
 [dependencies]
 arrow-schema = { workspace = true }
