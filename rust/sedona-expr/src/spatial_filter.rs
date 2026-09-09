@@ -549,10 +549,6 @@ impl std::fmt::Display for UnknownSentinelExpr {
 }
 
 impl PhysicalExpr for UnknownSentinelExpr {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
     fn evaluate(
         &self,
         _batch: &arrow_array::RecordBatch,
