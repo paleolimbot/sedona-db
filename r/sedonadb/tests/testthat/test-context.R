@@ -97,6 +97,15 @@ test_that("scalar udfs can be registered", {
     wk::as_wkt(df$geom),
     wk::wkt("POINT (0 1)")
   )
+
+  geography_df <- sd_sql(
+    "SELECT ST_Envelope(ST_GeogFromText('POINT (1 2)')) as geom"
+  ) |>
+    sd_collect()
+  expect_identical(
+    wk::as_wkt(geography_df$geom),
+    wk::wkt("POINT (1 2)")
+  )
 })
 
 test_that("configure_proj() errors for invalid inputs", {

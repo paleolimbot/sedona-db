@@ -285,6 +285,30 @@ impl SedonaContext {
             extensions.insert(SedonaOptions::default());
         }
 
+        // SedonaContext::new() and callers supplying a plain DataFusion
+        // context do not pass through the interactive constructor, so install
+        // the default geography bounder here as well. Preserve a custom
+        // spherical bounder when one is already configured.
+        #[cfg(feature = "s2geography")]
+        {
+            use sedona_geometry::types::Edges;
+
+            let options = extensions
+                .get_mut::<SedonaOptions>()
+                .expect("SedonaOptions was installed above");
+            if options
+                .runtime
+                .bounder_factory()
+                .bounder_for_edge_type(Edges::Spherical)
+                .is_none()
+            {
+                options.runtime = options.runtime.with_bounder(
+                    Edges::Spherical,
+                    Arc::new(sedona_s2geography::rect_bounder::WkbGeographyBounder::default()),
+                )?;
+            }
+        }
+
         // Stash a clone of the shared registry handle inside
         // `ConfigOptions` via the `RasterLoaderConfig` extension. The
         // RS_EnsureLoaded async UDF reads from there at dispatch time —
@@ -1000,6 +1024,19 @@ mod tests {
             .expect("SedonaOptions should be registered");
 
         assert!(!options.spatial_join.enable);
+    }
+
+    #[cfg(feature = "s2geography")]
+    #[tokio::test]
+    async fn geography_bounds_default_context() {
+        let ctx = SedonaContext::new();
+        ctx.ctx
+            .sql("SELECT ST_XMin(ST_GeogFromText('POINT (1 2)'))")
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
     }
 
     #[tokio::test]

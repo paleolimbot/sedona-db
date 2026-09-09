@@ -24,6 +24,7 @@ use datafusion_expr::ScalarUDFImpl;
 use pyo3::prelude::*;
 use sedona::context::SedonaContext;
 use sedona::context_builder::SedonaContextBuilder;
+use sedona_common::SedonaOptions;
 use sedona_datasource::format::ExternalFormatFactory;
 use sedona_extension::runtime::RuntimeHandle;
 
@@ -263,10 +264,19 @@ impl InternalContext {
         };
 
         if let Some(ScalarUdfLookup::Sedona(sedona_scalar_udf)) = inner {
+            let sedona_options = self
+                .inner
+                .ctx
+                .state()
+                .config_options()
+                .extensions
+                .get::<SedonaOptions>()
+                .cloned();
             Ok(Bound::new(
                 py,
                 PySedonaScalarUdf {
                     inner: sedona_scalar_udf,
+                    sedona_options,
                 },
             )?
             .into_any())
