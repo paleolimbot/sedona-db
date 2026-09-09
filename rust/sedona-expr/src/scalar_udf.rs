@@ -236,6 +236,12 @@ impl SedonaScalarUDF {
         &self.kernels
     }
 
+    /// Replace this UDF's kernels while preserving its name, volatility,
+    /// aliases, and metadata.
+    pub fn with_kernels(self, kernels: Vec<ScalarKernelRef>) -> Self {
+        Self { kernels, ..self }
+    }
+
     /// Create a SedonaScalarUDF from a single kernel
     ///
     /// This constructor creates a [Volatility::Immutable] function with no documentation
