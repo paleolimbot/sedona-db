@@ -21,7 +21,7 @@ use std::{
 
 use crate::exec::create_plan_from_sql;
 use crate::object_storage::ensure_object_store_registered_with_options;
-use crate::url_table::enable_sedona_url_table;
+use crate::url_table::install_sedona_url_table;
 use crate::{
     catalog::DynamicObjectStoreCatalog,
     random_geometry_provider::RandomGeometryFunction,
@@ -265,16 +265,29 @@ impl SedonaContext {
         // `enable_url_table` so directory-shaped external formats (Zarr)
         // resolve to a single-object table rather than a listing over the
         // directory's contents.
-        let ctx = enable_sedona_url_table(SessionContext::new_with_state(state));
+        let ctx = SessionContext::new_with_state(state);
 
-        // Install dynamic catalog provider that can register required object stores
+        // Load the configured catalogs before rebuilding the context below.
         ctx.refresh_catalogs().await?;
-        ctx.register_catalog_list(Arc::new(DynamicObjectStoreCatalog::new(
-            ctx.state().catalog_list().clone(),
-            ctx.state_weak_ref(),
-        )));
 
-        Self::new_from_context(ctx)
+        let out = Self::new_from_context(ctx)?;
+
+        // Install state-dependent catalog wrappers after `new_from_context()`
+        // rebuilds the SessionContext so their weak references point at the
+        // live SessionState.
+        install_sedona_url_table(&out.ctx);
+
+        // Install the dynamic catalog provider only after `new_from_context()`
+        // rebuilds the SessionContext. The provider stores a weak reference to
+        // SessionState; installing it before the rebuild leaves it pointing at
+        // the dropped state and causes catalog misses to report a locking error.
+        out.ctx
+            .register_catalog_list(Arc::new(DynamicObjectStoreCatalog::new(
+                out.ctx.state().catalog_list().clone(),
+                out.ctx.state_weak_ref(),
+            )));
+
+        Ok(out)
     }
 
     /// Creates a new context from a previously configured DataFusion context
