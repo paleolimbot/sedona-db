@@ -28,8 +28,7 @@ use sedona::{
     context::SedonaContext, context_builder::SedonaContextBuilder,
     record_batch_reader_provider::RecordBatchReaderProvider,
 };
-use sedona_common::SedonaOptions;
-use sedona_extension::{runtime::RuntimeHandle, scalar_kernel::with_sedona_options_for_ffi};
+use sedona_extension::{runtime::RuntimeHandle, scalar_kernel::with_config_options_for_ffi};
 use sedona_geoparquet::provider::GeoParquetReadOptions;
 
 use crate::{
@@ -156,15 +155,10 @@ impl InternalContext {
     pub fn scalar_udf_xptr(&self, name: &str) -> savvy::Result<savvy::Sexp> {
         if let Some(udf) = self.inner.ctx.state().scalar_functions().get(name) {
             let udf = if let Some(sedona_udf) = self.inner.scalar_udf(name)? {
-                let state = self.inner.ctx.state();
-                let options = state
-                    .config_options()
-                    .extensions
-                    .get::<SedonaOptions>()
-                    .ok_or_else(|| savvy_err!("SedonaOptions not available"))?;
-                Arc::new(ScalarUDF::from(with_sedona_options_for_ffi(
+                let config_options = self.inner.ctx.state().config_options().clone();
+                Arc::new(ScalarUDF::from(with_config_options_for_ffi(
                     sedona_udf,
-                    options.clone(),
+                    config_options,
                 )?))
             } else {
                 udf.clone()

@@ -34,12 +34,11 @@ use pyo3::{
     types::{PyAnyMethods, PyCapsule, PyTuple, PyTupleMethods},
     Bound, Py, PyAny, Python,
 };
-use sedona_common::SedonaOptions;
 use sedona_expr::aggregate_udf::{SedonaAccumulator, SedonaAccumulatorRef, SedonaAggregateUDF};
 use sedona_expr::scalar_udf::{SedonaScalarKernel, SedonaScalarUDF};
 use sedona_extension::{
     extension::SedonaCScalarKernel,
-    scalar_kernel::{with_sedona_options_for_ffi, ExportedScalarKernel},
+    scalar_kernel::{with_config_options_for_ffi, ExportedScalarKernel},
 };
 use sedona_schema::{datatypes::SedonaType, matchers::ArgMatcher};
 
@@ -133,7 +132,7 @@ impl PyAggregateUdf {
 #[derive(Clone)]
 pub struct PySedonaScalarUdf {
     pub inner: SedonaScalarUDF,
-    pub sedona_options: Option<SedonaOptions>,
+    pub config_options: Arc<ConfigOptions>,
 }
 
 #[pymethods]
@@ -157,11 +156,8 @@ impl PySedonaScalarUdf {
         &self,
         py: Python<'py>,
     ) -> Result<Bound<'py, PyCapsule>, PySedonaError> {
-        let inner = if let Some(sedona_options) = &self.sedona_options {
-            with_sedona_options_for_ffi(self.inner.clone(), sedona_options.clone())?
-        } else {
-            self.inner.clone()
-        };
+        let inner =
+            with_config_options_for_ffi(self.inner.clone(), Arc::clone(&self.config_options))?;
         let scalar_udf: ScalarUDF = inner.into();
         let ffi_scalar_udf = FFI_ScalarUDF::from(Arc::new(scalar_udf));
         Ok(PyCapsule::new_with_value(
@@ -191,9 +187,7 @@ impl PySedonaScalarUdf {
             .map(|kernel| {
                 let mut exported =
                     ExportedScalarKernel::from(kernel.clone()).with_function_name(name);
-                if let Some(sedona_options) = &self.sedona_options {
-                    exported = exported.with_sedona_options(sedona_options.clone());
-                }
+                exported = exported.with_config_options(Arc::clone(&self.config_options));
                 let ffi = SedonaCScalarKernel::from(exported);
                 Ok(PyCapsule::new_with_value(
                     py,
@@ -251,7 +245,7 @@ pub fn sedona_scalar_udf<'py>(
 
     Ok(PySedonaScalarUdf {
         inner: sedona_scalar_udf,
-        sedona_options: None,
+        config_options: Arc::new(ConfigOptions::new()),
     })
 }
 
@@ -304,7 +298,7 @@ pub fn sedona_native_scalar_udf(
     let kernel_refs = imported.into_iter().map(|(_, k)| k).collect();
     Ok(PySedonaScalarUdf {
         inner: SedonaScalarUDF::new(&udf_name, kernel_refs, volatility),
-        sedona_options: None,
+        config_options: Arc::new(ConfigOptions::new()),
     })
 }
 
