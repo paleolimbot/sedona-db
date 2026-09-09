@@ -394,6 +394,10 @@ async fn laz_chunk_table(
     let laz_vlr = header.laz_vlr()?;
 
     let num_points = header.number_of_points();
+    if num_points == 0 {
+        return Ok(Vec::new());
+    }
+
     let mut point_offset = 0;
     let mut byte_offset = offset_to_point_data(header);
 

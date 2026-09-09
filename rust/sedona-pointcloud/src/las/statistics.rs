@@ -428,6 +428,38 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn empty_laz_statistics() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("empty.laz");
+        let mut builder = Builder::from((1, 4));
+        builder.point_format = Format::new(6).unwrap();
+        builder.point_format.is_compressed = true;
+        let mut writer = Writer::from_path(&path, builder.into_header().unwrap()).unwrap();
+        writer.close().unwrap();
+
+        let store = LocalFileSystem::new();
+        let location = Path::from_filesystem_path(&path).unwrap();
+        let object = store.head(&location).await.unwrap();
+        let metadata = LasMetadataReader::new(&store, &object)
+            .fetch_metadata()
+            .await
+            .unwrap();
+        assert_eq!(metadata.header.number_of_points(), 0);
+
+        let options = LasOptions {
+            collect_statistics: true,
+            ..Default::default()
+        };
+        let metadata = LasMetadataReader::new(&store, &object)
+            .with_options(options)
+            .fetch_metadata()
+            .await
+            .unwrap();
+        assert!(metadata.chunk_table.is_empty());
+        assert_eq!(metadata.statistics.as_ref().unwrap().num_containers(), 0);
+    }
+
+    #[tokio::test]
     async fn persist_statistics() {
         let tmpdir = tempfile::tempdir().unwrap();
 
