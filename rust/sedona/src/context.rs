@@ -279,6 +279,11 @@ impl SedonaContext {
 
     /// Creates a new context from a previously configured DataFusion context
     pub fn new_from_context(ctx: SessionContext) -> Result<Self> {
+        // DataFusion #22620 workaround tracked by
+        // https://github.com/apache/sedona-db/issues/1232.
+        let state_builder = register_vendored_optimizer_rules(ctx.into_state_builder())?;
+        let ctx = SessionContext::new_with_state(state_builder.build());
+
         let mut out = Self {
             ctx,
             functions: RwLock::new(FunctionSet::new()),
@@ -1004,27 +1009,32 @@ mod tests {
         // Regression for https://github.com/apache/sedona-db/issues/1232.
         use datafusion::{functions::core::expr_fn::get_field, prelude::col};
 
-        let ctx = SedonaContext::new();
-        let df = ctx
-            .sql(
-                r#"
+        let contexts = [
+            SedonaContext::new(),
+            SedonaContext::new_from_context(SessionContext::new()).unwrap(),
+        ];
+        for ctx in contexts {
+            let df = ctx
+                .sql(
+                    r#"
                 SELECT ST_Dump(
                     ST_GeomFromText('MULTIPOINT (0 0, 1 1)')
                 ) AS dump
                 "#,
-            )
-            .await
-            .unwrap()
-            .unnest_columns(&["dump"])
-            .unwrap()
-            .select(vec![get_field(col("dump"), "geom").alias("geometry")])
-            .unwrap();
+                )
+                .await
+                .unwrap()
+                .unnest_columns(&["dump"])
+                .unwrap()
+                .select(vec![get_field(col("dump"), "geom").alias("geometry")])
+                .unwrap();
 
-        let batches = df.collect().await.unwrap();
-        assert_eq!(
-            batches.iter().map(|batch| batch.num_rows()).sum::<usize>(),
-            2
-        );
+            let batches = df.collect().await.unwrap();
+            assert_eq!(
+                batches.iter().map(|batch| batch.num_rows()).sum::<usize>(),
+                2
+            );
+        }
     }
 
     #[tokio::test]
