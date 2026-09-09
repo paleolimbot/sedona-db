@@ -275,6 +275,16 @@ impl SedonaContext {
             raster_loader_registry: Arc::new(RwLock::new(RasterLoaderRegistry::new())),
         };
 
+        // A plain DataFusion context does not carry Sedona's configuration
+        // extension. Install the defaults here, while preserving options on a
+        // context that was already configured by its caller.
+        let state_ref = out.ctx.state_ref();
+        let mut state = state_ref.write();
+        let extensions = &mut state.config_mut().options_mut().extensions;
+        if extensions.get::<SedonaOptions>().is_none() {
+            extensions.insert(SedonaOptions::default());
+        }
+
         // Stash a clone of the shared registry handle inside
         // `ConfigOptions` via the `RasterLoaderConfig` extension. The
         // RS_EnsureLoaded async UDF reads from there at dispatch time —
@@ -287,15 +297,10 @@ impl SedonaContext {
         // mutates the Arc held in `out.raster_loader_registry`) are immediately
         // visible to UDF reads through this config extension because
         // both handles share the same `RwLock`.
-        out.ctx
-            .state_ref()
-            .write()
-            .config_mut()
-            .options_mut()
-            .extensions
-            .insert(RasterLoaderConfig::from_handle(Arc::clone(
-                &out.raster_loader_registry,
-            )));
+        extensions.insert(RasterLoaderConfig::from_handle(Arc::clone(
+            &out.raster_loader_registry,
+        )));
+        drop(state);
 
         // Register the RS_EnsureLoaded async UDF. It pulls the registry
         // out of `args.config_options` at dispatch time, so it doesn't
@@ -966,6 +971,36 @@ mod tests {
     use tempfile::tempdir;
 
     use super::*;
+
+    #[test]
+    fn new_from_context_installs_default_sedona_options() {
+        let ctx = SedonaContext::new_from_context(SessionContext::new()).unwrap();
+        let state = ctx.ctx.state();
+
+        assert!(state
+            .config_options()
+            .extensions
+            .get::<SedonaOptions>()
+            .is_some());
+    }
+
+    #[test]
+    fn new_from_context_preserves_existing_sedona_options() {
+        let mut options = SedonaOptions::default();
+        options.spatial_join.enable = false;
+        let config = SessionConfig::new().with_option_extension(options);
+        let datafusion_ctx = SessionContext::new_with_config(config);
+
+        let ctx = SedonaContext::new_from_context(datafusion_ctx).unwrap();
+        let state = ctx.ctx.state();
+        let options = state
+            .config_options()
+            .extensions
+            .get::<SedonaOptions>()
+            .expect("SedonaOptions should be registered");
+
+        assert!(!options.spatial_join.enable);
+    }
 
     #[tokio::test]
     async fn outdb_registry_has_gdal_at_bootstrap_and_accepts_runtime_registration() {
