@@ -293,7 +293,7 @@ dependencies = [
  "arrow-schema 57.3.1",
  "arrow-select 57.3.1",
  "atoi",
- "base64",
+ "base64 0.22.1",
  "chrono",
  "comfy-table 7.2.2",
  "half",
@@ -315,7 +315,7 @@ dependencies = [
  "arrow-schema 58.4.0",
  "arrow-select 58.4.0",
  "atoi",
- "base64",
+ "base64 0.22.1",
  "chrono",
  "comfy-table 7.2.2",
  "half",
@@ -408,7 +408,7 @@ dependencies = [
  "arrow-select 58.4.0",
  "flatbuffers",
  "lz4_flex 0.13.1",
- "zstd",
+ "zstd 0.13.3",
 ]
 
 [[package]]
@@ -424,7 +424,7 @@ dependencies = [
  "arrow-schema 57.3.1",
  "chrono",
  "half",
- "indexmap 2.14.1",
+ "indexmap 2.14.2",
  "itoa",
  "lexical-core",
  "memchr",
@@ -449,7 +449,7 @@ dependencies = [
  "arrow-select 58.4.0",
  "chrono",
  "half",
- "indexmap 2.14.1",
+ "indexmap 2.14.2",
  "itoa",
  "lexical-core",
  "memchr",
@@ -621,9 +621,9 @@ dependencies = [
 
 [[package]]
 name = "async-compression"
-version = "0.4.44"
+version = "0.4.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "515a1f282e33d55983c499d7e9e87082e81cbc32974825bf9032f928392d5844"
+checksum = "24a8ec73eb862508b7041723c89386365894b4e7d9f6998bf1b8529e5b0ee254"
 dependencies = [
  "compression-codecs",
  "compression-core",
@@ -1085,6 +1085,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
+name = "base64"
+version = "0.23.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
+
+[[package]]
 name = "base64-simd"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1327,17 +1333,17 @@ dependencies = [
 
 [[package]]
 name = "compression-codecs"
-version = "0.4.39"
+version = "0.4.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2fe67f2944eef52fc7b106b8c9450d243a88701a0c065f7f57235e76abaed7df"
+checksum = "100590da849306918656ffbb22576bbdfc1382b50ad10d1d50ec177d3b205fb2"
 dependencies = [
  "bzip2",
  "compression-core",
  "flate2",
  "liblzma",
  "memchr",
- "zstd",
- "zstd-safe",
+ "zstd 0.14.0",
+ "zstd-safe 8.0.0",
 ]
 
 [[package]]
@@ -1453,18 +1459,18 @@ checksum = "790eea4361631c5e7d22598ecd5723ff611904e3344ce8720784c93e3d83d40b"
 
 [[package]]
 name = "crossbeam-channel"
-version = "0.5.16"
+version = "0.5.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d85363c37faeca707aef026efa9f3b34d077bce547e48f770770625c6013679e"
+checksum = "98b0cc327b5bc766e7fda9c9260cc0fa81b43a8e240440422dff70788e3f9ef1"
 dependencies = [
  "crossbeam-utils",
 ]
 
 [[package]]
 name = "crossbeam-deque"
-version = "0.8.7"
+version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5181e0de7b61eb03a81e347d6dd8797bae9da5146707b51077e2d71a54ec0ceb"
+checksum = "622f3fc73690be383c7214310406f28a90e6edeadc3cea882f9d71e495b9711a"
 dependencies = [
  "crossbeam-epoch",
  "crossbeam-utils",
@@ -1472,18 +1478,18 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-epoch"
-version = "0.9.20"
+version = "0.9.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d6914041f254d6e9176c01941b21115dcfb7089e55135a35411081bd106ef3f"
+checksum = "dc74980687109a3b14c72fd458107bf0baa1da1a1a805e178d15501ba9b86d9d"
 dependencies = [
  "crossbeam-utils",
 ]
 
 [[package]]
 name = "crossbeam-utils"
-version = "0.8.22"
+version = "0.8.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61803da095bee82a81bb1a452ecc25d3b2f1416d1897eb86430c6159ef717c17"
+checksum = "a31eee39dddec8330830986fcd7625edb5a24ec90ea038215273bbc3adb08ac6"
 
 [[package]]
 name = "crossterm"
@@ -1565,9 +1571,9 @@ dependencies = [
 
 [[package]]
 name = "darling"
-version = "0.23.0"
+version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25ae13da2f202d56bd7f91c25fba009e7717a1e4a1cc98a76d844b65ae912e9d"
+checksum = "ed17f5901b6630b993ca003def43f2f8ef4014fc13b047b57aad617ff32bc2ec"
 dependencies = [
  "darling_core",
  "darling_macro",
@@ -1575,26 +1581,26 @@ dependencies = [
 
 [[package]]
 name = "darling_core"
-version = "0.23.0"
+version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9865a50f7c335f53564bb694ef660825eb8610e0a53d3e11bf1b0d3df31e03b0"
+checksum = "6837e2cf7485aaae18f86181d2f0e9a7ed297a025e220aeabf63fdebd3a2ddff"
 dependencies = [
  "ident_case",
  "proc-macro2",
  "quote",
  "strsim",
- "syn 2.0.119",
+ "syn 3.0.5",
 ]
 
 [[package]]
 name = "darling_macro"
-version = "0.23.0"
+version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac3984ec7bd6cfa798e62b4a642426a5be0e68f9401cfc2a01e3fa9ea2fcdb8d"
+checksum = "2ac7135c3ef02b2f7833bbeb1be5ba7f966dcde8a87c6b87f65a778d71a02785"
 dependencies = [
  "darling_core",
  "quote",
- "syn 2.0.119",
+ "syn 3.0.5",
 ]
 
 [[package]]
@@ -1700,7 +1706,7 @@ dependencies = [
  "datafusion-sql 54.1.0",
  "flate2",
  "futures",
- "indexmap 2.14.1",
+ "indexmap 2.14.2",
  "itertools 0.14.0",
  "liblzma",
  "log",
@@ -1712,7 +1718,7 @@ dependencies = [
  "tokio",
  "url",
  "uuid",
- "zstd",
+ "zstd 0.13.3",
 ]
 
 [[package]]
@@ -1823,7 +1829,7 @@ dependencies = [
  "chrono",
  "half",
  "hashbrown 0.16.1",
- "indexmap 2.14.1",
+ "indexmap 2.14.2",
  "libc",
  "log",
  "object_store 0.12.5",
@@ -1847,7 +1853,7 @@ dependencies = [
  "foldhash 0.2.0",
  "half",
  "hashbrown 0.17.1",
- "indexmap 2.14.1",
+ "indexmap 2.14.2",
  "itertools 0.14.0",
  "libc",
  "log",
@@ -1944,7 +1950,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "url",
- "zstd",
+ "zstd 0.13.3",
 ]
 
 [[package]]
@@ -2217,7 +2223,7 @@ dependencies = [
  "datafusion-functions-aggregate-common 52.5.0",
  "datafusion-functions-window-common 52.5.0",
  "datafusion-physical-expr-common 52.5.0",
- "indexmap 2.14.1",
+ "indexmap 2.14.2",
  "itertools 0.14.0",
  "paste",
  "serde_json",
@@ -2240,7 +2246,7 @@ dependencies = [
  "datafusion-functions-aggregate-common 54.1.0",
  "datafusion-functions-window-common 54.1.0",
  "datafusion-physical-expr-common 54.1.0",
- "indexmap 2.14.1",
+ "indexmap 2.14.2",
  "itertools 0.14.0",
  "recursive",
  "serde_json",
@@ -2255,7 +2261,7 @@ checksum = "1b486b5f6255d40976b88bb83813b0d035a8333e0ec39864824e78068cf42fa6"
 dependencies = [
  "arrow 57.3.1",
  "datafusion-common 52.5.0",
- "indexmap 2.14.1",
+ "indexmap 2.14.2",
  "itertools 0.14.0",
  "paste",
 ]
@@ -2268,7 +2274,7 @@ checksum = "b7b19a8c95522bee8cbb313d74263b85e355d2b52f42e67ef5694bf5de9e9356"
 dependencies = [
  "arrow 58.4.0",
  "datafusion-common 54.1.0",
- "indexmap 2.14.1",
+ "indexmap 2.14.2",
  "itertools 0.14.0",
 ]
 
@@ -2310,7 +2316,7 @@ checksum = "07356c94118d881130dd0ffbff127540407d969c8978736e324edcd6c41cd48f"
 dependencies = [
  "arrow 57.3.1",
  "arrow-buffer 57.3.1",
- "base64",
+ "base64 0.22.1",
  "chrono",
  "chrono-tz",
  "datafusion-common 52.5.0",
@@ -2337,7 +2343,7 @@ checksum = "5f64c983bbbdcb729d921a2b2ac3375598719b5cc0c30345ad664936f3176fc7"
 dependencies = [
  "arrow 58.4.0",
  "arrow-buffer 58.4.0",
- "base64",
+ "base64 0.22.1",
  "blake2",
  "blake3",
  "chrono",
@@ -2597,7 +2603,7 @@ dependencies = [
  "datafusion-expr 52.5.0",
  "datafusion-expr-common 52.5.0",
  "datafusion-physical-expr 52.5.0",
- "indexmap 2.14.1",
+ "indexmap 2.14.2",
  "itertools 0.14.0",
  "log",
  "regex",
@@ -2616,7 +2622,7 @@ dependencies = [
  "datafusion-expr 54.1.0",
  "datafusion-expr-common 54.1.0",
  "datafusion-physical-expr 54.1.0",
- "indexmap 2.14.1",
+ "indexmap 2.14.2",
  "itertools 0.14.0",
  "log",
  "recursive",
@@ -2639,7 +2645,7 @@ dependencies = [
  "datafusion-physical-expr-common 52.5.0",
  "half",
  "hashbrown 0.16.1",
- "indexmap 2.14.1",
+ "indexmap 2.14.2",
  "itertools 0.14.0",
  "parking_lot",
  "paste",
@@ -2661,7 +2667,7 @@ dependencies = [
  "datafusion-physical-expr-common 54.1.0",
  "half",
  "hashbrown 0.17.1",
- "indexmap 2.14.1",
+ "indexmap 2.14.2",
  "itertools 0.14.0",
  "parking_lot",
  "petgraph",
@@ -2711,7 +2717,7 @@ dependencies = [
  "datafusion-common 52.5.0",
  "datafusion-expr-common 52.5.0",
  "hashbrown 0.16.1",
- "indexmap 2.14.1",
+ "indexmap 2.14.2",
  "itertools 0.14.0",
  "parking_lot",
 ]
@@ -2727,7 +2733,7 @@ dependencies = [
  "datafusion-common 54.1.0",
  "datafusion-expr-common 54.1.0",
  "hashbrown 0.17.1",
- "indexmap 2.14.1",
+ "indexmap 2.14.2",
  "itertools 0.14.0",
  "parking_lot",
  "pin-project",
@@ -2793,7 +2799,7 @@ dependencies = [
  "futures",
  "half",
  "hashbrown 0.16.1",
- "indexmap 2.14.1",
+ "indexmap 2.14.2",
  "itertools 0.14.0",
  "log",
  "parking_lot",
@@ -2825,7 +2831,7 @@ dependencies = [
  "futures",
  "half",
  "hashbrown 0.17.1",
- "indexmap 2.14.1",
+ "indexmap 2.14.2",
  "itertools 0.14.0",
  "log",
  "num-traits",
@@ -2944,7 +2950,7 @@ dependencies = [
  "chrono",
  "datafusion-common 52.5.0",
  "datafusion-expr 52.5.0",
- "indexmap 2.14.1",
+ "indexmap 2.14.2",
  "log",
  "regex",
  "sqlparser 0.59.0",
@@ -2962,7 +2968,7 @@ dependencies = [
  "datafusion-common 54.1.0",
  "datafusion-expr 54.1.0",
  "datafusion-functions-nested 54.1.0",
- "indexmap 2.14.1",
+ "indexmap 2.14.2",
  "log",
  "recursive",
  "regex",
@@ -3474,9 +3480,9 @@ dependencies = [
 
 [[package]]
 name = "glam"
-version = "0.33.6"
+version = "0.33.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21fef0953c54fd3de2f44b743fbf77e044c81a25faee03636dfccc0d35135e23"
+checksum = "e762b9b188634fc508d4ec54b62ea3d352c43fd431d18d05d46f559f217f4725"
 
 [[package]]
 name = "glob"
@@ -3496,7 +3502,7 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "http 1.5.0",
- "indexmap 2.14.1",
+ "indexmap 2.14.2",
  "slab",
  "tokio",
  "tokio-util",
@@ -3704,9 +3710,9 @@ checksum = "15cdd26707701c53297e2fa6afb323d55fbc1d0810c3aec078ae3ef0424c3c15"
 
 [[package]]
 name = "hybrid-array"
-version = "0.4.14"
+version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "707114b52a152fa7bdb290cd7cd5912d9467273b6d74e21b8d81aca1f8533f6b"
+checksum = "27f864f10dfb56725ce5ce5472bc52252c8f93a4ab86327122cebf62c5f59a17"
 dependencies = [
  "typenum",
 ]
@@ -3754,7 +3760,7 @@ version = "0.1.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96547c2556ec9d12fb1578c4eaf448b04993e7fb79cbaad930a656880a6bdfa0"
 dependencies = [
- "base64",
+ "base64 0.22.1",
  "bytes",
  "futures-channel",
  "futures-util",
@@ -3816,9 +3822,9 @@ dependencies = [
 
 [[package]]
 name = "i_overlay"
-version = "8.1.0"
+version = "8.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca5d3f41731d03eafa48213609113563099a479f593cc7c635b7e836fc52a3c8"
+checksum = "446147877ea388eba9face4812a16e040545c3bd275a59f22868c72f63f7c711"
 dependencies = [
  "i_float 4.1.0",
  "i_key_sort 0.11.0",
@@ -4003,9 +4009,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "2.14.1"
+version = "2.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07aa2048142242915a31d35844fb311e0e53fcca590c3a0a40dcf1b841fa09eb"
+checksum = "cc4e190f5d26ca7051642629da2c52fc03bde85a03197c99408dcd291734c855"
 dependencies = [
  "equivalent",
  "hashbrown 0.17.1",
@@ -4021,9 +4027,9 @@ checksum = "8bb03732005da905c88227371639bf1ad885cc712789c011c31c5fb3ab3ccf02"
 
 [[package]]
 name = "ipnet"
-version = "2.12.1"
+version = "2.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a756c3fac73139e83f14c2d742155dd2b78d3ee56597b419a0579b7bdd6dd78"
+checksum = "791930b43c0d5973160d90a8f3894509f2b273430f5c5c73b668636d0287c5c0"
 
 [[package]]
 name = "itertools"
@@ -4114,9 +4120,9 @@ dependencies = [
 
 [[package]]
 name = "js-sys"
-version = "0.3.104"
+version = "0.3.105"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e0c1080212aad755ea003d18543e8768dd432c48819efd73a7bf1e39b7a5a3a"
+checksum = "ce57d20d1ea864ce2ac172ab472d409214f4fd359f0b2a2775abdf522e2af99e"
 dependencies = [
  "cfg-if",
  "futures-util",
@@ -4442,7 +4448,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fbfbfff40aeccab00ec8a910b57ca8ecf4319b335c542f2edcd19dd25a1e2a00"
 dependencies = [
  "async-trait",
- "base64",
+ "base64 0.22.1",
  "bytes",
  "chrono",
  "form_urlencoded",
@@ -4569,7 +4575,7 @@ dependencies = [
  "arrow-ipc 57.3.1",
  "arrow-schema 57.3.1",
  "arrow-select 57.3.1",
- "base64",
+ "base64 0.22.1",
  "brotli",
  "bytes",
  "chrono",
@@ -4590,7 +4596,7 @@ dependencies = [
  "thrift",
  "tokio",
  "twox-hash",
- "zstd",
+ "zstd 0.13.3",
 ]
 
 [[package]]
@@ -4606,7 +4612,7 @@ dependencies = [
  "arrow-ipc 58.4.0",
  "arrow-schema 58.4.0",
  "arrow-select 58.4.0",
- "base64",
+ "base64 0.22.1",
  "brotli",
  "bytes",
  "chrono",
@@ -4626,7 +4632,7 @@ dependencies = [
  "thrift",
  "tokio",
  "twox-hash",
- "zstd",
+ "zstd 0.13.3",
 ]
 
 [[package]]
@@ -4668,7 +4674,7 @@ checksum = "8701b58ea97060d5e5b155d383a69952a60943f0e6dfe30b04c287beb0b27455"
 dependencies = [
  "fixedbitset",
  "hashbrown 0.15.5",
- "indexmap 2.14.1",
+ "indexmap 2.14.2",
  "serde",
 ]
 
@@ -5090,7 +5096,7 @@ version = "0.12.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eddd3ca559203180a307f12d114c268abf583f59b03cb906fd0b3ff8646c1147"
 dependencies = [
- "base64",
+ "base64 0.22.1",
  "bytes",
  "futures-core",
  "futures-util",
@@ -5249,9 +5255,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.43"
+version = "0.23.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0283386ce02abc0151e1761d08802dfe86c173b0b494af5cbc086574e453da06"
+checksum = "6725596c3f2c3a0aef021139e145d4eafe314a6623e4680ca83852b2c67ab2ba"
 dependencies = [
  "aws-lc-rs",
  "once_cell",
@@ -5391,7 +5397,7 @@ dependencies = [
 [[package]]
 name = "sedona"
 version = "0.5.0"
-source = "git+https://github.com/apache/sedona-db.git#7b2864a996cd14edde6bb2c8d451ca5df52756fe"
+source = "git+https://github.com/apache/sedona-db.git#69bbd8c4274e0e5ecc07401300a724a792117439"
 dependencies = [
  "arrow-array 57.3.1",
  "arrow-buffer 57.3.1",
@@ -5442,7 +5448,7 @@ dependencies = [
 [[package]]
 name = "sedona-common"
 version = "0.5.0"
-source = "git+https://github.com/apache/sedona-db.git#7b2864a996cd14edde6bb2c8d451ca5df52756fe"
+source = "git+https://github.com/apache/sedona-db.git#69bbd8c4274e0e5ecc07401300a724a792117439"
 dependencies = [
  "datafusion-common 52.5.0",
  "regex",
@@ -5452,7 +5458,7 @@ dependencies = [
 [[package]]
 name = "sedona-datasource"
 version = "0.5.0"
-source = "git+https://github.com/apache/sedona-db.git#7b2864a996cd14edde6bb2c8d451ca5df52756fe"
+source = "git+https://github.com/apache/sedona-db.git#69bbd8c4274e0e5ecc07401300a724a792117439"
 dependencies = [
  "arrow-array 57.3.1",
  "arrow-schema 57.3.1",
@@ -5475,7 +5481,7 @@ dependencies = [
 [[package]]
 name = "sedona-expr"
 version = "0.5.0"
-source = "git+https://github.com/apache/sedona-db.git#7b2864a996cd14edde6bb2c8d451ca5df52756fe"
+source = "git+https://github.com/apache/sedona-db.git#69bbd8c4274e0e5ecc07401300a724a792117439"
 dependencies = [
  "arrow-array 57.3.1",
  "arrow-buffer 57.3.1",
@@ -5495,7 +5501,7 @@ dependencies = [
 [[package]]
 name = "sedona-functions"
 version = "0.5.0"
-source = "git+https://github.com/apache/sedona-db.git#7b2864a996cd14edde6bb2c8d451ca5df52756fe"
+source = "git+https://github.com/apache/sedona-db.git#69bbd8c4274e0e5ecc07401300a724a792117439"
 dependencies = [
  "arrow-array 57.3.1",
  "arrow-buffer 57.3.1",
@@ -5517,7 +5523,7 @@ dependencies = [
 [[package]]
 name = "sedona-gdal"
 version = "0.5.0"
-source = "git+https://github.com/apache/sedona-db.git#7b2864a996cd14edde6bb2c8d451ca5df52756fe"
+source = "git+https://github.com/apache/sedona-db.git#69bbd8c4274e0e5ecc07401300a724a792117439"
 dependencies = [
  "libloading 0.9.0",
  "sedona-raster",
@@ -5527,7 +5533,7 @@ dependencies = [
 [[package]]
 name = "sedona-geo"
 version = "0.5.0"
-source = "git+https://github.com/apache/sedona-db.git#7b2864a996cd14edde6bb2c8d451ca5df52756fe"
+source = "git+https://github.com/apache/sedona-db.git#69bbd8c4274e0e5ecc07401300a724a792117439"
 dependencies = [
  "arrow-array 57.3.1",
  "arrow-schema 57.3.1",
@@ -5550,12 +5556,12 @@ dependencies = [
 [[package]]
 name = "sedona-geo-generic-alg"
 version = "0.5.0"
-source = "git+https://github.com/apache/sedona-db.git#7b2864a996cd14edde6bb2c8d451ca5df52756fe"
+source = "git+https://github.com/apache/sedona-db.git#69bbd8c4274e0e5ecc07401300a724a792117439"
 dependencies = [
  "float_next_after 2.0.0",
  "geo-traits",
  "geo-types",
- "i_overlay 8.1.0",
+ "i_overlay 8.1.1",
  "log",
  "num-traits",
  "robust",
@@ -5566,7 +5572,7 @@ dependencies = [
 [[package]]
 name = "sedona-geo-traits-ext"
 version = "0.5.0"
-source = "git+https://github.com/apache/sedona-db.git#7b2864a996cd14edde6bb2c8d451ca5df52756fe"
+source = "git+https://github.com/apache/sedona-db.git#69bbd8c4274e0e5ecc07401300a724a792117439"
 dependencies = [
  "byteorder",
  "geo-traits",
@@ -5578,7 +5584,7 @@ dependencies = [
 [[package]]
 name = "sedona-geometry"
 version = "0.5.0"
-source = "git+https://github.com/apache/sedona-db.git#7b2864a996cd14edde6bb2c8d451ca5df52756fe"
+source = "git+https://github.com/apache/sedona-db.git#69bbd8c4274e0e5ecc07401300a724a792117439"
 dependencies = [
  "geo-traits",
  "lru",
@@ -5591,7 +5597,7 @@ dependencies = [
 [[package]]
 name = "sedona-geoparquet"
 version = "0.5.0"
-source = "git+https://github.com/apache/sedona-db.git#7b2864a996cd14edde6bb2c8d451ca5df52756fe"
+source = "git+https://github.com/apache/sedona-db.git#69bbd8c4274e0e5ecc07401300a724a792117439"
 dependencies = [
  "arrow-array 57.3.1",
  "arrow-schema 57.3.1",
@@ -5626,7 +5632,7 @@ dependencies = [
 [[package]]
 name = "sedona-geos"
 version = "0.5.0"
-source = "git+https://github.com/apache/sedona-db.git#7b2864a996cd14edde6bb2c8d451ca5df52756fe"
+source = "git+https://github.com/apache/sedona-db.git#69bbd8c4274e0e5ecc07401300a724a792117439"
 dependencies = [
  "arrow-array 57.3.1",
  "arrow-schema 57.3.1",
@@ -5647,7 +5653,7 @@ dependencies = [
 [[package]]
 name = "sedona-proj"
 version = "0.5.0"
-source = "git+https://github.com/apache/sedona-db.git#7b2864a996cd14edde6bb2c8d451ca5df52756fe"
+source = "git+https://github.com/apache/sedona-db.git#69bbd8c4274e0e5ecc07401300a724a792117439"
 dependencies = [
  "geo-traits",
  "libloading 0.9.0",
@@ -5659,7 +5665,7 @@ dependencies = [
 [[package]]
 name = "sedona-query-planner"
 version = "0.5.0"
-source = "git+https://github.com/apache/sedona-db.git#7b2864a996cd14edde6bb2c8d451ca5df52756fe"
+source = "git+https://github.com/apache/sedona-db.git#69bbd8c4274e0e5ecc07401300a724a792117439"
 dependencies = [
  "arrow-schema 57.3.1",
  "async-trait",
@@ -5678,7 +5684,7 @@ dependencies = [
 [[package]]
 name = "sedona-raster"
 version = "0.5.0"
-source = "git+https://github.com/apache/sedona-db.git#7b2864a996cd14edde6bb2c8d451ca5df52756fe"
+source = "git+https://github.com/apache/sedona-db.git#69bbd8c4274e0e5ecc07401300a724a792117439"
 dependencies = [
  "arrow-array 57.3.1",
  "arrow-buffer 57.3.1",
@@ -5693,7 +5699,7 @@ dependencies = [
 [[package]]
 name = "sedona-raster-functions"
 version = "0.5.0"
-source = "git+https://github.com/apache/sedona-db.git#7b2864a996cd14edde6bb2c8d451ca5df52756fe"
+source = "git+https://github.com/apache/sedona-db.git#69bbd8c4274e0e5ecc07401300a724a792117439"
 dependencies = [
  "arrow-array 57.3.1",
  "arrow-buffer 57.3.1",
@@ -5715,7 +5721,7 @@ dependencies = [
 [[package]]
 name = "sedona-raster-gdal"
 version = "0.5.0"
-source = "git+https://github.com/apache/sedona-db.git#7b2864a996cd14edde6bb2c8d451ca5df52756fe"
+source = "git+https://github.com/apache/sedona-db.git#69bbd8c4274e0e5ecc07401300a724a792117439"
 dependencies = [
  "arrow-array 57.3.1",
  "arrow-buffer 57.3.1",
@@ -5737,7 +5743,7 @@ dependencies = [
 [[package]]
 name = "sedona-schema"
 version = "0.5.0"
-source = "git+https://github.com/apache/sedona-db.git#7b2864a996cd14edde6bb2c8d451ca5df52756fe"
+source = "git+https://github.com/apache/sedona-db.git#69bbd8c4274e0e5ecc07401300a724a792117439"
 dependencies = [
  "arrow-array 57.3.1",
  "arrow-schema 57.3.1",
@@ -5751,7 +5757,7 @@ dependencies = [
 [[package]]
 name = "sedona-spatial-join"
 version = "0.5.0"
-source = "git+https://github.com/apache/sedona-db.git#7b2864a996cd14edde6bb2c8d451ca5df52756fe"
+source = "git+https://github.com/apache/sedona-db.git#69bbd8c4274e0e5ecc07401300a724a792117439"
 dependencies = [
  "arrow 57.3.1",
  "arrow-array 57.3.1",
@@ -5794,7 +5800,7 @@ dependencies = [
 [[package]]
 name = "sedona-spatial-join-raster"
 version = "0.5.0"
-source = "git+https://github.com/apache/sedona-db.git#7b2864a996cd14edde6bb2c8d451ca5df52756fe"
+source = "git+https://github.com/apache/sedona-db.git#69bbd8c4274e0e5ecc07401300a724a792117439"
 dependencies = [
  "arrow-array 57.3.1",
  "arrow-schema 57.3.1",
@@ -5816,7 +5822,7 @@ dependencies = [
 [[package]]
 name = "sedona-testing"
 version = "0.5.0"
-source = "git+https://github.com/apache/sedona-db.git#7b2864a996cd14edde6bb2c8d451ca5df52756fe"
+source = "git+https://github.com/apache/sedona-db.git#69bbd8c4274e0e5ecc07401300a724a792117439"
 dependencies = [
  "arrow-array 57.3.1",
  "arrow-cast 57.3.1",
@@ -5841,7 +5847,7 @@ dependencies = [
 [[package]]
 name = "sedona-tg"
 version = "0.5.0"
-source = "git+https://github.com/apache/sedona-db.git#7b2864a996cd14edde6bb2c8d451ca5df52756fe"
+source = "git+https://github.com/apache/sedona-db.git#69bbd8c4274e0e5ecc07401300a724a792117439"
 dependencies = [
  "arrow-array 57.3.1",
  "arrow-schema 57.3.1",
@@ -5932,16 +5938,16 @@ dependencies = [
 
 [[package]]
 name = "serde_with"
-version = "3.22.0"
+version = "3.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee78f1fbe43ac4a0e47aadb3dbd357b69eb0d3793e948624cd03dd2750ab1c0a"
+checksum = "935177bb8c0cd8ca1a4e6d1a2ac8988bea69cab4f9d3a31311e012ad27868ea4"
 dependencies = [
- "base64",
+ "base64 0.23.1",
  "bs58",
  "chrono",
  "hex",
  "indexmap 1.9.3",
- "indexmap 2.14.1",
+ "indexmap 2.14.2",
  "jiff",
  "schemars 0.9.0",
  "schemars 1.2.2",
@@ -5953,14 +5959,14 @@ dependencies = [
 
 [[package]]
 name = "serde_with_macros"
-version = "3.22.0"
+version = "3.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8705578779c2b6bd90d84d66eb2e206b708b1a4d7b9f17641b293545bf1c7e46"
+checksum = "1d607aa01a3cb0ad757d6fd216136910db3c97b102fe686585689615a02dbcdc"
 dependencies = [
  "darling",
  "proc-macro2",
  "quote",
- "syn 2.0.119",
+ "syn 3.0.5",
 ]
 
 [[package]]
@@ -6402,7 +6408,7 @@ version = "0.25.13+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6975367e4d2ef766d86af01ffad14b622fecc8d4357a998fbc4deb6e9bacaf9b"
 dependencies = [
- "indexmap 2.14.1",
+ "indexmap 2.14.2",
  "toml_datetime",
  "toml_parser",
  "winnow",
@@ -6645,9 +6651,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen"
-version = "0.2.127"
+version = "0.2.128"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b70935747edd64d89de3efa29d73789b806c15798f8e7dca4d8ac356b50ce70"
+checksum = "aecb87a33d3b0c5e3b7aa46336eaf486cffafbd281b195e4c8b80d50df2351bf"
 dependencies = [
  "cfg-if",
  "once_cell",
@@ -6658,9 +6664,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-futures"
-version = "0.4.77"
+version = "0.4.78"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b7777d5cc23d0e91404e53ce2d5e8ec7acae3026b16233dba62cd3246457950"
+checksum = "6ef4c5d3d2cdf5c54f4231181768f5510842e350db025faf1f7163b1030ed928"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
@@ -6668,9 +6674,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro"
-version = "0.2.127"
+version = "0.2.128"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77775f8f3f7217702089053b94958f8f54061a3f663417df76e19cbdcca29bc1"
+checksum = "a690d511e3c1a8b3a55e33511e3c2c00c78415cd23650f32b808627f5696b9ed"
 dependencies = [
  "quote",
  "wasm-bindgen-macro-support",
@@ -6678,22 +6684,22 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro-support"
-version = "0.2.127"
+version = "0.2.128"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e11d33f857dc2fb11b8bc75aee111aa9cbeb12cd9f25efd3d4c2a3dd4e235284"
+checksum = "411e4887f0071ef2d2164a9d5fdf2d20efbef78fccd3a78b0c10a1dc5295e48a"
 dependencies = [
  "bumpalo",
  "proc-macro2",
  "quote",
- "syn 2.0.119",
+ "syn 3.0.5",
  "wasm-bindgen-shared",
 ]
 
 [[package]]
 name = "wasm-bindgen-shared"
-version = "0.2.127"
+version = "0.2.128"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ef64dbcc55df09c7e5a46182d181c2cfa3e925f3da937ea764728b4bbb9dcbf"
+checksum = "81941cd78d0c92026c33e5e01312845a4cb1e9af3407f9134b100dd03144103e"
 dependencies = [
  "unicode-ident",
 ]
@@ -6713,9 +6719,9 @@ dependencies = [
 
 [[package]]
 name = "web-sys"
-version = "0.3.104"
+version = "0.3.105"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c435338968042f4f59a557f690a253676d47ce13ceb55d70100e7facf6620a30"
+checksum = "9fbddc4a036f00ec4f18c83445bd3115cb306a91da554919a099d9222fe4a7f8"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
@@ -6992,18 +6998,18 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.8.56"
+version = "0.8.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "556764e583adb45a9f8d413c2a147fa7e8d821e48e12b14fd560b607998b75eb"
+checksum = "d35102a9f36d089ccae9e4c6802bc118be4487b80aaffc0ab4e0cf5ce92d2873"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.56"
+version = "0.8.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2ab42fc20575779bd240faa45f94a74256f755c0fa9e89f0ede20d91d0cdfc1"
+checksum = "146c01f5ab44258da43cf276c74a2763db2ff3969c9c652c3f2de07041d0b2bc"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -7088,7 +7094,16 @@ version = "0.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e91ee311a569c327171651566e07972200e76fcfe2242a4fa446149a3881c08a"
 dependencies = [
- "zstd-safe",
+ "zstd-safe 7.3.0",
+]
+
+[[package]]
+name = "zstd"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf06bd8162af0734b344780deb55b42a2429ae430870d13fcc12f238e880fe6e"
+dependencies = [
+ "zstd-safe 8.0.0",
 ]
 
 [[package]]
@@ -7096,6 +7111,15 @@ name = "zstd-safe"
 version = "7.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "64d80649ab6db9d9f6f9c80a40becd948eda4714a0a5ac8c4d157a32231c7882"
+dependencies = [
+ "zstd-sys",
+]
+
+[[package]]
+name = "zstd-safe"
+version = "8.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae42c0555055784c70058d19ba8e275528e8a99a706684868ace5da4e716a4ab"
 dependencies = [
  "zstd-sys",
 ]
