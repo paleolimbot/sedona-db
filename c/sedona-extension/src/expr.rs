@@ -691,6 +691,35 @@ mod tests {
     }
 
     #[test]
+    fn test_physical_expr_view_properties_and_formatting() {
+        use datafusion_physical_expr::expressions::Column;
+
+        let expr = Arc::new(Column::new("physical_col", 0)) as Arc<dyn PhysicalExpr>;
+        let exported = ExportedPhysicalExprView::new(&expr);
+        let view = exported.as_ffi_view();
+        let imported = ImportedExprView::try_new(&view).unwrap();
+
+        assert_eq!(
+            imported.get_string_property("debug_string").unwrap(),
+            format!("{expr:?}")
+        );
+        assert_eq!(
+            imported.get_string_property("display_string").unwrap(),
+            format!("{expr}")
+        );
+
+        let debug_output = format!("{imported:?}");
+        assert!(debug_output.contains("ImportedExprView"));
+        assert!(debug_output.contains("physical_col"));
+        assert_eq!(format!("{imported}"), format!("{expr}"));
+
+        let error = imported
+            .get_string_property("nonexistent_property")
+            .unwrap_err();
+        assert!(error.to_string().contains("Unknown property"));
+    }
+
+    #[test]
     fn test_expr_view_with_null_private_data_fails() {
         let invalid_view = SedonaCExprView::default();
         let result = ImportedExprView::try_new(&invalid_view);
@@ -770,6 +799,47 @@ mod tests {
         assert_eq!(
             imported.get_string_property("display_string").unwrap(),
             format!("{expr}")
+        );
+    }
+
+    #[cfg(feature = "protobuf")]
+    #[test]
+    fn test_physical_expr_view_function_becomes_placeholder_udf() {
+        use datafusion_common::{config::ConfigOptions, ScalarValue};
+        use datafusion_physical_expr::expressions::{Column, Literal};
+        use datafusion_physical_expr::ScalarFunctionExpr;
+
+        let schema = Schema::new(vec![Field::new("x", DataType::Int32, false)]);
+        let test_udf = Arc::new(ScalarUDF::new_from_impl(PlaceholderUDF::new(
+            "my_physical_func",
+        )));
+        let args = vec![
+            Arc::new(Column::new("x", 0)) as Arc<dyn PhysicalExpr>,
+            Arc::new(Literal::new(ScalarValue::Int32(Some(42)))) as Arc<dyn PhysicalExpr>,
+        ];
+        let expr = Arc::new(ScalarFunctionExpr::new(
+            "my_physical_func",
+            test_udf,
+            args,
+            Arc::new(Field::new("", DataType::Null, true)),
+            Arc::new(ConfigOptions::default()),
+        )) as Arc<dyn PhysicalExpr>;
+        let exported = ExportedPhysicalExprView::new(&expr);
+        let view = exported.as_ffi_view();
+        let imported = ImportedExprView::try_new(&view).unwrap();
+
+        let decoded = imported.to_physical_expr(&schema, None).unwrap();
+        let function = decoded
+            .downcast_ref::<ScalarFunctionExpr>()
+            .expect("expected ScalarFunctionExpr");
+        assert_eq!(function.name(), "my_physical_func");
+        assert!(
+            function
+                .fun()
+                .inner()
+                .downcast_ref::<PlaceholderUDF>()
+                .is_some(),
+            "expected PlaceholderUDF"
         );
     }
 }
