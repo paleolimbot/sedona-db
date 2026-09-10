@@ -456,7 +456,7 @@ mod tests {
             .await
             .unwrap();
         assert!(metadata.chunk_table.is_empty());
-        assert_eq!(metadata.statistics.as_ref().unwrap().num_containers(), 0);
+        assert!(metadata.statistics.is_none());
     }
 
     #[tokio::test]
