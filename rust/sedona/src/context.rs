@@ -107,7 +107,7 @@ impl SedonaContext {
         // DataFusion #22620 workaround tracked by
         // https://github.com/apache/sedona-db/issues/1232.
         let state_builder = register_vendored_optimizer_rules(state_builder).unwrap();
-        Self::new_from_context(SessionContext::new_with_state(state_builder.build())).unwrap()
+        Self::finish_new(SessionContext::new_with_state(state_builder.build())).unwrap()
     }
 
     /// Creates a new context with default interactive options
@@ -267,20 +267,17 @@ impl SedonaContext {
         // directory's contents.
         let ctx = SessionContext::new_with_state(state);
 
-        // Load the configured catalogs before rebuilding the context below.
+        // Load the configured catalogs before finishing context setup below.
         ctx.refresh_catalogs().await?;
 
-        let out = Self::new_from_context(ctx)?;
+        let out = Self::finish_new(ctx)?;
 
-        // Install state-dependent catalog wrappers after `new_from_context()`
-        // rebuilds the SessionContext so their weak references point at the
-        // live SessionState.
+        // Install state-dependent catalog wrappers after context setup so
+        // their weak references point at the live SessionState.
         install_sedona_url_table(&out.ctx);
 
-        // Install the dynamic catalog provider only after `new_from_context()`
-        // rebuilds the SessionContext. The provider stores a weak reference to
-        // SessionState; installing it before the rebuild leaves it pointing at
-        // the dropped state and causes catalog misses to report a locking error.
+        // The provider stores a weak reference to SessionState, so install it
+        // only after the context is fully initialized.
         out.ctx
             .register_catalog_list(Arc::new(DynamicObjectStoreCatalog::new(
                 out.ctx.state().catalog_list().clone(),
@@ -290,13 +287,7 @@ impl SedonaContext {
         Ok(out)
     }
 
-    /// Creates a new context from a previously configured DataFusion context
-    pub fn new_from_context(ctx: SessionContext) -> Result<Self> {
-        // DataFusion #22620 workaround tracked by
-        // https://github.com/apache/sedona-db/issues/1232.
-        let state_builder = register_vendored_optimizer_rules(ctx.into_state_builder())?;
-        let ctx = SessionContext::new_with_state(state_builder.build());
-
+    fn finish_new(ctx: SessionContext) -> Result<Self> {
         let mut out = Self {
             ctx,
             functions: RwLock::new(FunctionSet::new()),
@@ -313,18 +304,15 @@ impl SedonaContext {
             .optimizer
             .enable_physical_uncorrelated_scalar_subquery = false;
 
-        // A plain DataFusion context does not carry Sedona's configuration
-        // extension. Install the defaults here, while preserving options on a
-        // context that was already configured by its caller.
+        // The default context does not yet carry Sedona's configuration
+        // extension, while the interactive context was configured above.
         let extensions = &mut state.config_mut().options_mut().extensions;
         if extensions.get::<SedonaOptions>().is_none() {
             extensions.insert(SedonaOptions::default());
         }
 
-        // SedonaContext::new() and callers supplying a plain DataFusion
-        // context do not pass through the interactive constructor, so install
-        // the default geography bounder here as well. Preserve a custom
-        // spherical bounder when one is already configured.
+        // SedonaContext::new() does not pass through the interactive
+        // constructor, so install the default geography bounder here as well.
         #[cfg(feature = "s2geography")]
         {
             use sedona_geometry::types::Edges;
@@ -1049,62 +1037,27 @@ mod tests {
         // Regression for https://github.com/apache/sedona-db/issues/1232.
         use datafusion::{functions::core::expr_fn::get_field, prelude::col};
 
-        let contexts = [
-            SedonaContext::new(),
-            SedonaContext::new_from_context(SessionContext::new()).unwrap(),
-        ];
-        for ctx in contexts {
-            let df = ctx
-                .sql(
-                    r#"
+        let ctx = SedonaContext::new();
+        let df = ctx
+            .sql(
+                r#"
                 SELECT ST_Dump(
                     ST_GeomFromText('MULTIPOINT (0 0, 1 1)')
                 ) AS dump
                 "#,
-                )
-                .await
-                .unwrap()
-                .unnest_columns(&["dump"])
-                .unwrap()
-                .select(vec![get_field(col("dump"), "geom").alias("geometry")])
-                .unwrap();
+            )
+            .await
+            .unwrap()
+            .unnest_columns(&["dump"])
+            .unwrap()
+            .select(vec![get_field(col("dump"), "geom").alias("geometry")])
+            .unwrap();
 
-            let batches = df.collect().await.unwrap();
-            assert_eq!(
-                batches.iter().map(|batch| batch.num_rows()).sum::<usize>(),
-                2
-            );
-        }
-    }
-
-    #[test]
-    fn new_from_context_installs_default_sedona_options() {
-        let ctx = SedonaContext::new_from_context(SessionContext::new()).unwrap();
-        let state = ctx.ctx.state();
-
-        assert!(state
-            .config_options()
-            .extensions
-            .get::<SedonaOptions>()
-            .is_some());
-    }
-
-    #[test]
-    fn new_from_context_preserves_existing_sedona_options() {
-        let mut options = SedonaOptions::default();
-        options.spatial_join.enable = false;
-        let config = SessionConfig::new().with_option_extension(options);
-        let datafusion_ctx = SessionContext::new_with_config(config);
-
-        let ctx = SedonaContext::new_from_context(datafusion_ctx).unwrap();
-        let state = ctx.ctx.state();
-        let options = state
-            .config_options()
-            .extensions
-            .get::<SedonaOptions>()
-            .expect("SedonaOptions should be registered");
-
-        assert!(!options.spatial_join.enable);
+        let batches = df.collect().await.unwrap();
+        assert_eq!(
+            batches.iter().map(|batch| batch.num_rows()).sum::<usize>(),
+            2
+        );
     }
 
     #[cfg(feature = "s2geography")]
