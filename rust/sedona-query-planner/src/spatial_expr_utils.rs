@@ -23,8 +23,8 @@ use crate::spatial_predicate::{
 };
 use datafusion_common::ScalarValue;
 use datafusion_common::{
-    tree_node::{Transformed, TreeNode},
     Column as LogicalColumn, JoinSide,
+    tree_node::{Transformed, TreeNode},
 };
 use datafusion_common::{DFSchema, HashMap};
 use datafusion_expr::expr::ScalarFunction;
@@ -33,7 +33,7 @@ use datafusion_physical_expr::expressions::{BinaryExpr, Column, Literal};
 use datafusion_physical_expr::{PhysicalExpr, ScalarFunctionExpr};
 use datafusion_physical_plan::joins::utils::ColumnIndex;
 use datafusion_physical_plan::joins::utils::JoinFilter;
-use sedona_expr::utils::{parse_distance_predicate, ParsedDistancePredicate};
+use sedona_expr::utils::{ParsedDistancePredicate, parse_distance_predicate};
 
 /// Collect the names of spatial predicates appeared in expr. We assume that the given
 /// `expr` evaluates to a boolean value and originates from a filter logical node.
@@ -132,11 +132,10 @@ fn extract_spatial_predicate(
     }
 
     // No ST_KNN found, proceed with normal extraction
-    if let Some(scalar_fn) = expr.downcast_ref::<ScalarFunctionExpr>() {
-        if let Some(relation_predicate) = match_relation_predicate(scalar_fn, column_indices) {
+    if let Some(scalar_fn) = expr.downcast_ref::<ScalarFunctionExpr>()
+        && let Some(relation_predicate) = match_relation_predicate(scalar_fn, column_indices) {
             return Some((SpatialPredicate::Relation(relation_predicate), None));
         }
-    }
 
     if let Some(distance_predicate) = match_distance_predicate(expr, column_indices) {
         return Some((SpatialPredicate::Distance(distance_predicate), None));
@@ -186,15 +185,14 @@ fn extract_knn_predicate_prioritized(
     column_indices: &[ColumnIndex],
 ) -> Option<(KNNPredicate, Option<Arc<dyn PhysicalExpr>>)> {
     // Check if this expression itself is ST_KNN
-    if let Some(scalar_fn) = expr.downcast_ref::<ScalarFunctionExpr>() {
-        if let Some(knn_predicate) = match_knn_predicate(scalar_fn, column_indices) {
+    if let Some(scalar_fn) = expr.downcast_ref::<ScalarFunctionExpr>()
+        && let Some(knn_predicate) = match_knn_predicate(scalar_fn, column_indices) {
             return Some((knn_predicate, None));
         }
-    }
 
     // If this is an AND expression, check both sides for ST_KNN
-    if let Some(binary_expr) = expr.downcast_ref::<BinaryExpr>() {
-        if matches!(binary_expr.op(), Operator::And) {
+    if let Some(binary_expr) = expr.downcast_ref::<BinaryExpr>()
+        && matches!(binary_expr.op(), Operator::And) {
             let left = binary_expr.left();
             let right = binary_expr.right();
 
@@ -230,7 +228,6 @@ fn extract_knn_predicate_prioritized(
                 return Some((knn_predicate, combined_remainder));
             }
         }
-    }
 
     None
 }
@@ -625,7 +622,7 @@ mod tests {
     use datafusion::config::ConfigOptions;
     use datafusion_common::{JoinSide, ScalarValue};
     use datafusion_expr::Operator;
-    use datafusion_expr::{col, lit, ColumnarValue, Expr, ScalarUDF, SimpleScalarUDF};
+    use datafusion_expr::{ColumnarValue, Expr, ScalarUDF, SimpleScalarUDF, col, lit};
     use datafusion_physical_expr::expressions::{BinaryExpr, Column, IsNotNullExpr, Literal};
     use datafusion_physical_expr::{PhysicalExpr, ScalarFunctionExpr};
     use datafusion_physical_plan::joins::utils::ColumnIndex;
