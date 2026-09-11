@@ -382,12 +382,13 @@ impl SpatialIndex for DefaultSpatialIndex {
 
             for &result_idx in &final_results {
                 if (result_idx as usize) < self.inner.data_id_to_batch_pos.len()
-                    && let Some(item_geom) = geometry_accessor.get_geometry(result_idx as usize) {
-                        let distance = distance_metric.distance_to_geometry(&probe_geom, item_geom);
-                        if let Some(distance_f64) = distance.to_f64() {
-                            distances_with_indices.push((distance_f64, result_idx));
-                        }
+                    && let Some(item_geom) = geometry_accessor.get_geometry(result_idx as usize)
+                {
+                    let distance = distance_metric.distance_to_geometry(&probe_geom, item_geom);
+                    if let Some(distance_f64) = distance.to_f64() {
+                        distances_with_indices.push((distance_f64, result_idx));
                     }
+                }
             }
 
             // Sort by distance
@@ -437,13 +438,12 @@ impl SpatialIndex for DefaultSpatialIndex {
                 for &result_idx in &expanded_results {
                     if (result_idx as usize) < self.inner.data_id_to_batch_pos.len()
                         && let Some(item_geom) = geometry_accessor.get_geometry(result_idx as usize)
-                        {
-                            let distance =
-                                distance_metric.distance_to_geometry(&probe_geom, item_geom);
-                            if let Some(distance_f64) = distance.to_f64() {
-                                all_distances_with_indices.push((distance_f64, result_idx));
-                            }
+                    {
+                        let distance = distance_metric.distance_to_geometry(&probe_geom, item_geom);
+                        if let Some(distance_f64) = distance.to_f64() {
+                            all_distances_with_indices.push((distance_f64, result_idx));
                         }
+                    }
                 }
 
                 // Sort by distance

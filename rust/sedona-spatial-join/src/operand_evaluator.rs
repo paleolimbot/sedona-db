@@ -354,10 +354,9 @@ impl EvaluatedGeometryArray {
             return Ok(None);
         };
 
-        if !needs_array
-            && let ColumnarValue::Scalar(value) = distance_value {
-                return Ok(Some(ColumnarValue::Scalar(value.clone())));
-            }
+        if !needs_array && let ColumnarValue::Scalar(value) = distance_value {
+            return Ok(Some(ColumnarValue::Scalar(value.clone())));
+        }
 
         let mut arrays: Vec<ArrayRef> = Vec::with_capacity(geom_arrays.len());
         for geom in geom_arrays {

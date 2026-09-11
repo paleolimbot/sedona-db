@@ -101,12 +101,13 @@ impl<C: FirstPassStreamCallback> FirstPassStream<C> {
         let err_arc = Arc::new(err);
         let callback_opt = self.callback.take();
         if let Some(callback) = callback_opt
-            && let Err(e) = callback.call(Err(DataFusionError::Shared(err_arc.clone()))) {
-                log::warn!(
-                    "Failed to invoke first pass stream callback on error: {}",
-                    e
-                );
-            }
+            && let Err(e) = callback.call(Err(DataFusionError::Shared(err_arc.clone())))
+        {
+            log::warn!(
+                "Failed to invoke first pass stream callback on error: {}",
+                e
+            );
+        }
         DataFusionError::Shared(err_arc)
     }
 }
@@ -156,12 +157,12 @@ impl<C: FirstPassStreamCallback + Unpin> Stream for FirstPassStream<C> {
 
                     if let Some((spill_batch, assignments)) = split.spilled
                         && let Some(repartitioner) = this.repartitioner.as_mut()
-                            && let Err(err) =
-                                repartitioner.insert_repartitioned_batch(spill_batch, &assignments)
-                            {
-                                let err = this.transition_to_failed(err);
-                                return Poll::Ready(Some(Err(err)));
-                            }
+                        && let Err(err) =
+                            repartitioner.insert_repartitioned_batch(spill_batch, &assignments)
+                    {
+                        let err = this.transition_to_failed(err);
+                        return Poll::Ready(Some(Err(err)));
+                    }
                 }
                 Poll::Ready(Some(Err(e))) => {
                     let err = this.transition_to_failed(e);

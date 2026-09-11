@@ -112,12 +112,13 @@ impl<'a> GeometryAccessor for SedonaKnnAdapter<'a> {
         let indexed_batch = &self.indexed_batches[batch_idx as usize];
 
         if let Some(wkb) = indexed_batch.geom_array.wkb(row_idx as usize)
-            && let Ok(geom) = item_to_geometry(wkb) {
-                // Try to store in cache - if another thread got there first, we just use theirs
-                let _ = geometry_cache[item_index].set(geom);
-                // Return reference to the cached geometry
-                return geometry_cache[item_index].get();
-            }
+            && let Ok(geom) = item_to_geometry(wkb)
+        {
+            // Try to store in cache - if another thread got there first, we just use theirs
+            let _ = geometry_cache[item_index].set(geom);
+            // Return reference to the cached geometry
+            return geometry_cache[item_index].get();
+        }
 
         // Failed to decode - don't cache invalid results
         None

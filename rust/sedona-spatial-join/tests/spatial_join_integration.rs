@@ -1381,9 +1381,10 @@ fn extract_geoms_and_ids(partitions: &[Vec<RecordBatch>]) -> Vec<(i32, geo::Geom
             executor
                 .execute_wkb_void(|maybe_geom| {
                     if let Some(id_opt) = id_iter.next()
-                        && let (Some(id), Some(geom)) = (id_opt, maybe_geom) {
-                            result.push((id, geom.clone()))
-                        }
+                        && let (Some(id), Some(geom)) = (id_opt, maybe_geom)
+                    {
+                        result.push((id, geom.clone()))
+                    }
                     Ok(())
                 })
                 .expect("Failed to extract geoms and ids from RecordBatch");

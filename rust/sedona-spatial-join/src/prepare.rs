@@ -368,7 +368,6 @@ impl SpatialJoinComponentsBuilder {
             let runtime_env = Arc::clone(&runtime_env);
             let partitioner = build_partitioner.box_clone();
             join_set.spawn(async move {
-
                 StreamRepartitioner::builder(
                     runtime_env,
                     partitioner,

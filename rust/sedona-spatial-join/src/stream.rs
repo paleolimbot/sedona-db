@@ -434,17 +434,18 @@ impl SpatialJoinStream {
         }
 
         if num_partitions > 1
-            && let SpatialPredicate::KNearestNeighbors(knn) = &self.spatial_predicate {
-                self.knn_results_merger = Some(Box::new(KNNResultsMerger::try_new(
-                    knn.k as usize,
-                    self.options.knn_include_tie_breakers,
-                    self.target_output_batch_size,
-                    Arc::clone(&self.runtime_env),
-                    self.spill_compression,
-                    self.schema.clone(),
-                    SpillMetrics::new(&self.metrics_set, self.probe_partition_id),
-                )?));
-            }
+            && let SpatialPredicate::KNearestNeighbors(knn) = &self.spatial_predicate
+        {
+            self.knn_results_merger = Some(Box::new(KNNResultsMerger::try_new(
+                knn.k as usize,
+                self.options.knn_include_tie_breakers,
+                self.target_output_batch_size,
+                Arc::clone(&self.runtime_env),
+                self.spill_compression,
+                self.schema.clone(),
+                SpillMetrics::new(&self.metrics_set, self.probe_partition_id),
+            )?));
+        }
 
         self.state = SpatialJoinStreamState::WaitBuildIndex(0, true);
         Poll::Ready(Ok(StatefulStreamResult::Continue))
@@ -754,11 +755,10 @@ impl SpatialJoinStream {
         is_last_stream: bool,
     ) -> Poll<Result<StatefulStreamResult<Option<RecordBatch>>>> {
         self.spatial_index = None;
-        if is_last_stream
-            && let Some(provider) = self.index_provider.as_ref() {
-                provider.dispose_index(current_partition_id);
-                assert!(provider.num_loaded_indexes() == 0);
-            }
+        if is_last_stream && let Some(provider) = self.index_provider.as_ref() {
+            provider.dispose_index(current_partition_id);
+            assert!(provider.num_loaded_indexes() == 0);
+        }
 
         let num_regular_partitions = self
             .num_regular_partitions
@@ -767,9 +767,10 @@ impl SpatialJoinStream {
         let next_partition_id = current_partition_id + 1;
 
         if let Some(merger) = self.knn_results_merger.as_deref_mut()
-            && next_partition_id < num_regular_partitions {
-                merger.rotate(next_partition_id == num_regular_partitions - 1)?;
-            }
+            && next_partition_id < num_regular_partitions
+        {
+            merger.rotate(next_partition_id == num_regular_partitions - 1)?;
+        }
 
         if next_partition_id >= num_regular_partitions {
             if is_last_stream {
@@ -1350,9 +1351,10 @@ impl SpatialJoinBatchIterator {
             if let Some(batch) = knn
                 .knn_results_merger
                 .produce_batch_until(end_offset_in_partition)?
-                && batch.num_rows() > 0 {
-                    return Ok(Some(batch));
-                }
+                && batch.num_rows() > 0
+            {
+                return Ok(Some(batch));
+            }
         }
 
         let Some(probe_range) = progress.last_probe_range(num_rows) else {
@@ -1441,13 +1443,14 @@ impl SpatialJoinBatchIterator {
 
         // set the build side bitmap
         if need_produce_result_in_final(self.join_type)
-            && let Some(visited_bitmaps) = self.spatial_index.visited_build_side() {
-                mark_build_side_rows_as_visited(
-                    &build_indices,
-                    &interleave_indices_map,
-                    visited_bitmaps,
-                );
-            }
+            && let Some(visited_bitmaps) = self.spatial_index.visited_build_side()
+        {
+            mark_build_side_rows_as_visited(
+                &build_indices,
+                &interleave_indices_map,
+                visited_bitmaps,
+            );
+        }
 
         Ok((
             partial_build_batch,
