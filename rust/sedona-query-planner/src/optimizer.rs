@@ -206,12 +206,13 @@ impl OptimizerRule for KnnJoinEarlyRewrite {
 
         // Join(filter=ST_KNN(...))
         if let LogicalPlan::Join(join) = &plan
-            && let Some(filter) = join.filter.as_ref() {
-                let names = collect_spatial_predicate_names(filter);
-                if names.contains("st_knn") {
-                    return rewrite_join_to_spatial_join_plan_node(join);
-                }
+            && let Some(filter) = join.filter.as_ref()
+        {
+            let names = collect_spatial_predicate_names(filter);
+            if names.contains("st_knn") {
+                return rewrite_join_to_spatial_join_plan_node(join);
             }
+        }
 
         Ok(Transformed::no(plan))
     }

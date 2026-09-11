@@ -92,10 +92,11 @@ fn merged_input_schema(inputs: &[&LogicalPlan]) -> Option<Arc<DFSchema>> {
 /// Pre-order pass: skip children of `sd_restore_metadata` for idempotency.
 fn skip_already_wrapped(expr: Expr) -> Result<Transformed<Expr>> {
     if let Expr::ScalarFunction(ref func_call) = expr
-        && func_call.func.name() == RESTORE_METADATA_NAME {
-            // Already wrapped; skip children to avoid re-wrapping nested async UDFs.
-            return Ok(Transformed::new(expr, false, TreeNodeRecursion::Jump));
-        }
+        && func_call.func.name() == RESTORE_METADATA_NAME
+    {
+        // Already wrapped; skip children to avoid re-wrapping nested async UDFs.
+        return Ok(Transformed::new(expr, false, TreeNodeRecursion::Jump));
+    }
     Ok(Transformed::no(expr))
 }
 

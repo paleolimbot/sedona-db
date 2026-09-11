@@ -366,9 +366,10 @@ mod tests {
         let mut n = 0;
         expr.apply(|e| {
             if let Expr::ScalarFunction(sf) = e
-                && sf.func.name() == "rs_ensureloaded" {
-                    n += 1;
-                }
+                && sf.func.name() == "rs_ensureloaded"
+            {
+                n += 1;
+            }
             Ok(TreeNodeRecursion::Continue)
         })
         .unwrap();

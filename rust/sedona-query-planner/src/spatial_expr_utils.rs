@@ -133,9 +133,10 @@ fn extract_spatial_predicate(
 
     // No ST_KNN found, proceed with normal extraction
     if let Some(scalar_fn) = expr.downcast_ref::<ScalarFunctionExpr>()
-        && let Some(relation_predicate) = match_relation_predicate(scalar_fn, column_indices) {
-            return Some((SpatialPredicate::Relation(relation_predicate), None));
-        }
+        && let Some(relation_predicate) = match_relation_predicate(scalar_fn, column_indices)
+    {
+        return Some((SpatialPredicate::Relation(relation_predicate), None));
+    }
 
     if let Some(distance_predicate) = match_distance_predicate(expr, column_indices) {
         return Some((SpatialPredicate::Distance(distance_predicate), None));
@@ -186,48 +187,50 @@ fn extract_knn_predicate_prioritized(
 ) -> Option<(KNNPredicate, Option<Arc<dyn PhysicalExpr>>)> {
     // Check if this expression itself is ST_KNN
     if let Some(scalar_fn) = expr.downcast_ref::<ScalarFunctionExpr>()
-        && let Some(knn_predicate) = match_knn_predicate(scalar_fn, column_indices) {
-            return Some((knn_predicate, None));
-        }
+        && let Some(knn_predicate) = match_knn_predicate(scalar_fn, column_indices)
+    {
+        return Some((knn_predicate, None));
+    }
 
     // If this is an AND expression, check both sides for ST_KNN
     if let Some(binary_expr) = expr.downcast_ref::<BinaryExpr>()
-        && matches!(binary_expr.op(), Operator::And) {
-            let left = binary_expr.left();
-            let right = binary_expr.right();
+        && matches!(binary_expr.op(), Operator::And)
+    {
+        let left = binary_expr.left();
+        let right = binary_expr.right();
 
-            // Check if left side contains ST_KNN
-            if let Some((knn_predicate, left_remainder)) =
-                extract_knn_predicate_prioritized(left, column_indices)
-            {
-                // ST_KNN found in left side, combine any left remainder with right side
-                let combined_remainder = match left_remainder {
-                    Some(remainder) => Some(Arc::new(BinaryExpr::new(
-                        remainder,
-                        Operator::And,
-                        right.clone(),
-                    )) as Arc<dyn PhysicalExpr>),
-                    None => Some(right.clone()),
-                };
-                return Some((knn_predicate, combined_remainder));
-            }
-
-            // Check if right side contains ST_KNN
-            if let Some((knn_predicate, right_remainder)) =
-                extract_knn_predicate_prioritized(right, column_indices)
-            {
-                // ST_KNN found in right side, combine left side with any right remainder
-                let combined_remainder = match right_remainder {
-                    Some(remainder) => Some(Arc::new(BinaryExpr::new(
-                        left.clone(),
-                        Operator::And,
-                        remainder,
-                    )) as Arc<dyn PhysicalExpr>),
-                    None => Some(left.clone()),
-                };
-                return Some((knn_predicate, combined_remainder));
-            }
+        // Check if left side contains ST_KNN
+        if let Some((knn_predicate, left_remainder)) =
+            extract_knn_predicate_prioritized(left, column_indices)
+        {
+            // ST_KNN found in left side, combine any left remainder with right side
+            let combined_remainder = match left_remainder {
+                Some(remainder) => Some(Arc::new(BinaryExpr::new(
+                    remainder,
+                    Operator::And,
+                    right.clone(),
+                )) as Arc<dyn PhysicalExpr>),
+                None => Some(right.clone()),
+            };
+            return Some((knn_predicate, combined_remainder));
         }
+
+        // Check if right side contains ST_KNN
+        if let Some((knn_predicate, right_remainder)) =
+            extract_knn_predicate_prioritized(right, column_indices)
+        {
+            // ST_KNN found in right side, combine left side with any right remainder
+            let combined_remainder = match right_remainder {
+                Some(remainder) => Some(Arc::new(BinaryExpr::new(
+                    left.clone(),
+                    Operator::And,
+                    remainder,
+                )) as Arc<dyn PhysicalExpr>),
+                None => Some(left.clone()),
+            };
+            return Some((knn_predicate, combined_remainder));
+        }
+    }
 
     None
 }
