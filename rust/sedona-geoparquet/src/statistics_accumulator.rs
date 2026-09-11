@@ -178,6 +178,11 @@ impl GeoStatsAccumulator for GeographyGeoStatsAccumulator {
 
 #[cfg(test)]
 mod test {
+    #[cfg(feature = "s2geography_tests")]
+    use super::GeographyGeoStatsAccumulator;
+
+    #[cfg(feature = "s2geography_tests")]
+    use parquet::geospatial::accumulator::GeoStatsAccumulator;
 
     #[cfg(feature = "s2geography_tests")]
     use parquet::geospatial::bounding_box::BoundingBox;
