@@ -240,7 +240,7 @@ mod test {
             .unwrap_err();
         assert_eq!(
             err.to_string(),
-            "InvalidArguments: Expected boolean option (sqlstate: [0, 0, 0, 0, 0], vendor_code: 0)"
+            "InvalidArguments: Expected boolean option (sqlstate: 00000, vendor_code: 0)"
         );
     }
 }
