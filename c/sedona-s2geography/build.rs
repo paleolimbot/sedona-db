@@ -29,6 +29,23 @@ fn main() {
     // target like a Python package.
     let mut cmake_config = cmake::Config::new(".");
 
+    // cmake-rs forwards CMAKE_TOOLCHAIN_FILE, but vcpkg's CMake integration
+    // does not infer a custom triplet from VCPKG_DEFAULT_TRIPLET. Pass these
+    // through explicitly so a MinGW build cannot silently install/use the
+    // default MSVC x64-windows dependencies.
+    for key in [
+        "VCPKG_TARGET_TRIPLET",
+        "VCPKG_OVERLAY_TRIPLETS",
+        "VCPKG_MANIFEST_MODE",
+    ] {
+        println!("cargo:rerun-if-env-changed={key}");
+        if let Ok(value) = std::env::var(key) {
+            if !value.is_empty() {
+                cmake_config.define(key, value);
+            }
+        }
+    }
+
     // Use RelWithDebInfo if building release with debug symbols
     if std::env::var("PROFILE").unwrap_or_default() == "release"
         && std::env::var("CARGO_PROFILE_RELEASE_DEBUG").is_ok()

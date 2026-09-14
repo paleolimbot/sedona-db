@@ -17,7 +17,17 @@
 
 # Retain vcpkg's MinGW platform setup, but force the compilers selected by R.
 # This also supports R's Windows arm64 gnullvm toolchain.
-include("$ENV{VCPKG_ROOT}/scripts/toolchains/mingw.cmake")
+if(DEFINED Z_VCPKG_ROOT_DIR)
+  set(SEDONADB_VCPKG_ROOT "${Z_VCPKG_ROOT_DIR}")
+else()
+  set(SEDONADB_VCPKG_ROOT "${_VCPKG_ROOT_DIR}")
+endif()
+include("${SEDONADB_VCPKG_ROOT}/scripts/toolchains/mingw.cmake")
 
 set(CMAKE_C_COMPILER "$ENV{SEDONADB_R_CC}" CACHE FILEPATH "" FORCE)
 set(CMAKE_CXX_COMPILER "$ENV{SEDONADB_R_CXX}" CACHE FILEPATH "" FORCE)
+
+# R's compiler executables already target the correct Windows ABI. vcpkg's
+# generic MinGW toolchain sets this for Clang, but GCC rejects --target.
+unset(CMAKE_C_COMPILER_TARGET CACHE)
+unset(CMAKE_CXX_COMPILER_TARGET CACHE)
