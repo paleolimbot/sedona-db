@@ -39,10 +39,10 @@ fn main() {
         "VCPKG_MANIFEST_MODE",
     ] {
         println!("cargo:rerun-if-env-changed={key}");
-        if let Ok(value) = std::env::var(key) {
-            if !value.is_empty() {
-                cmake_config.define(key, value);
-            }
+        if let Ok(value) = std::env::var(key)
+            && !value.is_empty()
+        {
+            cmake_config.define(key, value);
         }
     }
 

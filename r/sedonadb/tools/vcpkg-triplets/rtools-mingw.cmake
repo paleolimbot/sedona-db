@@ -24,8 +24,12 @@ else()
 endif()
 include("${SEDONADB_VCPKG_ROOT}/scripts/toolchains/mingw.cmake")
 
-set(CMAKE_C_COMPILER "$ENV{SEDONADB_R_CC}" CACHE FILEPATH "" FORCE)
-set(CMAKE_CXX_COMPILER "$ENV{SEDONADB_R_CXX}" CACHE FILEPATH "" FORCE)
+set(CMAKE_C_COMPILER
+    "$ENV{SEDONADB_R_CC}"
+    CACHE FILEPATH "" FORCE)
+set(CMAKE_CXX_COMPILER
+    "$ENV{SEDONADB_R_CXX}"
+    CACHE FILEPATH "" FORCE)
 
 # R's compiler executables already target the correct Windows ABI. vcpkg's
 # generic MinGW toolchain sets this for Clang, but GCC rejects --target.
