@@ -40,7 +40,9 @@ RUSTFLAGS =
 TARGET_DIR = @TARGET_DIR@
 LIBDIR = $(TARGET_DIR)/$(TARGET)/$(subst dev,debug,$(PROFILE))
 STATLIB = $(LIBDIR)/libsedonadbr.a
-PKG_LIBS = -L$(LIBDIR) -lsedonadbr -lws2_32 -ladvapi32 -luserenv -lbcrypt -lntdll -lole32 @PKG_LIBS@
+S2_R_LINK_FLAGS = $(LIBDIR)/sedonadb-s2-r-link-flags.txt
+S2_NATIVE_LIBS = $(if $(findstring s2geography,$(FEATURE_FLAGS)),$(shell test ! -f "$(S2_R_LINK_FLAGS)" || cat "$(S2_R_LINK_FLAGS)"))
+PKG_LIBS = -L$(LIBDIR) -lsedonadbr $(S2_NATIVE_LIBS) -lws2_32 -ladvapi32 -luserenv -lbcrypt -lntdll -lole32 @PKG_LIBS@
 
 # Rtools doesn't have the linker in the location that cargo expects, so we need
 # to overwrite it via configuration.
@@ -84,6 +86,7 @@ $(STATLIB):
 	    export SEDONADB_R_CFLAGS="$(SEDONADB_R_CFLAGS)"; \
 	    export SEDONADB_R_CXXFLAGS="$(SEDONADB_R_CXXFLAGS)"; \
 	    export SEDONADB_R_LDFLAGS="$(SEDONADB_R_LDFLAGS)"; \
+	    export SEDONADB_R_LINK_FLAGS_FILE="$(S2_R_LINK_FLAGS)"; \
 	  fi && \
 	  export CC="$(CC)" && \
 	  export CFLAGS="$(CFLAGS_TWEAKED)" && \
