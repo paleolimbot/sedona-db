@@ -408,7 +408,9 @@ impl SedonaContext {
 
         // Register geos aggregate kernels if built with geos support
         #[cfg(feature = "geos")]
-        out.register_aggregate_kernels(sedona_geos::register::aggregate_kernels().into_iter())?;
+        out.register_order_insensitive_aggregate_kernels(
+            sedona_geos::register::aggregate_kernels().into_iter(),
+        )?;
 
         // Register geo kernels if built with geo support
         #[cfg(feature = "geo")]
@@ -419,7 +421,9 @@ impl SedonaContext {
 
         // Register geo aggregate kernels if built with geo support
         #[cfg(feature = "geo")]
-        out.register_aggregate_kernels(sedona_geo::register::aggregate_kernels().into_iter())?;
+        out.register_order_insensitive_aggregate_kernels(
+            sedona_geo::register::aggregate_kernels().into_iter(),
+        )?;
 
         // Register s2geography scalar kernels if built with s2geography support
         #[cfg(feature = "s2geography")]
@@ -580,6 +584,23 @@ impl SedonaContext {
         let mut functions = self.functions_mut()?;
         for (name, kernel) in kernels {
             let udf = functions.add_aggregate_udf_kernel(name, kernel)?;
+            self.ctx.register_udaf(udf.clone().into());
+        }
+
+        Ok(())
+    }
+
+    fn register_order_insensitive_aggregate_kernels<'a>(
+        &mut self,
+        kernels: impl Iterator<Item = (&'a str, impl IntoSedonaAccumulatorRefs)>,
+    ) -> Result<()> {
+        use datafusion_expr::utils::AggregateOrderSensitivity;
+
+        let mut functions = self.functions_mut()?;
+        for (name, kernel) in kernels {
+            functions.add_aggregate_udf_kernel(name, kernel)?;
+            let udf = functions.aggregate_udf_mut(name).unwrap();
+            udf.set_order_sensitivity(AggregateOrderSensitivity::Insensitive);
             self.ctx.register_udaf(udf.clone().into());
         }
 
@@ -1080,25 +1101,37 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn ordered_sedona_aggregates_are_rejected() {
+    async fn ordered_sedona_aggregates_respect_order_sensitivity() {
         let ctx = SedonaContext::new();
 
-        for function in ["ST_Collect_Agg", "ST_Envelope_Agg"] {
-            let sql = format!(
-                "SELECT {function}(g ORDER BY x) \
-                 FROM (VALUES (2, ST_Point(2, 2)), (1, ST_Point(1, 1))) AS t(x, g)"
-            );
-            let err = ctx.sql(&sql).await.unwrap().collect().await.unwrap_err();
-            assert!(
-                err.to_string().contains(&format!(
-                    "ORDER BY is not supported for aggregate function {}",
-                    function.to_lowercase()
-                )),
-                "unexpected error: {err}"
-            );
+        let values = "FROM (VALUES (2, ST_Point(2, 2)), (1, ST_Point(1, 1))) AS t(x, g)";
+
+        let sql = format!("SELECT ST_Collect_Agg(g ORDER BY x) {values}");
+        let err = ctx.sql(&sql).await.unwrap().collect().await.unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("ORDER BY is not supported for aggregate function st_collect_agg"),
+            "unexpected error: {err}"
+        );
+
+        for function in [
+            "ST_Analyze_Agg",
+            "ST_Envelope_Agg",
+            "ST_ConvexHull_Agg",
+            "ST_Intersection_Agg",
+            "ST_Union_Agg",
+            "ST_Polygonize_Agg",
+        ] {
+            let sql = format!("SELECT {function}(g ORDER BY x) {values}");
+            ctx.sql(&sql)
+                .await
+                .unwrap()
+                .collect()
+                .await
+                .unwrap_or_else(|err| panic!("{function} unexpectedly failed: {err}"));
         }
 
-        // DataFusion aggregates with ordered-accumulator support remain available.
+        // DataFusion's own ordered aggregates remain available.
         ctx.sql("SELECT array_agg(x ORDER BY x) FROM (VALUES (2), (1)) AS t(x)")
             .await
             .unwrap()

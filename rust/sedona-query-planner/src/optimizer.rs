@@ -29,15 +29,15 @@ use datafusion_common::tree_node::{Transformed, TransformedResult, TreeNode};
 use datafusion_common::{NullEquality, Result, plan_err};
 use datafusion_expr::logical_plan::Extension;
 use datafusion_expr::utils::{conjunction, split_conjunction};
-use datafusion_expr::{BinaryExpr, Expr, Operator};
+use datafusion_expr::{AggregateUDFImpl, BinaryExpr, Expr, Operator};
 use datafusion_expr::{Filter, Join, JoinType, LogicalPlan};
 use datafusion_optimizer::{AnalyzerRule, ApplyOrder, Optimizer, OptimizerConfig, OptimizerRule};
 use sedona_common::option::SedonaOptions;
 use sedona_common::{sedona_internal_datafusion_err, sedona_internal_err};
 use sedona_expr::aggregate_udf::SedonaAggregateUDF;
 
-/// Reject ordered Sedona aggregates until their accumulator contract supports
-/// DataFusion's appended ORDER BY arrays and ordered partial-state merging.
+/// Reject ordered Sedona aggregates unless they explicitly declare that input
+/// ordering does not affect their result.
 #[derive(Default, Debug)]
 struct RejectOrderedAggregates;
 
@@ -54,12 +54,9 @@ impl AnalyzerRule for RejectOrderedAggregates {
 
 fn reject_ordered_aggregate(expr: Expr) -> Result<Transformed<Expr>> {
     if let Expr::AggregateFunction(ref aggregate) = expr
-        && aggregate
-            .func
-            .inner()
-            .downcast_ref::<SedonaAggregateUDF>()
-            .is_some()
+        && let Some(udf) = aggregate.func.inner().downcast_ref::<SedonaAggregateUDF>()
         && !aggregate.params.order_by.is_empty()
+        && !udf.order_sensitivity().is_insensitive()
     {
         return plan_err!(
             "ORDER BY is not supported for aggregate function {}",
