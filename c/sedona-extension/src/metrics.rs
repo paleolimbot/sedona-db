@@ -34,7 +34,7 @@ use datafusion_physical_plan::metrics::{
     MetricType, MetricValue, MetricsSet, PruningMetrics, RatioMergeStrategy, RatioMetrics, Time,
     Timestamp,
 };
-use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _};
+use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{Map, Value};
 
 /// An owned, serde-compatible snapshot of an [`ExecutionPlanMetricsSet`].

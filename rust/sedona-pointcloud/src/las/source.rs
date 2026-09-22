@@ -95,9 +95,10 @@ impl FileSource for LasSource {
         f: &mut dyn FnMut(&Arc<dyn PhysicalExpr>) -> Result<TreeNodeRecursion, DataFusionError>,
     ) -> Result<TreeNodeRecursion, DataFusionError> {
         if let Some(predicate) = &self.predicate
-            && f(predicate)? == TreeNodeRecursion::Stop {
-                return Ok(TreeNodeRecursion::Stop);
-            }
+            && f(predicate)? == TreeNodeRecursion::Stop
+        {
+            return Ok(TreeNodeRecursion::Stop);
+        }
         for projection in &self.projection {
             if f(&projection.expr)? == TreeNodeRecursion::Stop {
                 return Ok(TreeNodeRecursion::Stop);
