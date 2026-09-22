@@ -74,8 +74,8 @@ use sedona_spatial_join_gpu::options::GpuOptions;
 
 use sedona_query_planner::{
     optimizer::{
-        register_ensure_loaded_optimizer, register_spatial_join_logical_optimizer,
-        register_vendored_optimizer_rules,
+        register_ensure_loaded_optimizer, register_sedona_analyzer_rules,
+        register_spatial_join_logical_optimizer, register_vendored_optimizer_rules,
     },
     query_planner::SedonaQueryPlanner,
     raster_batch_budget::RasterBatchBudgetRule,
@@ -108,6 +108,7 @@ impl SedonaContext {
         // DataFusion #22620 workaround tracked by
         // https://github.com/apache/sedona-db/issues/1232.
         let state_builder = register_vendored_optimizer_rules(state_builder).unwrap();
+        let state_builder = register_sedona_analyzer_rules(state_builder).unwrap();
         Self::finish_new(SessionContext::new_with_state(state_builder.build())).unwrap()
     }
 
@@ -259,6 +260,7 @@ impl SedonaContext {
         // DataFusion #22620 workaround tracked by
         // https://github.com/apache/sedona-db/issues/1232.
         state_builder = register_vendored_optimizer_rules(state_builder)?;
+        state_builder = register_sedona_analyzer_rules(state_builder)?;
         state_builder = register_spatial_join_logical_optimizer(state_builder)?;
         state_builder = register_ensure_loaded_optimizer(state_builder)?;
         // Re-batch raster materialization by estimated bytes rather than
@@ -1075,6 +1077,34 @@ mod tests {
             batches.iter().map(|batch| batch.num_rows()).sum::<usize>(),
             2
         );
+    }
+
+    #[tokio::test]
+    async fn ordered_sedona_aggregates_are_rejected() {
+        let ctx = SedonaContext::new();
+
+        for function in ["ST_Collect_Agg", "ST_Envelope_Agg"] {
+            let sql = format!(
+                "SELECT {function}(g ORDER BY x) \
+                 FROM (VALUES (2, ST_Point(2, 2)), (1, ST_Point(1, 1))) AS t(x, g)"
+            );
+            let err = ctx.sql(&sql).await.unwrap().collect().await.unwrap_err();
+            assert!(
+                err.to_string().contains(&format!(
+                    "ORDER BY is not supported for aggregate function {}",
+                    function.to_lowercase()
+                )),
+                "unexpected error: {err}"
+            );
+        }
+
+        // DataFusion aggregates with ordered-accumulator support remain available.
+        ctx.sql("SELECT array_agg(x ORDER BY x) FROM (VALUES (2), (1)) AS t(x)")
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
     }
 
     #[cfg(feature = "s2geography")]
