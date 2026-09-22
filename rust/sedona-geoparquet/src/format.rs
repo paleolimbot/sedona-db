@@ -1093,7 +1093,7 @@ mod test {
         let schema = Arc::new(Schema::new(vec![
             WKB_GEOMETRY.to_storage_field("geometry", true).unwrap(),
         ]));
-        let table_schema = TableSchema::new(schema, vec![]);
+        let table_schema = TableSchema::from(schema);
         let file_source = format.file_source(table_schema);
         let conf =
             FileScanConfigBuilder::new(ObjectStoreUrl::local_filesystem(), file_source).build();
@@ -1125,7 +1125,7 @@ mod test {
             DataType::Int32,
             false,
         )]));
-        let table_schema = TableSchema::new(schema, vec![]);
+        let table_schema = TableSchema::from(schema);
 
         // Create a parquet source with the correct constructor signature
         let parquet_source = ParquetSource::new(table_schema);

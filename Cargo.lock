@@ -6270,6 +6270,7 @@ dependencies = [
  "arrow-data",
  "arrow-schema",
  "async-trait",
+ "bytes",
  "criterion",
  "datafusion",
  "datafusion-common",

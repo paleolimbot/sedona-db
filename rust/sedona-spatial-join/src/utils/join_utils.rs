@@ -916,6 +916,7 @@ mod tests {
     use arrow_schema::Field;
     use arrow_schema::SchemaRef;
     use datafusion_common::ScalarValue;
+    use datafusion_common::tree_node::TreeNodeRecursion;
     use datafusion_expr::JoinType;
     use datafusion_expr::Operator;
     use datafusion_physical_expr::EquivalenceProperties;
@@ -1190,6 +1191,13 @@ mod tests {
 
         fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
             vec![]
+        }
+
+        fn apply_expressions(
+            &self,
+            _f: &mut dyn FnMut(&Arc<dyn PhysicalExpr>) -> Result<TreeNodeRecursion>,
+        ) -> Result<TreeNodeRecursion> {
+            Ok(TreeNodeRecursion::Continue)
         }
 
         fn with_new_children(
