@@ -141,8 +141,7 @@ def test_filter_pushdown_into_ffi_producer(geoarrow_data):
     df_filtered = sd_consumer.sql('SELECT * FROM df_producer WHERE "OBJECTID" < 50')
 
     # Get the physical plan (second row)
-    plan_df = df_filtered.explain().to_pandas()
-    plan_text = str(plan_df["plan"].iloc[1])
+    plan_text = df_filtered.explain().physical_plan
 
     # The filter should appear inside ImportedSedonaCExec, indicating it was pushed down
     # Look for the filter predicate appearing after ImportedSedonaCExec in the plan
@@ -201,8 +200,7 @@ def test_udf_filter_not_pushed_down_into_ffi_producer(geoarrow_data):
     )
 
     # Get the physical plan (second row)
-    plan_df = df_filtered.explain().to_pandas()
-    plan_text = str(plan_df["plan"].iloc[1])
+    plan_text = df_filtered.explain().physical_plan
 
     assert "ImportedSedonaCExec" in plan_text, (
         f"Expected ImportedSedonaCExec in plan:\n{plan_text}"

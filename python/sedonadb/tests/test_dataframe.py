@@ -564,48 +564,33 @@ def test_show_explained(con, capsys):
     assert capsys.readouterr().out.strip() == expected
 
 
-def test_explain(con, capsys):
-    con.sql("SELECT 1 as one").explain().show()
+def test_explain(con):
+    plan = con.sql("SELECT 1 as one").explain()
     expected = """
-┌───────────────┬─────────────────────────────────┐
-│   plan_type   ┆               plan              │
-│      utf8     ┆               utf8              │
-╞═══════════════╪═════════════════════════════════╡
-│ logical_plan  ┆ Projection: Int64(1) AS one     │
-│               ┆   EmptyRelation: rows=1         │
-├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
-│ physical_plan ┆ ProjectionExec: expr=[1 as one] │
-│               ┆   PlaceholderRowExec            │
-│               ┆                                 │
-└───────────────┴─────────────────────────────────┘
+== logical_plan ==
+Projection: Int64(1) AS one
+  EmptyRelation: rows=1
+
+== physical_plan ==
+ProjectionExec: expr=[1 as one]
+  PlaceholderRowExec
     """.strip()
-    assert capsys.readouterr().out.strip() == expected
+    assert repr(plan) == expected
+    assert plan.logical_plan == "Projection: Int64(1) AS one\n  EmptyRelation: rows=1"
+    assert plan.physical_plan == "ProjectionExec: expr=[1 as one]\n  PlaceholderRowExec\n"
+    assert plan["logical_plan"] == plan.logical_plan
 
-    con.sql("SELECT 1 as one").explain(format="tree").show()
-    expected = """
-┌───────────────┬───────────────────────────────┐
-│   plan_type   ┆              plan             │
-│      utf8     ┆              utf8             │
-╞═══════════════╪═══════════════════════════════╡
-│ physical_plan ┆ ┌───────────────────────────┐ │
-│               ┆ │       ProjectionExec      │ │
-│               ┆ │    --------------------   │ │
-│               ┆ │           one: 1          │ │
-│               ┆ └─────────────┬─────────────┘ │
-│               ┆ ┌─────────────┴─────────────┐ │
-│               ┆ │     PlaceholderRowExec    │ │
-│               ┆ └───────────────────────────┘ │
-│               ┆                               │
-└───────────────┴───────────────────────────────┘
-    """.strip()
-    assert capsys.readouterr().out.strip() == expected
+    tree_plan = con.sql("SELECT 1 as one").explain(format="tree")
+    assert tree_plan.logical_plan is None
+    assert tree_plan.physical_plan.startswith("┌")
+    assert "ProjectionExec" in repr(tree_plan)
 
-    query_plan = con.sql("SELECT 1 as one").explain(type="analyze").to_pandas()
-    assert query_plan.iloc[0, 0] == "Plan with Metrics"
+    query_plan = con.sql("SELECT 1 as one").explain(type="analyze")
+    assert "Plan with Metrics" in query_plan.plans
 
-    query_plan = con.sql("SELECT 1 as one").explain(type="extended").to_pandas()
-    assert query_plan.iloc[0, 0] == "initial_logical_plan"
-    assert len(query_plan) > 10
+    query_plan = con.sql("SELECT 1 as one").explain(type="extended")
+    assert next(iter(query_plan.plans)) == "initial_logical_plan"
+    assert len(query_plan.plans) > 10
 
 
 def test_repr(con):

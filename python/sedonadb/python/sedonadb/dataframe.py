@@ -31,6 +31,38 @@ if TYPE_CHECKING:
     import pyarrow as pa
 
 
+class ExplainPlan:
+    """An eagerly resolved query execution plan.
+
+    The keys in :attr:`plans` are the plan types returned by DataFusion. For a
+    standard, indent-formatted explanation these are ``logical_plan`` and
+    ``physical_plan``. Other explain types and formats may return different
+    keys.
+    """
+
+    def __init__(self, plans: Dict[str, str]):
+        self.plans = plans
+
+    @property
+    def logical_plan(self) -> Optional[str]:
+        """The logical plan, if one was returned."""
+        return self.plans.get("logical_plan")
+
+    @property
+    def physical_plan(self) -> Optional[str]:
+        """The physical plan, if one was returned."""
+        return self.plans.get("physical_plan")
+
+    def __getitem__(self, plan_type: str) -> str:
+        return self.plans[plan_type]
+
+    def __repr__(self) -> str:
+        return "\n\n".join(
+            f"== {plan_type} ==\n{plan.rstrip()}"
+            for plan_type, plan in self.plans.items()
+        )
+
+
 class DataFrame:
     """Representation of a (lazy) collection of columns
 
@@ -1834,8 +1866,8 @@ class DataFrame:
         self,
         type: str = "standard",
         format: str = "indent",
-    ) -> "DataFrame":
-        """Return the execution plan for this DataFrame as a DataFrame
+    ) -> ExplainPlan:
+        """Return the eagerly resolved execution plan for this DataFrame
 
         Retrieves the logical and physical execution plans that will be used to
         compute this DataFrame. This is useful for understanding query
@@ -1850,28 +1882,33 @@ class DataFrame:
                 "indent" (default), "tree", "pgjson" and "graphviz".
 
         Returns:
-            A DataFrame containing the execution plan information with columns
-            'plan_type' and 'plan'.
+            An ExplainPlan containing the resolved plan strings, keyed by plan
+            type.
 
         Examples:
 
             >>> import sedonadb
             >>> con = sedonadb.connect()
             >>> df = con.sql("SELECT 1 as one")
-            >>> df.explain().show()
-            ┌───────────────┬─────────────────────────────────┐
-            │   plan_type   ┆               plan              │
-            │      utf8     ┆               utf8              │
-            ╞═══════════════╪═════════════════════════════════╡
-            │ logical_plan  ┆ Projection: Int64(1) AS one     │
-            │               ┆   EmptyRelation: rows=1         │
-            ├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
-            │ physical_plan ┆ ProjectionExec: expr=[1 as one] │
-            │               ┆   PlaceholderRowExec            │
-            │               ┆                                 │
-            └───────────────┴─────────────────────────────────┘
+            >>> df.explain()
+            == logical_plan ==
+            Projection: Int64(1) AS one
+              EmptyRelation: rows=1
+            <BLANKLINE>
+            == physical_plan ==
+            ProjectionExec: expr=[1 as one]
+              PlaceholderRowExec
         """
-        return DataFrame(self._ctx, self._impl.explain(type, format))
+        explain_df = DataFrame(self._ctx, self._impl.explain(type, format))
+        explain_table = explain_df.to_arrow_table()
+        return ExplainPlan(
+            dict(
+                zip(
+                    explain_table["plan_type"].to_pylist(),
+                    explain_table["plan"].to_pylist(),
+                )
+            )
+        )
 
     def __repr__(self) -> str:
         if self._ctx.options.interactive:

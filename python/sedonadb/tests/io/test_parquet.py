@@ -733,8 +733,8 @@ def test_prune_geography_parquet():
         assert result_count > 0, "Expected some results from partial region query"
 
         # Verify pruning occurred via EXPLAIN ANALYZE
-        explained = con.sql(query_partial).explain("analyze").to_pandas()
-        plan_text = explained.iloc[0, 1]
+        explained = con.sql(query_partial).explain("analyze")
+        plan_text = explained["Plan with Metrics"]
 
         # Check that spatial pruning metrics are reported
         assert "row_groups_spatial_pruned" in plan_text, (
