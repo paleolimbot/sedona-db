@@ -33,8 +33,8 @@ use datafusion_expr::{ColumnarValue, Expr, JoinType};
 use datafusion_physical_plan::filter::FilterExec;
 use datafusion_physical_plan::joins::NestedLoopJoinExec;
 use datafusion_physical_plan::{
-    DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties, PlanProperties,
-    SendableRecordBatchStream,
+    ChildStats, DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties,
+    PlanProperties, SendableRecordBatchStream, StatisticsArgs,
 };
 use geo::{Distance, Euclidean};
 use geo_types::{Coord, Rect};
@@ -415,10 +415,21 @@ impl ExecutionPlan for StatsOverrideExec {
         self.inner.execute(partition, context)
     }
 
-    fn partition_statistics(&self, partition: Option<usize>) -> Result<Arc<Statistics>> {
+    fn child_stats_requests(&self, partition: Option<usize>) -> Vec<ChildStats> {
         match partition {
-            None => Ok(self.stats.clone()),
-            Some(partition) => self.inner.partition_statistics(Some(partition)),
+            None => vec![ChildStats::Skip],
+            Some(partition) => vec![ChildStats::At(Some(partition))],
+        }
+    }
+
+    fn statistics_from_inputs(
+        &self,
+        input_stats: &[Arc<Statistics>],
+        args: &StatisticsArgs,
+    ) -> Result<Arc<Statistics>> {
+        match args.partition() {
+            None => Ok(Arc::clone(&self.stats)),
+            Some(_) => Ok(Arc::clone(&input_stats[0])),
         }
     }
 }

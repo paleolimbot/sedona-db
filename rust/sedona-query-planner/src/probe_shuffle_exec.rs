@@ -46,8 +46,8 @@ use datafusion_physical_plan::metrics::MetricsSet;
 use datafusion_physical_plan::projection::ProjectionExec;
 use datafusion_physical_plan::repartition::RepartitionExec;
 use datafusion_physical_plan::{
-    DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties, Partitioning,
-    PlanProperties,
+    ChildStats, DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties, Partitioning,
+    PlanProperties, StatisticsArgs,
 };
 
 /// A round-robin repartitioning node that is invisible to DataFusion's
@@ -172,8 +172,17 @@ impl ExecutionPlan for ProbeShuffleExec {
         self.inner_repartition.metrics()
     }
 
-    fn partition_statistics(&self, partition: Option<usize>) -> Result<Arc<Statistics>> {
-        self.inner_repartition.partition_statistics(partition)
+    fn child_stats_requests(&self, partition: Option<usize>) -> Vec<ChildStats> {
+        self.inner_repartition.child_stats_requests(partition)
+    }
+
+    fn statistics_from_inputs(
+        &self,
+        input_stats: &[Arc<Statistics>],
+        args: &StatisticsArgs,
+    ) -> Result<Arc<Statistics>> {
+        self.inner_repartition
+            .statistics_from_inputs(input_stats, args)
     }
 
     fn try_swapping_with_projection(

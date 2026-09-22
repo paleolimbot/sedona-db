@@ -1215,9 +1215,10 @@ mod tests {
             unimplemented!("PropertiesOnlyExec is for properties tests only")
         }
 
-        fn partition_statistics(
+        fn statistics_from_inputs(
             &self,
-            _partition: Option<usize>,
+            _input_stats: &[Arc<datafusion_common::Statistics>],
+            _args: &datafusion_physical_plan::StatisticsArgs,
         ) -> Result<Arc<datafusion_common::Statistics>> {
             Ok(Arc::new(datafusion_common::Statistics::new_unknown(
                 self.schema().as_ref(),

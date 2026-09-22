@@ -34,7 +34,7 @@ use datafusion_physical_plan::{
     execution_plan::{Boundedness, CardinalityEffect, EmissionType},
     metrics::{CustomMetricValue, Metric, MetricValue, MetricsSet},
     DisplayAs, DisplayFormatType, ExecutionPlan, Partitioning, PlanProperties,
-    SendableRecordBatchStream,
+    SendableRecordBatchStream, StatisticsArgs,
 };
 use sedona_common::{sedona_internal_datafusion_err, sedona_internal_err};
 use serde::{Deserialize, Serialize};
@@ -415,7 +415,11 @@ impl ExecutionPlan for ImportedSedonaCExec {
         &self.properties
     }
 
-    fn partition_statistics(&self, _partition: Option<usize>) -> Result<Arc<Statistics>> {
+    fn statistics_from_inputs(
+        &self,
+        _input_stats: &[Arc<Statistics>],
+        _args: &StatisticsArgs,
+    ) -> Result<Arc<Statistics>> {
         Ok(Arc::new(Statistics::new_unknown(&self.schema)))
     }
 
