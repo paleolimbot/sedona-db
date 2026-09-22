@@ -497,7 +497,7 @@ fn filter_access_plan_using_native_geostats(
     if top_level_indices.iter().all(|i| {
         !matches!(
             parquet_schema.column(*i).logical_type_ref(),
-            Some(LogicalType::Geometry { .. }) | Some(LogicalType::Geography { .. })
+            Some(LogicalType::Geometry(_)) | Some(LogicalType::Geography(_))
         )
     }) {
         return Ok(());

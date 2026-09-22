@@ -749,7 +749,7 @@ mod test {
     use std::sync::Arc;
 
     use geo_traits::Dimensions;
-    use parquet::basic::{Repetition, Type as PhysicalType};
+    use parquet::basic::{GeographyType, GeometryType, Repetition, Type as PhysicalType};
     use parquet::schema::types::Type;
     use sedona_geometry::types::{GeometryTypeAndDimensions, GeometryTypeId};
 
@@ -805,7 +805,10 @@ mod test {
 
         let schema_additional_parquet_geo = make_parquet_schema(&[
             ("geom_geoparquet", None),
-            ("geom_parquet", Some(LogicalType::Geometry { crs: None })),
+            (
+                "geom_parquet",
+                Some(LogicalType::Geometry(GeometryType { crs: None })),
+            ),
         ]);
         let metadata = GeoParquetMetadata::try_from_parquet_metadata_impl(
             &schema_additional_parquet_geo,
@@ -817,8 +820,10 @@ mod test {
         assert!(metadata.columns.contains_key("geom_geoparquet"));
         assert!(metadata.columns.contains_key("geom_parquet"));
 
-        let schema_overlapping_columns =
-            make_parquet_schema(&[("geom_geoparquet", Some(LogicalType::Geometry { crs: None }))]);
+        let schema_overlapping_columns = make_parquet_schema(&[(
+            "geom_geoparquet",
+            Some(LogicalType::Geometry(GeometryType { crs: None })),
+        )]);
         let metadata = GeoParquetMetadata::try_from_parquet_metadata_impl(
             &schema_overlapping_columns,
             kv_metadata_with_geo_key.as_ref(),
@@ -835,8 +840,10 @@ mod test {
             Some(Value::String("geom_geoparquet_crs".to_string()))
         );
 
-        let schema_only_parquet_geo =
-            make_parquet_schema(&[("geom_parquet", Some(LogicalType::Geometry { crs: None }))]);
+        let schema_only_parquet_geo = make_parquet_schema(&[(
+            "geom_parquet",
+            Some(LogicalType::Geometry(GeometryType { crs: None })),
+        )]);
         let metadata = GeoParquetMetadata::try_from_parquet_metadata_impl(
             &schema_only_parquet_geo,
             None, // No key/value metadata
@@ -865,7 +872,7 @@ mod test {
 
         // Geometry logical type
         let metadata = column_from_logical_type(
-            Some(&LogicalType::Geometry { crs: None }),
+            Some(&LogicalType::Geometry(GeometryType { crs: None })),
             kv_metadata.as_ref(),
         )
         .unwrap()
@@ -874,9 +881,9 @@ mod test {
 
         // Ensure CRS is translated
         let metadata = column_from_logical_type(
-            Some(&LogicalType::Geometry {
+            Some(&LogicalType::Geometry(GeometryType {
                 crs: Some("projjson:some_projjson_key".to_string()),
-            }),
+            })),
             kv_metadata.as_ref(),
         )
         .unwrap()
@@ -888,10 +895,10 @@ mod test {
 
         // Geography logical type
         let metadata = column_from_logical_type(
-            Some(&LogicalType::Geography {
+            Some(&LogicalType::Geography(GeographyType {
                 crs: None,
                 algorithm: None,
-            }),
+            })),
             kv_metadata.as_ref(),
         )
         .unwrap()
@@ -900,10 +907,10 @@ mod test {
 
         // Ensure CRS is translated
         let metadata = column_from_logical_type(
-            Some(&LogicalType::Geography {
+            Some(&LogicalType::Geography(GeographyType {
                 crs: Some("projjson:some_projjson_key".to_string()),
                 algorithm: None,
-            }),
+            })),
             kv_metadata.as_ref(),
         )
         .unwrap()
@@ -915,10 +922,10 @@ mod test {
 
         // Ensure algorithm is translated
         let metadata = column_from_logical_type(
-            Some(&LogicalType::Geography {
+            Some(&LogicalType::Geography(GeographyType {
                 crs: None,
                 algorithm: Some(EdgeInterpolationAlgorithm::VINCENTY),
-            }),
+            })),
             kv_metadata.as_ref(),
         )
         .unwrap()

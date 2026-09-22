@@ -268,7 +268,7 @@ impl TableProvider for SingleObjectExternalTable {
         // for single-object formats today.
         let (object_store_url, _) = &self.files[0];
 
-        let table_schema = TableSchema::new(self.schema.clone(), vec![]);
+        let table_schema = TableSchema::from(self.schema.clone());
         let format = ExternalFileFormat::new(self.spec.clone());
         let file_source = format.file_source(table_schema);
 
