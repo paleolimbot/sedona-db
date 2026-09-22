@@ -406,11 +406,9 @@ impl SedonaContext {
         #[cfg(feature = "geos")]
         out.register_scalar_kernels(sedona_geos::register::scalar_kernels().into_iter())?;
 
-        // Register geos aggregate kernels if built with geos support
+        // Register geos aggregate UDFs if built with geos support
         #[cfg(feature = "geos")]
-        out.register_order_insensitive_aggregate_kernels(
-            sedona_geos::register::aggregate_kernels().into_iter(),
-        )?;
+        out.register_aggregate_udfs(sedona_geos::register::aggregate_udfs().into_iter())?;
 
         // Register geo kernels if built with geo support
         #[cfg(feature = "geo")]
@@ -419,11 +417,9 @@ impl SedonaContext {
         #[cfg(feature = "tg")]
         out.register_scalar_kernels(sedona_tg::register::scalar_kernels().into_iter())?;
 
-        // Register geo aggregate kernels if built with geo support
+        // Register geo aggregate UDFs if built with geo support
         #[cfg(feature = "geo")]
-        out.register_order_insensitive_aggregate_kernels(
-            sedona_geo::register::aggregate_kernels().into_iter(),
-        )?;
+        out.register_aggregate_udfs(sedona_geo::register::aggregate_udfs().into_iter())?;
 
         // Register s2geography scalar kernels if built with s2geography support
         #[cfg(feature = "s2geography")]
@@ -445,9 +441,7 @@ impl SedonaContext {
             sd_order_lnglat::OrderLngLat::new(sedona_s2geography::utils::s2_cell_id_from_lnglat);
         self.register_scalar_kernels([("sd_order", sd_order_kernel)].into_iter())?;
 
-        self.register_aggregate_kernels(
-            sedona_s2geography::register::aggregate_kernels().into_iter(),
-        )?;
+        self.register_aggregate_udfs(sedona_s2geography::register::aggregate_udfs().into_iter())?;
 
         Ok(())
     }
@@ -590,17 +584,13 @@ impl SedonaContext {
         Ok(())
     }
 
-    fn register_order_insensitive_aggregate_kernels<'a>(
+    pub fn register_aggregate_udfs(
         &mut self,
-        kernels: impl Iterator<Item = (&'a str, impl IntoSedonaAccumulatorRefs)>,
+        udfs: impl Iterator<Item = SedonaAggregateUDF>,
     ) -> Result<()> {
-        use datafusion_expr::utils::AggregateOrderSensitivity;
-
         let mut functions = self.functions_mut()?;
-        for (name, kernel) in kernels {
-            functions.add_aggregate_udf_kernel(name, kernel)?;
-            let udf = functions.aggregate_udf_mut(name).unwrap();
-            udf.set_order_sensitivity(AggregateOrderSensitivity::Insensitive);
+        for udf in udfs {
+            let udf = functions.add_aggregate_udf(udf)?;
             self.ctx.register_udaf(udf.clone().into());
         }
 

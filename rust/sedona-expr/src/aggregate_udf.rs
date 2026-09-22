@@ -117,9 +117,9 @@ impl SedonaAggregateUDF {
         self
     }
 
-    /// Update how this aggregate responds to an `ORDER BY` clause.
-    pub fn set_order_sensitivity(&mut self, order_sensitivity: AggregateOrderSensitivity) {
-        self.order_sensitivity = order_sensitivity;
+    /// Return how this aggregate responds to an `ORDER BY` clause.
+    pub fn order_sensitivity(&self) -> AggregateOrderSensitivity {
+        self.order_sensitivity
     }
 
     /// Add a new kernel to an Aggregate UDF
@@ -236,7 +236,7 @@ impl AggregateUDFImpl for SedonaAggregateUDF {
     }
 
     fn order_sensitivity(&self) -> AggregateOrderSensitivity {
-        self.order_sensitivity
+        self.order_sensitivity()
     }
 }
 

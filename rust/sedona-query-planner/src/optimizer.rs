@@ -29,7 +29,7 @@ use datafusion_common::tree_node::{Transformed, TransformedResult, TreeNode};
 use datafusion_common::{NullEquality, Result, plan_err};
 use datafusion_expr::logical_plan::Extension;
 use datafusion_expr::utils::{conjunction, split_conjunction};
-use datafusion_expr::{AggregateUDFImpl, BinaryExpr, Expr, Operator};
+use datafusion_expr::{BinaryExpr, Expr, Operator};
 use datafusion_expr::{Filter, Join, JoinType, LogicalPlan};
 use datafusion_optimizer::{AnalyzerRule, ApplyOrder, Optimizer, OptimizerConfig, OptimizerRule};
 use sedona_common::option::SedonaOptions;
