@@ -1130,6 +1130,27 @@ mod tests {
             .unwrap();
     }
 
+    #[tokio::test]
+    async fn ordered_sedona_aggregates_in_subqueries_are_rejected() {
+        let ctx = SedonaContext::new();
+
+        let sql = r#"
+            SELECT ST_AsText((
+                SELECT ST_Collect_Agg(g ORDER BY x)
+                FROM (VALUES
+                    (2, ST_Point(2, 2)),
+                    (1, ST_Point(1, 1))
+                ) AS t(x, g)
+            ))
+        "#;
+        let err = ctx.sql(sql).await.unwrap().collect().await.unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("ORDER BY is not supported for aggregate function st_collect_agg"),
+            "unexpected error: {err}"
+        );
+    }
+
     #[cfg(feature = "s2geography")]
     #[tokio::test]
     async fn geography_bounds_default_context() {

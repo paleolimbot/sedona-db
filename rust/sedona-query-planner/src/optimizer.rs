@@ -25,7 +25,7 @@ use crate::spatial_expr_utils::{
 use crate::wrap_async_udf::WrapAsyncUdfRule;
 use datafusion::execution::session_state::SessionStateBuilder;
 use datafusion_common::config::ConfigOptions;
-use datafusion_common::tree_node::{Transformed, TransformedResult, TreeNode};
+use datafusion_common::tree_node::{Transformed, TransformedResult};
 use datafusion_common::{NullEquality, Result, plan_err};
 use datafusion_expr::logical_plan::Extension;
 use datafusion_expr::utils::{conjunction, split_conjunction};
@@ -43,7 +43,7 @@ struct RejectOrderedAggregates;
 
 impl AnalyzerRule for RejectOrderedAggregates {
     fn analyze(&self, plan: LogicalPlan, _config: &ConfigOptions) -> Result<LogicalPlan> {
-        plan.transform_up(|plan| plan.map_expressions(reject_ordered_aggregate))
+        plan.transform_up_with_subqueries(|plan| plan.map_expressions(reject_ordered_aggregate))
             .data()
     }
 
