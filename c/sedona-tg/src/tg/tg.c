@@ -72,7 +72,7 @@ enum tg_geom_type {
     TG_GEOMETRYCOLLECTION = 7, ///< GeometryCollection, collection of geometries
 };
 
-enum tg_index { 
+enum tg_index {
     TG_DEFAULT,  ///< default is TG_NATURAL or tg_env_set_default_index().
     TG_NONE,     ///< no indexing available, or disabled.
     TG_NATURAL,  ///< indexing with natural ring order, for rings/lines
@@ -185,7 +185,7 @@ TG_EXTERN int tg_geobin_fullrect(const uint8_t *geobin, size_t len,
     double min[4], double max[4]);
 TG_EXTERN struct tg_rect tg_geobin_rect(const uint8_t *geobin, size_t len);
 TG_EXTERN struct tg_point tg_geobin_point(const uint8_t *geobin, size_t len);
-TG_EXTERN size_t tg_geom_geojson(const struct tg_geom *geom, char *dst, 
+TG_EXTERN size_t tg_geom_geojson(const struct tg_geom *geom, char *dst,
     size_t n);
 TG_EXTERN size_t tg_geom_wkt(const struct tg_geom *geom, char *dst, size_t n);
 TG_EXTERN size_t tg_geom_wkb(const struct tg_geom *geom, uint8_t *dst,
@@ -280,8 +280,8 @@ TG_EXTERN int tg_ring_index_level_num_rects(const struct tg_ring *ring,
 TG_EXTERN struct tg_rect tg_ring_index_level_rect(const struct tg_ring *ring,
     int levelidx, int rectidx);
 TG_EXTERN bool tg_ring_nearest_segment(const struct tg_ring *ring,
-    double (*rect_dist)(struct tg_rect rect, int *more, void *udata), 
-    double (*seg_dist)(struct tg_segment seg, int *more, void *udata), 
+    double (*rect_dist)(struct tg_rect rect, int *more, void *udata),
+    double (*seg_dist)(struct tg_segment seg, int *more, void *udata),
     bool (*iter)(struct tg_segment seg, double dist, int index, void *udata),
     void *udata);
 TG_EXTERN void tg_ring_line_search(const struct tg_ring *a,
@@ -318,7 +318,7 @@ TG_EXTERN struct tg_rect tg_line_index_level_rect(const struct tg_line *line,
 TG_EXTERN bool tg_line_nearest_segment(const struct tg_line *line,
     double (*rect_dist)(struct tg_rect rect, int *more, void *udata),
     double (*seg_dist)(struct tg_segment seg, int *more, void *udata),
-    bool (*iter)(struct tg_segment seg, double dist, int index, void *udata), 
+    bool (*iter)(struct tg_segment seg, double dist, int index, void *udata),
     void *udata);
 TG_EXTERN void tg_line_line_search(const struct tg_line *a,
     const struct tg_line *b, bool (*iter)(struct tg_segment aseg, int aidx,
@@ -548,7 +548,7 @@ enum flags {
 #endif
 #endif
 
-#ifndef HAS_ATOMICS 
+#ifndef HAS_ATOMICS
 #error <stdatomic.h> is not available. \
 Explicitly provide TG_NOATOMIC if you intend to use TG without atomics.
 #endif
@@ -579,7 +579,7 @@ static bool rc_release(rc_t *rc) {
 #ifndef atomic_fetch_sub_explicit
 #define atomic_fetch_sub_explicit(a,b,c) atomic_fetch_sub(a,b)
 #endif
-#endif 
+#endif
 
 typedef atomic_int rc_t;
 static void rc_init(rc_t *rc) {
@@ -594,7 +594,7 @@ static bool rc_release(rc_t *rc) {
 
 #endif
 
-struct head { 
+struct head {
     rc_t rc;        // 4-byte atomic reference counter
     uint8_t noheap; // bool
     uint8_t base;   // enum base
@@ -637,7 +637,7 @@ struct tg_ring {
     struct tg_rect rect;
     struct index *index;
     struct ystripes *ystripes;
-    struct tg_point points[]; 
+    struct tg_point points[];
 };
 
 /// A line is a series of tg_segment that make up a linestring.
@@ -663,7 +663,7 @@ struct tg_ring {
 struct tg_line { int _; };
 
 /// A polygon consists of one exterior ring and zero or more holes.
-/// 
+///
 /// **Creating**
 ///
 /// To create a new polygon use the tg_poly_new() function.
@@ -698,10 +698,10 @@ struct multi {
 };
 
 /// A geometry is the common generic type that can represent a Point,
-/// LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon, or 
-/// GeometryCollection. 
-/// 
-/// For geometries that are derived from GeoJSON, they may have additional 
+/// LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon, or
+/// GeometryCollection.
+///
+/// For geometries that are derived from GeoJSON, they may have additional
 /// attributes such as being a Feature or a FeatureCollection; or include
 /// extra json fields.
 ///
@@ -794,7 +794,7 @@ static inline float fmaxf0(float x, float y) {
     return fmaxf(x, y);
 }
 #elif defined(__GNUC__) && defined(__x86_64__)
-// gcc/amd64 sometimes uses branching with fmin/fmax. 
+// gcc/amd64 sometimes uses branching with fmin/fmax.
 // This code use single a asm op instead.
 // https://gcc.gnu.org/bugzilla//show_bug.cgi?id=94497
 #pragma GCC diagnostic push
@@ -850,7 +850,7 @@ static bool collinear(
     double x1, double y1, // point 1
     double x2, double y2, // point 2
     double x3, double y3  // point 3
-) { 
+) {
     bool x1x2 = feq(x1, x2);
     bool x1x3 = feq(x1, x3);
     bool x2x3 = feq(x2, x3);
@@ -891,7 +891,7 @@ static bool collinear(
 static double length(double x1, double y1, double x2, double y2) {
     return sqrt((x1-x2) * (x1-x2) + (y1-y2) * (y1-y2));
 }
-    
+
 #ifndef ludo
 #define ludo
 #define ludo1(i,f) f; i++;
@@ -940,7 +940,7 @@ static int default_index_spread = 16;
 static bool print_fixed_floats = false;
 
 /// Set the floating point printing to be fixed size.
-/// By default floating points are printed using their smallest textual 
+/// By default floating points are printed using their smallest textual
 /// representation. Such as 800000 is converted to "8e5". This is ideal when
 /// both accuracy and size are desired. But there may be times when only
 /// fixed epresentations are wanted, in that case set this param to true.
@@ -956,9 +956,9 @@ void tg_env_set_print_fixed_floats(bool print) {
 /// program start up and prior to calling any other tg_*() function.
 /// @see GlobalFuncs
 void tg_env_set_allocator(
-    void *(*malloc)(size_t), 
+    void *(*malloc)(size_t),
     void *(*realloc)(void*, size_t),
-    void (*free)(void*)) 
+    void (*free)(void*))
 {
     _malloc = malloc;
     _realloc = realloc;
@@ -992,8 +992,8 @@ void tg_free(void *ptr) {
 }
 
 /// Set the geometry indexing default.
-/// 
-/// This is a global override to the indexing for all yet-to-be created 
+///
+/// This is a global override to the indexing for all yet-to-be created
 /// geometries.
 /// @warning This function, if needed, should be called **only once** at
 /// program start up and prior to calling any other tg_*() function.
@@ -1002,8 +1002,8 @@ void tg_free(void *ptr) {
 /// @see GlobalFuncs
 void tg_env_set_index(enum tg_index ix) {
     switch (ix) {
-    case TG_NONE: 
-    case TG_NATURAL: 
+    case TG_NONE:
+    case TG_NATURAL:
     case TG_YSTRIPES:
         // only change for none, natural, and ystripes
         default_index = ix;
@@ -1023,13 +1023,13 @@ enum tg_index tg_env_get_default_index(void) {
 }
 
 /// Set the default index spread.
-/// 
+///
 /// The "spread" is how many rectangles are grouped together on an indexed
 /// level before propagating up to a higher level.
-/// 
+///
 /// Default is 16.
 ///
-/// This is a global override to the indexing spread for all yet-to-be created 
+/// This is a global override to the indexing spread for all yet-to-be created
 /// geometries.
 /// @warning This function, if needed, should be called **only once** at
 /// program start up and prior to calling any other tg_*() function.
@@ -1079,7 +1079,7 @@ static bool pteq(struct tg_point a, struct tg_point b) {
     return feq(a.x, b.x) && feq(a.y, b.y);
 }
 
-/// Returns the minimum bounding rectangle of a point. 
+/// Returns the minimum bounding rectangle of a point.
 /// @see PointFuncs
 struct tg_rect tg_point_rect(struct tg_point point) {
     return (struct tg_rect){ .min = point, .max = point };
@@ -1115,25 +1115,25 @@ bool tg_point_covers_rect(struct tg_point point, struct tg_rect rect) {
 
 /// Tests whether a point fully intersects a rectangle.
 /// @see PointFuncs
-bool tg_point_intersects_rect(struct tg_point point, struct tg_rect rect) { 
+bool tg_point_intersects_rect(struct tg_point point, struct tg_rect rect) {
     return tg_rect_covers_point(rect, point);
 }
 
 /// Tests whether a point fully contains a line.
 /// @see PointFuncs
 bool tg_point_covers_line(struct tg_point point, const struct tg_line *line) {
-    return !tg_line_empty(line) && 
+    return !tg_line_empty(line) &&
            tg_point_covers_rect(point, tg_line_rect(line));
 }
 
 bool tg_point_contains_line(struct tg_point point, const struct tg_line *line) {
-    return !tg_line_empty(line) && 
+    return !tg_line_empty(line) &&
            tg_point_covers_rect(point, tg_line_rect(line));
 }
 
 /// Tests whether a point intersects a line.
 /// @see PointFuncs
-bool tg_point_intersects_line(struct tg_point point, 
+bool tg_point_intersects_line(struct tg_point point,
     const struct tg_line *line)
 {
     return tg_line_intersects_point(line, point);
@@ -1152,7 +1152,7 @@ bool tg_point_touches_line(struct tg_point point, const struct tg_line *line) {
 /// Tests whether a point fully contains a polygon.
 /// @see PointFuncs
 bool tg_point_covers_poly(struct tg_point point, const struct tg_poly *poly) {
-    return !tg_poly_empty(poly) && 
+    return !tg_poly_empty(poly) &&
            tg_point_covers_rect(point, tg_poly_rect(poly));
 }
 
@@ -1172,7 +1172,7 @@ bool tg_point_intersects_poly(struct tg_point point,
 
 bool tg_point_touches_poly(struct tg_point point, const struct tg_poly *poly) {
     // Return true if the point touches the boundary of the exterior ring or
-    // the boundary of the interior holes. 
+    // the boundary of the interior holes.
     const struct tg_ring *ring = tg_poly_exterior(poly);
     if (tg_line_covers_point((struct tg_line*)ring, point)) {
         return true;
@@ -1198,7 +1198,7 @@ static bool point_on_segment(struct tg_point p, struct tg_segment s) {
     return collinear(s.a.x, s.a.y, s.b.x, s.b.y, p.x, p.y);
 }
 
-static enum tg_raycast_result raycast(struct tg_segment seg, 
+static enum tg_raycast_result raycast(struct tg_segment seg,
     struct tg_point p)
 {
     struct tg_rect r = tg_segment_rect(seg);
@@ -1281,7 +1281,7 @@ enum tg_raycast_result tg_raycast(struct tg_segment seg, struct tg_point p) {
     return raycast(seg, p);
 }
 
-struct tg_point tg_point_move(struct tg_point point, 
+struct tg_point tg_point_move(struct tg_point point,
     double delta_x, double delta_y)
 {
     return (struct tg_point){ .x = point.x + delta_x, .y = point.y + delta_y };
@@ -1305,11 +1305,11 @@ bool tg_segment_covers_point(struct tg_segment seg, struct tg_point p) {
 /// Tests whether a segment fully contains another segment.
 /// @see SegmentFuncs
 bool tg_segment_covers_segment(struct tg_segment a, struct tg_segment b) {
-    return tg_segment_covers_point(a, b.a) && 
+    return tg_segment_covers_point(a, b.a) &&
            tg_segment_covers_point(a, b.b);
 }
 
-static void segment_fill_rect(const struct tg_segment *seg, 
+static void segment_fill_rect(const struct tg_segment *seg,
     struct tg_rect *rect)
 {
     rect->min.x = fmin0(seg->a.x, seg->b.x);
@@ -1318,7 +1318,7 @@ static void segment_fill_rect(const struct tg_segment *seg,
     rect->max.y = fmax0(seg->a.y, seg->b.y);
 }
 
-/// Returns the minimum bounding rectangle of a segment. 
+/// Returns the minimum bounding rectangle of a segment.
 /// @see SegmentFuncs
 struct tg_rect tg_segment_rect(struct tg_segment seg) {
     struct tg_rect rect;
@@ -1391,19 +1391,19 @@ struct tg_segment tg_rect_segment_at(struct tg_rect r, int index) {
 
 /// Tests whether a segment intersects another segment.
 /// @see SegmentFuncs
-bool tg_segment_intersects_segment(struct tg_segment seg_a, 
+bool tg_segment_intersects_segment(struct tg_segment seg_a,
     struct tg_segment seg_b)
 {
     struct tg_point a = seg_a.a;
     struct tg_point b = seg_a.b;
     struct tg_point c = seg_b.a;
     struct tg_point d = seg_b.b;
-    if (!tg_rect_intersects_rect(tg_segment_rect(seg_a), 
+    if (!tg_rect_intersects_rect(tg_segment_rect(seg_a),
         tg_segment_rect(seg_b)))
     {
         return false;
     }
-    
+
     if (pteq(seg_a.a, seg_b.a) || pteq(seg_a.a, seg_b.b) ||
         pteq(seg_a.b, seg_b.a) || pteq(seg_a.b, seg_b.b))
     {
@@ -1420,7 +1420,7 @@ bool tg_segment_intersects_segment(struct tg_segment seg_a,
         if (!(((c.x-a.x <= 0) != (c.x-b.x <= 0))) ||
               ((c.y-a.y <= 0) != (c.y-b.y <= 0)))
         {
-            return tg_segment_covers_point(seg_a, seg_b.a) || 
+            return tg_segment_covers_point(seg_a, seg_b.a) ||
                    tg_segment_covers_point(seg_a, seg_b.b) ||
                    tg_segment_covers_point(seg_b, seg_a.a) ||
                    tg_segment_covers_point(seg_b, seg_a.b);
@@ -1432,7 +1432,7 @@ bool tg_segment_intersects_segment(struct tg_segment seg_a,
     double rxs = rx*sy - ry*sx;
     if (eq_zero(rxs)) {
         // Segments are parallel.
-        return false; 
+        return false;
     }
     double cmpxs = cmpx*sy - cmpy*sx;
     double rxsr = 1 / rxs;
@@ -1447,7 +1447,7 @@ bool tg_segment_intersects_segment(struct tg_segment seg_a,
 /// Tests whether a segment fully contains a rectangle.
 /// @see SegmentFuncs
 bool tg_segment_covers_rect(struct tg_segment seg, struct tg_rect rect) {
-    return tg_segment_covers_point(seg, rect.min) && 
+    return tg_segment_covers_point(seg, rect.min) &&
            tg_segment_covers_point(seg, rect.max);
 }
 
@@ -1470,7 +1470,7 @@ static bool tg_buf_ensure(struct tg_buf *buf, size_t len) {
     return true;
 }
 
-// tg_buf_append_byte append byte to buffer. 
+// tg_buf_append_byte append byte to buffer.
 // The buf->len should be greater than before, otherwise out of memory.
 static bool tg_buf_append_byte(struct tg_buf *buf, uint8_t b) {
     if (!tg_buf_ensure(buf, 1)) return false;
@@ -1524,9 +1524,9 @@ static inline void ixrect_expand(struct ixrect *rect, struct ixrect *other) {
 // fdown/fup returns a value that is a little larger or smaller.
 // Works similarly to nextafter, though it's faster and less accurate.
 //    fdown(d) -> nextafter(d, -INFINITY);
-//    fup(d)   -> nextafter(d, INFINITY); 
-// fnext0 returns the next value after d. 
-// Param dir can be 0 (towards -INFINITY) or 1 (towards INFINITY). 
+//    fup(d)   -> nextafter(d, INFINITY);
+// fnext0 returns the next value after d.
+// Param dir can be 0 (towards -INFINITY) or 1 (towards INFINITY).
 static double fnext0(double d, int dir) {
     static double vals[2] = {
         1.0 - 1.0/8388608.0, /* towards zero */
@@ -1543,7 +1543,7 @@ static double fup(double d) {
     return fnext0(d, 1);
 }
 
-static void tg_rect_to_ixrect(struct tg_rect *rect, 
+static void tg_rect_to_ixrect(struct tg_rect *rect,
     struct ixrect *ixrect)
 {
     ixrect->min.x = fdown(rect->min.x);
@@ -1572,7 +1572,7 @@ static inline void ixrect_expand(struct ixrect *rect, struct ixrect *other) {
     rect->max.x = fmax0(rect->max.x, other->max.x);
     rect->max.y = fmax0(rect->max.y, other->max.y);
 }
-static inline void tg_rect_to_ixrect(struct tg_rect *rect, 
+static inline void tg_rect_to_ixrect(struct tg_rect *rect,
     struct ixrect *ixrect)
 {
     ixrect->min.x = rect->min.x;
@@ -1595,7 +1595,7 @@ struct index {
     struct level levels[];    // all levels starting with root
 };
 
-static inline void tg_point_to_ixpoint(struct tg_point *point, 
+static inline void tg_point_to_ixpoint(struct tg_point *point,
     struct ixpoint *ixpoint)
 {
     ixpoint->x = point->x;
@@ -1612,7 +1612,7 @@ static inline void ixrect_to_tg_rect(struct ixrect *ixrect,
     rect->max.y = ixrect->max.y;
 }
 
-static inline bool ixrect_intersects_ixrect(struct ixrect *a, 
+static inline bool ixrect_intersects_ixrect(struct ixrect *a,
     struct ixrect *b)
 {
     if (a->min.y > b->max.y || a->max.y < b->min.y) return false;
@@ -1634,7 +1634,7 @@ static int index_level_num_rects(const struct index *index, int levelidx) {
     return index->levels[levelidx].nrects;
 }
 
-static struct tg_rect index_level_rect(const struct index *index, 
+static struct tg_rect index_level_rect(const struct index *index,
     int levelidx, int rectidx)
 {
     if (!index) return (struct tg_rect) { 0 };
@@ -1748,7 +1748,7 @@ static bool process_ystripes(struct tg_ring *ring) {
     size_t pos = mark;
     for (int i = 0; i < nstripes; i++) {
         ystripes->stripes[i].count = 0;
-        ystripes->stripes[i].indexes = (void*)&((char*)ystripes)[pos]; 
+        ystripes->stripes[i].indexes = (void*)&((char*)ystripes)[pos];
         pos += ycounts[i]*sizeof(int);
     }
     tg_free(ycounts);
@@ -1778,7 +1778,7 @@ static struct tg_segment ring_segment_at(const struct tg_ring *ring, int index);
 /// Tests whether a rectangle fully contains a point using xy coordinates.
 /// @see RectFuncs
 bool tg_rect_covers_xy(struct tg_rect rect, double x, double y) {
-    return !(x < rect.min.x || y < rect.min.y || 
+    return !(x < rect.min.x || y < rect.min.y ||
              x > rect.max.x || y > rect.max.y);
 }
 
@@ -1797,7 +1797,7 @@ bool tg_rect_intersects_point(struct tg_rect rect, struct tg_point point) {
 /// Returns the center point of a rectangle
 /// @see RectFuncs
 struct tg_point tg_rect_center(struct tg_rect rect) {
-    return (struct tg_point){ 
+    return (struct tg_point){
         .x = (rect.max.x + rect.min.x) / 2,
         .y = (rect.max.y + rect.min.y) / 2,
     };
@@ -1853,7 +1853,7 @@ static void rect_to_ring(struct tg_rect rect, struct tg_ring *ring) {
     }
 }
 
-void tg_rect_search(const struct tg_rect rect, struct tg_rect target, 
+void tg_rect_search(const struct tg_rect rect, struct tg_rect target,
     bool(*iter)(struct tg_segment seg, int index, void *udata),
     void *udata)
 {
@@ -1868,7 +1868,7 @@ void tg_rect_search(const struct tg_rect rect, struct tg_rect target,
 
 /// Tests whether a rectangle fully contains line.
 bool tg_rect_covers_line(struct tg_rect rect, const struct tg_line *line) {
-    return !tg_line_empty(line) && 
+    return !tg_line_empty(line) &&
         tg_rect_covers_rect(rect, tg_line_rect(line));
 }
 
@@ -1914,7 +1914,7 @@ static struct tg_rect process_points(const struct tg_point *points,
         *area = 0;
         return rect;
     }
-    
+
     struct tg_point a, b, c;
     bool concave = false;
     int dir = 0;
@@ -1925,7 +1925,7 @@ static struct tg_rect process_points(const struct tg_point *points,
     rect.min = points[0];
     rect.max = points[0];
 
-    // 
+    //
     struct tg_rect spreadrect;
     spreadrect.min = points[0];
     spreadrect.max = points[0];
@@ -1937,7 +1937,7 @@ static struct tg_rect process_points(const struct tg_point *points,
         c = points[i+2]; \
         ring_points[i] = a; \
     }
-    
+
     #define step_gather_abc_wrap() { \
         a = points[i]; \
         if (i < npoints-2) { \
@@ -1952,7 +1952,7 @@ static struct tg_rect process_points(const struct tg_point *points,
         } \
         ring_points[i] = a; \
     }
-    
+
     #define step_inflate_rect_no_index() { \
         rect_inflate_point(&rect, &a); \
     }
@@ -2001,13 +2001,13 @@ static struct tg_rect process_points(const struct tg_point *points,
         } \
     }
 
-    // The following code is a large loop that scans over every point and 
-    // performs various processing. 
+    // The following code is a large loop that scans over every point and
+    // performs various processing.
     //
     // There are two major branch groups, Indexed and Non-indexed.
     // - Indexed is when there is a provided tablemesa type index structure,
     //   and each segment spread (usually eight segments at a time) are
-    //   naturally inflated into a single rectangle that is stored contiguously 
+    //   naturally inflated into a single rectangle that is stored contiguously
     //   in a series of rectangles.
     // - Non-indexed is when there is no provided index. The entire MBR is
     //   inflated to included every point.
@@ -2029,7 +2029,7 @@ static struct tg_rect process_points(const struct tg_point *points,
     int i = 0;
     int j = 0;
     int r = 0;
-    
+
     // LOOP START
     // Convex section
     if (!index) {
@@ -2138,10 +2138,10 @@ static size_t calc_series_size(int npoints) {
     return size;
 }
 
-static void fill_index_struct(struct index *index, int nlevels, int nsegs, 
+static void fill_index_struct(struct index *index, int nlevels, int nsegs,
     int ixspread, size_t size)
 {
-    // Allocate the memory needed to store the entire index plus the size 
+    // Allocate the memory needed to store the entire index plus the size
     // of the allocation in a pre header.
     index->nlevels = nlevels-1;
     index->memsz = size;
@@ -2158,11 +2158,11 @@ static void fill_index_struct(struct index *index, int nlevels, int nsegs,
     }
 }
 
-static struct tg_ring *series_new(const struct tg_point *points, int npoints, 
-    bool closed, enum tg_index ix) 
+static struct tg_ring *series_new(const struct tg_point *points, int npoints,
+    bool closed, enum tg_index ix)
 {
     npoints = npoints <= 0 ? 0 : npoints;
-    int nsegs = num_segments(points, npoints, closed);    
+    int nsegs = num_segments(points, npoints, closed);
     size_t size = calc_series_size(npoints);
 
     int ixspread;
@@ -2218,7 +2218,7 @@ static struct tg_ring *series_new(const struct tg_point *points, int npoints,
 
     ring->rect = process_points(points, npoints, ring->points, ring->index,
         &ring->convex, &ring->clockwise, &ring->area);
-    
+
     // Fill extra point to ensure perfect close.
     ring->points[npoints] = ring->points[0];
 
@@ -2239,7 +2239,7 @@ static struct tg_ring *series_new(const struct tg_point *points, int npoints,
     return ring;
 }
 
-static struct tg_ring *series_move(const struct tg_ring *ring, bool closed, 
+static struct tg_ring *series_move(const struct tg_ring *ring, bool closed,
     double delta_x, double delta_y)
 {
     if (!ring) return NULL;
@@ -2316,9 +2316,9 @@ static size_t ring_alloc_size(const struct tg_ring *ring) {
 
 /// Clones a ring
 /// @param ring Input ring, caller retains ownership.
-/// @return A duplicate of the provided ring. 
+/// @return A duplicate of the provided ring.
 /// @note The caller is responsible for freeing with tg_ring_free().
-/// @note This method of cloning uses implicit sharing through an atomic 
+/// @note This method of cloning uses implicit sharing through an atomic
 /// reference counter.
 /// @see RingFuncs
 struct tg_ring *tg_ring_clone(const struct tg_ring *ring) {
@@ -2330,7 +2330,7 @@ struct tg_ring *tg_ring_clone(const struct tg_ring *ring) {
     return ring_mut;
 }
 
-/// Returns the allocation size of the ring. 
+/// Returns the allocation size of the ring.
 /// @param ring Input ring
 /// @return Size of ring in bytes
 /// @see RingFuncs
@@ -2411,15 +2411,15 @@ struct tg_segment tg_ring_segment_at(const struct tg_ring *ring, int index) {
     return ring_segment_at(ring, index);
 }
 
-static bool segment_rect_intersects_rect(const struct tg_segment *seg, 
-    struct tg_rect *rect) 
+static bool segment_rect_intersects_rect(const struct tg_segment *seg,
+    struct tg_rect *rect)
 {
     struct tg_rect rect2;
     segment_fill_rect(seg, &rect2);
     return rect_intersects_rect(rect, &rect2);
 }
 
-static bool index_search(const struct tg_ring *ring, struct tg_rect *rect, 
+static bool index_search(const struct tg_ring *ring, struct tg_rect *rect,
     int lvl, int start,
     bool(*iter)(struct tg_segment seg, int index, void *udata),
     void *udata)
@@ -2449,8 +2449,8 @@ static bool index_search(const struct tg_ring *ring, struct tg_rect *rect,
         if (e > level->nrects) e = level->nrects;
         for (; i < e; i++) {
             if (ixrect_intersects_ixrect(&level->rects[i], &ixrect)) {
-                if (!index_search(ring, rect, lvl+1, i*ixspread, iter, 
-                    udata)) 
+                if (!index_search(ring, rect, lvl+1, i*ixspread, iter,
+                    udata))
                 {
                     return false;
                 }
@@ -2461,7 +2461,7 @@ static bool index_search(const struct tg_ring *ring, struct tg_rect *rect,
 }
 
 // ring_search searches for ring segments that intersect the provided rect.
-void tg_ring_search(const struct tg_ring *ring, struct tg_rect rect, 
+void tg_ring_search(const struct tg_ring *ring, struct tg_rect rect,
     bool (*iter)(struct tg_segment seg, int index, void *udata),
     void *udata)
 {
@@ -2486,14 +2486,14 @@ struct ring_ring_iter_ctx {
     int index;
     bool swapped;
     bool stop;
-    bool (*iter)(struct tg_segment aseg, int aidx, struct tg_segment bseg, 
+    bool (*iter)(struct tg_segment aseg, int aidx, struct tg_segment bseg,
         int bidx, void *udata);
 };
 
 static bool ring_ring_iter(struct tg_segment seg, int index, void *udata) {
     struct ring_ring_iter_ctx *ctx = udata;
     if (tg_segment_intersects_segment(seg, ctx->seg)) {
-        bool ok = ctx->swapped ? 
+        bool ok = ctx->swapped ?
             ctx->iter(ctx->seg, ctx->index, seg, index, ctx->udata):
             ctx->iter(seg, index, ctx->seg, ctx->index, ctx->udata);
         if (!ok) {
@@ -2504,9 +2504,9 @@ static bool ring_ring_iter(struct tg_segment seg, int index, void *udata) {
     return true;
 }
 
-static bool ring_ring_ix(const struct tg_ring *a, int alvl, int aidx, 
+static bool ring_ring_ix(const struct tg_ring *a, int alvl, int aidx,
     int aspread, const struct tg_ring *b, int blvl, int bidx, int bspread,
-    bool (*iter)(struct tg_segment aseg, int aidx, struct tg_segment bseg, 
+    bool (*iter)(struct tg_segment aseg, int aidx, struct tg_segment bseg,
         int bidx, void *udata),
     void *udata)
 {
@@ -2579,7 +2579,7 @@ static bool ring_ring_ix(const struct tg_ring *a, int alvl, int aidx,
                     {
                         return false;
                     }
-                } 
+                }
             }
         }
     }
@@ -2589,26 +2589,26 @@ static bool ring_ring_ix(const struct tg_ring *a, int alvl, int aidx,
 /// Iterates over all segments in ring A that intersect with segments in ring B.
 /// @note This efficiently uses the indexes of each geometry, if available.
 /// @see RingFuncs
-void tg_ring_ring_search(const struct tg_ring *a, const struct tg_ring *b, 
-    bool (*iter)(struct tg_segment aseg, int aidx, struct tg_segment bseg, 
+void tg_ring_ring_search(const struct tg_ring *a, const struct tg_ring *b,
+    bool (*iter)(struct tg_segment aseg, int aidx, struct tg_segment bseg,
         int bidx, void *udata),
     void *udata)
 {
-    if (tg_ring_empty(a) || tg_ring_empty(b) || !iter || 
+    if (tg_ring_empty(a) || tg_ring_empty(b) || !iter ||
         !tg_rect_intersects_rect(tg_ring_rect(a), tg_ring_rect(b)))
     {
         return;
     }
     if (a->index && b->index) {
         // both indexes are available
-        ring_ring_ix(a, 0, 0, a->index->spread, 
+        ring_ring_ix(a, 0, 0, a->index->spread,
             b, 0, 0, b->index->spread, iter, udata);
     } else if (a->index || b->index) {
         // only one index is available
         const struct tg_ring *c = b->index ? b : a;
         const struct tg_ring *d = b->index ? a : b;
-        struct ring_ring_iter_ctx ctx = { 
-            .iter = iter, 
+        struct ring_ring_iter_ctx ctx = {
+            .iter = iter,
             .swapped = c == b,
             .udata = udata,
         };
@@ -2642,8 +2642,8 @@ void tg_ring_ring_search(const struct tg_ring *a, const struct tg_ring *b,
 /// Iterates over all segments in line A that intersect with segments in line B.
 /// @note This efficiently uses the indexes of each geometry, if available.
 /// @see LineFuncs
-void tg_line_line_search(const struct tg_line *a, const struct tg_line *b, 
-    bool (*iter)(struct tg_segment aseg, int aidx, struct tg_segment bseg, 
+void tg_line_line_search(const struct tg_line *a, const struct tg_line *b,
+    bool (*iter)(struct tg_segment aseg, int aidx, struct tg_segment bseg,
         int bidx, void *udata),
     void *udata)
 {
@@ -2653,8 +2653,8 @@ void tg_line_line_search(const struct tg_line *a, const struct tg_line *b,
 /// Iterates over all segments in ring A that intersect with segments in line B.
 /// @note This efficiently uses the indexes of each geometry, if available.
 /// @see RingFuncs
-void tg_ring_line_search(const struct tg_ring *a, const struct tg_line *b, 
-    bool (*iter)(struct tg_segment aseg, int aidx, struct tg_segment bseg, 
+void tg_ring_line_search(const struct tg_ring *a, const struct tg_line *b,
+    bool (*iter)(struct tg_segment aseg, int aidx, struct tg_segment bseg,
         int bidx, void *udata),
     void *udata)
 {
@@ -2663,10 +2663,10 @@ void tg_ring_line_search(const struct tg_ring *a, const struct tg_line *b,
 
 
 __attr_noinline
-static void pip_eval_seg_slow(const struct tg_ring *ring, int i, 
+static void pip_eval_seg_slow(const struct tg_ring *ring, int i,
     struct tg_point point, bool allow_on_edge, bool *in, int *idx)
 {
-    struct tg_segment seg = { ring->points[i], ring->points[i+1] };    
+    struct tg_segment seg = { ring->points[i], ring->points[i+1] };
     switch (raycast(seg, point)) {
     case TG_OUT:
         break;
@@ -2682,7 +2682,7 @@ static void pip_eval_seg_slow(const struct tg_ring *ring, int i,
     }
 }
 
-static inline void pip_eval_seg(const struct tg_ring *ring, int i, 
+static inline void pip_eval_seg(const struct tg_ring *ring, int i,
     struct tg_point point, bool allow_on_edge, bool *in, int *idx)
 {
     // Performs fail-fast raycast boundary tests first.
@@ -2698,7 +2698,7 @@ static inline void pip_eval_seg(const struct tg_ring *ring, int i,
             if (*idx != -1) return;
             *in = !*in;
             return;
-        }    
+        }
     } else if (point.x > xmax) {
         if (ymin != ymax && xmin != xmax) {
             return;
@@ -2712,7 +2712,7 @@ struct ring_result {
     int idx;  // edge index
 };
 
-static struct ring_result ystripes_pip(const struct tg_ring *ring, 
+static struct ring_result ystripes_pip(const struct tg_ring *ring,
     struct tg_point point, bool allow_on_edge)
 {
     bool in = false;
@@ -2724,12 +2724,12 @@ static struct ring_result ystripes_pip(const struct tg_ring *ring,
     struct ystripe *ystripe = &ystripes->stripes[y];
     for (int i = 0; i < ystripe->count; i++) {
         int j = ystripe->indexes[i];
-        pip_eval_seg(ring, j, point, allow_on_edge, &in, &idx); 
+        pip_eval_seg(ring, j, point, allow_on_edge, &in, &idx);
     }
     return (struct ring_result){ .hit = in, .idx = idx};
 }
 
-static struct ring_result standard_pip(const struct tg_ring *ring, 
+static struct ring_result standard_pip(const struct tg_ring *ring,
     struct tg_point point, bool allow_on_edge)
 {
     bool in = false;
@@ -2786,14 +2786,14 @@ static void index_pip_counter(const struct tg_ring *ring, struct tg_point point,
         if (e > level->nrects) e = level->nrects;
         for16(i, e, {
             if (branch_maybe_in(ixpoint, level->rects[i])) {
-                index_pip_counter(ring, point, allow_on_edge, lvl+1, 
+                index_pip_counter(ring, point, allow_on_edge, lvl+1,
                     i*ixspread, in, idx);
             }
         });
     }
 }
 
-static struct ring_result index_pip(const struct tg_ring *ring, 
+static struct ring_result index_pip(const struct tg_ring *ring,
     struct tg_point point, bool allow_on_edge)
 {
     bool in = false;
@@ -2802,7 +2802,7 @@ static struct ring_result index_pip(const struct tg_ring *ring,
     return (struct ring_result){ .hit = in, .idx = idx};
 }
 
-struct ring_result tg_ring_contains_point(const struct tg_ring *ring, 
+struct ring_result tg_ring_contains_point(const struct tg_ring *ring,
     struct tg_point point, bool allow_on_edge)
 {
     if (!tg_rect_covers_point(ring->rect, point)) {
@@ -2817,7 +2817,7 @@ struct ring_result tg_ring_contains_point(const struct tg_ring *ring,
     return standard_pip(ring, point, allow_on_edge);
 }
 
-/// Returns true if ring is convex. 
+/// Returns true if ring is convex.
 /// @param ring Input ring
 /// @return True if ring is convex.
 /// @return False if ring is concave.
@@ -2827,7 +2827,7 @@ bool tg_ring_convex(const struct tg_ring *ring) {
     return ring->convex;
 }
 
-/// Returns true if winding order is clockwise. 
+/// Returns true if winding order is clockwise.
 /// @param ring Input ring
 /// @return True if clockwise
 /// @return False if counter-clockwise
@@ -2846,7 +2846,7 @@ static bool contsegiter1(struct tg_segment seg2, int index, void *udata) {
     (void)index;
     struct contsegiterctx *ctx = udata;
     if (tg_segment_intersects_segment(ctx->seg, seg2)) {
-        if (tg_raycast(seg2, ctx->seg.a) != TG_ON && 
+        if (tg_raycast(seg2, ctx->seg.a) != TG_ON &&
             tg_raycast(seg2, ctx->seg.b) != TG_ON)
         {
             ctx->intersects = true;
@@ -2883,7 +2883,7 @@ static bool contsegiter5(struct tg_segment seg2, int index, void *udata) {
     (void)index;
     struct contsegiterctx *ctx = udata;
     if (tg_segment_intersects_segment(ctx->seg, seg2)) {
-        if (tg_raycast(ctx->seg, seg2.a) != TG_ON && 
+        if (tg_raycast(ctx->seg, seg2.a) != TG_ON &&
             tg_raycast(ctx->seg, seg2.b) != TG_ON)
         {
             ctx->intersects = true;
@@ -2903,14 +2903,14 @@ static bool contsegiter3(struct tg_segment seg2, int index, void *udata) {
     return true;
 }
 
-bool tg_ring_contains_segment(const struct tg_ring *ring, 
+bool tg_ring_contains_segment(const struct tg_ring *ring,
     struct tg_segment seg, bool allow_on_edge)
 {
     if (!tg_rect_covers_rect(ring->rect, tg_segment_rect(seg))) {
         return false;
     }
     // Test that segment points are contained in the ring.
-    struct ring_result res_a = tg_ring_contains_point(ring, seg.a, 
+    struct ring_result res_a = tg_ring_contains_point(ring, seg.a,
         allow_on_edge);
     if (!res_a.hit) {
         // seg A is not inside ring
@@ -3128,7 +3128,7 @@ static bool intersegiter(struct tg_segment seg, int index, void *udata) {
     return ctx->count < 2;
 }
 
-bool tg_ring_intersects_segment(const struct tg_ring *ring, 
+bool tg_ring_intersects_segment(const struct tg_ring *ring,
     struct tg_segment seg, bool allow_on_edge)
 {
     if (!tg_rect_intersects_rect(tg_segment_rect(seg), ring->rect)) {
@@ -3144,7 +3144,7 @@ bool tg_ring_intersects_segment(const struct tg_ring *ring,
     // Neither point A or B is inside of the ring. It's possible that both
     // are on the outside and are passing over segments. If the segment passes
     // over at least two ring segments then it's intersecting.
-    struct intersegiterctx ctx = { 
+    struct intersegiterctx ctx = {
         .ring = ring,
         .seg = seg,
         .allow_on_edge = allow_on_edge,
@@ -3194,7 +3194,7 @@ bool tg_ring_contains_ring(const struct tg_ring *a, const struct tg_ring *b,
     return true;
 }
 
-struct tg_rect tg_rect_move(struct tg_rect rect, 
+struct tg_rect tg_rect_move(struct tg_rect rect,
     double delta_x, double delta_y)
 {
     rect.min = tg_point_move(rect.min, delta_x, delta_y);
@@ -3225,8 +3225,8 @@ bool tg_ring_intersects_ring(const struct tg_ring *ring,
         other = tmp;
     }
     for (int i = 0; i < other->nsegs; i++) {
-        if (tg_ring_intersects_segment(ring, ring_segment_at(other, i), 
-            allow_on_edge)) 
+        if (tg_ring_intersects_segment(ring, ring_segment_at(other, i),
+            allow_on_edge))
         {
             return true;
         }
@@ -3234,11 +3234,11 @@ bool tg_ring_intersects_ring(const struct tg_ring *ring,
     return false;
 }
 
-bool tg_ring_contains_line(const struct tg_ring *a, const struct tg_line *b, 
+bool tg_ring_contains_line(const struct tg_ring *a, const struct tg_line *b,
     bool allow_on_edge, bool respect_boundaries)
 {
     // Almost the same logic as tg_ring_contains_line except for boundaries
-    // detection for the input line. 
+    // detection for the input line.
     if (tg_ring_empty(a) || tg_line_empty(b)) {
         return false;
     }
@@ -3260,8 +3260,8 @@ bool tg_ring_contains_line(const struct tg_ring *a, const struct tg_line *b,
     //             return false;
     //         }
     //     }
-    // } else 
-    
+    // } else
+
     if (!allow_on_edge && respect_boundaries) {
         // outer ring is concave so let's make sure that all inner segments are
         // fully contained inside of the outer ring.
@@ -3292,7 +3292,7 @@ bool tg_ring_contains_line(const struct tg_ring *a, const struct tg_line *b,
 
 /// Tests whether a ring intersects a line.
 /// @see RingFuncs
-bool tg_ring_intersects_line(const struct tg_ring *ring, 
+bool tg_ring_intersects_line(const struct tg_ring *ring,
     const struct tg_line *line, bool allow_on_edge)
 {
     if (tg_ring_empty(ring) || tg_line_empty(line)) {
@@ -3306,7 +3306,7 @@ bool tg_ring_intersects_line(const struct tg_ring *ring,
     // TODO: use line index if available.
     int nsegs = tg_line_num_segments(line);
     for (int i = 0; i < nsegs; i++) {
-        if (tg_ring_intersects_segment(ring, tg_line_segment_at(line, i), 
+        if (tg_ring_intersects_segment(ring, tg_line_segment_at(line, i),
             allow_on_edge))
         {
             return true;
@@ -3332,7 +3332,7 @@ bool tg_rect_intersects_poly(struct tg_rect rect, const struct tg_poly *poly) {
 /// Tests whether a rectangle fully contains a polygon.
 /// @see RectFuncs
 bool tg_rect_covers_poly(struct tg_rect rect, const struct tg_poly *poly) {
-    return !tg_poly_empty(poly) && 
+    return !tg_poly_empty(poly) &&
         tg_rect_covers_rect(rect, tg_poly_rect(poly));
 }
 
@@ -3449,7 +3449,7 @@ bool tg_line_empty(const struct tg_line *line) {
     return tg_ring_empty(ring);
 }
 
-void tg_line_search(const struct tg_line *line, struct tg_rect rect, 
+void tg_line_search(const struct tg_line *line, struct tg_rect rect,
     bool(*iter)(struct tg_segment seg, int index, void *udata),
     void *udata)
 {
@@ -3462,7 +3462,7 @@ struct line_covers_point_iter_ctx {
     struct tg_point point;
 };
 
-static bool line_covers_point_iter(struct tg_segment seg, 
+static bool line_covers_point_iter(struct tg_segment seg,
     int index, void *udata)
 {
     (void)index;
@@ -3477,10 +3477,10 @@ static bool line_covers_point_iter(struct tg_segment seg,
 /// Tests whether a line fully contains a point
 /// @see LineFuncs
 bool tg_line_covers_point(const struct tg_line *line, struct tg_point point) {
-    struct line_covers_point_iter_ctx ctx = { 
+    struct line_covers_point_iter_ctx ctx = {
         .point = point,
     };
-    tg_line_search(line, (struct tg_rect){ point, point }, 
+    tg_line_search(line, (struct tg_rect){ point, point },
         line_covers_point_iter, &ctx);
     return ctx.covers;
 }
@@ -3490,7 +3490,7 @@ bool tg_line_contains_point(const struct tg_line *line, struct tg_point point) {
         return false;
     }
     int nsegs = tg_line_num_segments(line);
-    if (pteq(point, tg_line_segment_at(line, 0).a) || 
+    if (pteq(point, tg_line_segment_at(line, 0).a) ||
         pteq(point, tg_line_segment_at(line, nsegs-1).b))
     {
         return false;
@@ -3500,7 +3500,7 @@ bool tg_line_contains_point(const struct tg_line *line, struct tg_point point) {
 
 /// Tests whether a line intersects a point
 /// @see LineFuncs
-bool tg_line_intersects_point(const struct tg_line *line, 
+bool tg_line_intersects_point(const struct tg_line *line,
     struct tg_point point)
 {
     return tg_line_covers_point(line, point);
@@ -3571,14 +3571,14 @@ bool tg_line_covers_line(const struct tg_line *a, const struct tg_line *b) {
     return true;
 }
 
-bool tg_line_contains_line(const struct tg_line *line, 
+bool tg_line_contains_line(const struct tg_line *line,
     const struct tg_line *other)
 {
     return tg_line_covers_line(line, other);
 }
 
 enum segment_intersects_kind {
-    SI_INTERSECTS, 
+    SI_INTERSECTS,
     SI_TOUCHES,
 };
 
@@ -3616,7 +3616,7 @@ static bool any_touching(struct tg_segment a, int aidx, int ansegs,
            (bidx == bnsegs-1 && segment_touches0(a, b.b, b.a));
 }
 
-static bool segment_intersects_iter(struct tg_segment a, int aidx, 
+static bool segment_intersects_iter(struct tg_segment a, int aidx,
     struct tg_segment b, int bidx, void *udata)
 {
     struct segment_intersects_iter_ctx *ctx = udata;
@@ -3635,10 +3635,10 @@ static bool segment_intersects_iter(struct tg_segment a, int aidx,
     return false;
 }
 
-static bool line_intersects_line(const struct tg_line *a, 
+static bool line_intersects_line(const struct tg_line *a,
     const struct tg_line *b, enum segment_intersects_kind kind)
 {
-    struct segment_intersects_iter_ctx ctx = { 
+    struct segment_intersects_iter_ctx ctx = {
         .kind = kind,
         .ansegs = tg_line_num_segments(a),
         .bnsegs = tg_line_num_segments(b),
@@ -3653,7 +3653,7 @@ bool tg_line_intersects_line(const struct tg_line *a, const struct tg_line *b) {
     return line_intersects_line(a, b, SI_INTERSECTS);
 }
 
-bool tg_line_touches_line(const struct tg_line *a,const struct tg_line *b) {    
+bool tg_line_touches_line(const struct tg_line *a,const struct tg_line *b) {
     return line_intersects_line(a, b, SI_TOUCHES);
 }
 
@@ -3665,7 +3665,7 @@ bool tg_line_covers_poly(const struct tg_line *line,
     if (tg_line_empty(line) || tg_poly_empty(poly)) return false;
     struct tg_rect rect = tg_poly_rect(poly);
     if (rect.min.x != rect.max.x && rect.min.y != rect.max.y) return false;
-    
+
     // polygon can fit in a straight (vertical or horizontal) line
     struct tg_ring *other = stack_ring();
     rect_to_ring(rect, other);
@@ -3699,7 +3699,7 @@ struct tg_line *tg_line_move(const struct tg_line *line,
     return (struct tg_line*)series_move(ring, false, delta_x, delta_y);
 }
 
-/// Returns true if winding order is clockwise. 
+/// Returns true if winding order is clockwise.
 /// @param line Input line
 /// @return True if clockwise
 /// @return False if counter-clockwise
@@ -3711,9 +3711,9 @@ bool tg_line_clockwise(const struct tg_line *line) {
 
 /// Clones a line
 /// @param line Input line, caller retains ownership.
-/// @return A duplicate of the provided line. 
+/// @return A duplicate of the provided line.
 /// @note The caller is responsible for freeing with tg_line_free().
-/// @note This method of cloning uses implicit sharing through an atomic 
+/// @note This method of cloning uses implicit sharing through an atomic
 /// reference counter.
 /// @see LineFuncs
 struct tg_line *tg_line_clone(const struct tg_line *line) {
@@ -3731,7 +3731,7 @@ const struct tg_point *tg_line_points(const struct tg_line *line) {
     return tg_ring_points(ring);
 }
 
-/// Returns the allocation size of the line. 
+/// Returns the allocation size of the line.
 /// @param line Input line
 /// @return Size of line in bytes
 /// @see LineFuncs
@@ -3741,10 +3741,10 @@ size_t tg_line_memsize(const struct tg_line *line) {
 }
 
 /// Returns the indexing spread for a line.
-/// 
-/// The "spread" is the number of segments or rectangles that are grouped 
+///
+/// The "spread" is the number of segments or rectangles that are grouped
 /// together to produce a unioned rectangle that is stored at a higher level.
-/// 
+///
 /// For a tree based structure, this would be the number of items per node.
 ///
 /// @param line Input line
@@ -3797,7 +3797,7 @@ int tg_line_index_level_num_rects(const struct tg_line *line, int levelidx) {
 /// @see tg_line_index_num_levels()
 /// @see tg_line_index_level_num_rects()
 /// @see LineFuncs
-struct tg_rect tg_line_index_level_rect(const struct tg_line *line, 
+struct tg_rect tg_line_index_level_rect(const struct tg_line *line,
     int levelidx, int rectidx)
 {
     const struct tg_ring *ring = (const struct tg_ring *)line;
@@ -3817,8 +3817,8 @@ struct tg_rect tg_line_index_level_rect(const struct tg_line *line,
 /// @return NULL if exterior or any holes are NULL
 /// @note A tg_poly can be safely upcasted to a tg_geom. `(struct tg_geom*)poly`
 /// @see PolyFuncs
-struct tg_poly *tg_poly_new(const struct tg_ring *exterior, 
-    const struct tg_ring *const holes[], int nholes) 
+struct tg_poly *tg_poly_new(const struct tg_ring *exterior,
+    const struct tg_ring *const holes[], int nholes)
 {
     if (!exterior) {
         return NULL;
@@ -3877,9 +3877,9 @@ void tg_poly_free(struct tg_poly *poly) {
 
 /// Clones a polygon.
 /// @param poly Input polygon, caller retains ownership.
-/// @return A duplicate of the provided polygon. 
+/// @return A duplicate of the provided polygon.
 /// @note The caller is responsible for freeing with tg_poly_free().
-/// @note This method of cloning uses implicit sharing through an atomic 
+/// @note This method of cloning uses implicit sharing through an atomic
 /// reference counter.
 /// @see PolyFuncs
 struct tg_poly *tg_poly_clone(const struct tg_poly *poly) {
@@ -3947,12 +3947,12 @@ struct tg_rect tg_poly_rect(const struct tg_poly *poly) {
     return tg_ring_rect(tg_poly_exterior(poly));
 }
 
-static bool poly_contains_point(const struct tg_poly *poly, 
+static bool poly_contains_point(const struct tg_poly *poly,
     struct tg_point point, bool allow_on_edge)
 {
     if (poly && poly->head.base == BASE_RING) {
         // downcast fast path
-        return tg_ring_contains_point((struct tg_ring*)poly, point, 
+        return tg_ring_contains_point((struct tg_ring*)poly, point,
             allow_on_edge).hit;
     }
     // standard path
@@ -4084,7 +4084,7 @@ bool tg_poly_intersects_line(const struct tg_poly *poly,
 /// Tests whether a polygon fully contains another polygon.
 /// @see PolyFuncs
 bool tg_poly_covers_poly(const struct tg_poly *a, const struct tg_poly *b) {
-    if (a && a->head.base == BASE_RING && 
+    if (a && a->head.base == BASE_RING &&
         b && b->head.base == BASE_RING)
     {
         // downcast fast path
@@ -4108,7 +4108,7 @@ bool tg_poly_covers_poly(const struct tg_poly *a, const struct tg_poly *b) {
     if (b->head.base == BASE_POLY) {
         b_holes = b->holes;
     }
-    
+
     // 1) other exterior must be fully contained inside of the poly exterior.
     if (!tg_ring_contains_ring(a_exterior, b_exterior, true)) {
         return false;
@@ -4123,7 +4123,7 @@ bool tg_poly_covers_poly(const struct tg_poly *a, const struct tg_poly *b) {
             covers = false;
             // 3) unless the poly hole is contain inside of a other hole
             for (int j = 0; j < b_nholes; j++) {
-                if (tg_ring_contains_ring(b_holes[j], a_holes[i], 
+                if (tg_ring_contains_ring(b_holes[j], a_holes[i],
                     true))
                 {
                     covers = true;
@@ -4144,10 +4144,10 @@ bool tg_poly_contains_poly(const struct tg_poly *a, const struct tg_poly *b) {
 
 /// Tests whether a polygon intesects a polygon.
 /// @see PolyFuncs
-bool tg_poly_intersects_poly(const struct tg_poly *poly, 
+bool tg_poly_intersects_poly(const struct tg_poly *poly,
     const struct tg_poly *other)
 {
-    if (poly && poly->head.base == BASE_RING && 
+    if (poly && poly->head.base == BASE_RING &&
         other && other->head.base == BASE_RING)
     {
         // downcast fast path
@@ -4237,20 +4237,20 @@ bool tg_poly_touches_poly(const struct tg_poly *a, const struct tg_poly *b) {
     if (!tg_rect_intersects_rect(tg_poly_rect(a), tg_poly_rect(b))) {
         return false;
     }
-    
+
     const struct tg_ring *aext = tg_poly_exterior(a);
     const struct tg_ring *bext = tg_poly_exterior(b);
 
     // Check if one polygon is fully inside a hole of the other and touching
     // the hole boundary.
     for (int ii = 0; ii < 2; ii++) {
-        const struct tg_poly *poly = ii == 0 ? a : b; 
-        const struct tg_ring *ring = ii == 0 ? bext : aext; 
+        const struct tg_poly *poly = ii == 0 ? a : b;
+        const struct tg_ring *ring = ii == 0 ? bext : aext;
         int nholes = tg_poly_num_holes(poly);
         for (int i = 0; i < nholes; i++) {
             const struct tg_ring *hole = tg_poly_hole_at(poly, i);
             if (tg_ring_contains_ring(hole, ring, true)) {
-                // Yes, now check if any exterior points are on the other 
+                // Yes, now check if any exterior points are on the other
                 // hole boundary.
                 int npoints = tg_ring_num_points(ring);
                 for (int j = 0; j < npoints; j++) {
@@ -4265,7 +4265,7 @@ bool tg_poly_touches_poly(const struct tg_poly *a, const struct tg_poly *b) {
             }
         }
     }
-    
+
     // Now we can work with the exterior rings only.
     // Check if one polygon is touching the other
     int ansegs = tg_ring_num_segments(aext);
@@ -4273,8 +4273,8 @@ bool tg_poly_touches_poly(const struct tg_poly *a, const struct tg_poly *b) {
     int atouches = 0;
     int btouches = 0;
     for (int ii = 0; ii < 2; ii++) {
-        const struct tg_ring *a = ii == 0 ? aext : bext; 
-        const struct tg_ring *b = ii == 0 ? bext : aext; 
+        const struct tg_ring *a = ii == 0 ? aext : bext;
+        const struct tg_ring *b = ii == 0 ? bext : aext;
         int nsegs = ii == 0 ? bnsegs : ansegs;
         int touches = 0;
         for (int i = 0; i < nsegs; i++) {
@@ -4299,12 +4299,12 @@ bool tg_poly_touches_poly(const struct tg_poly *a, const struct tg_poly *b) {
     return false;
 }
 
-struct tg_poly *tg_poly_move(const struct tg_poly *poly, double delta_x, 
+struct tg_poly *tg_poly_move(const struct tg_poly *poly, double delta_x,
     double delta_y)
 {
     if (!poly) return NULL;
     if (poly->head.base == BASE_RING) {
-        return (struct tg_poly*)tg_ring_move((struct tg_ring*)poly, delta_x, 
+        return (struct tg_poly*)tg_ring_move((struct tg_ring*)poly, delta_x,
             delta_y);
     }
 
@@ -4337,7 +4337,7 @@ done:
     return final;
 }
 
-/// Returns the allocation size of the polygon. 
+/// Returns the allocation size of the polygon.
 /// @param poly Input polygon
 /// @return Size of polygon in bytes
 /// @see PolyFuncs
@@ -4382,7 +4382,7 @@ static struct tg_geom *geom_new_empty(enum tg_geom_type type) {
 /// Creates a Point geometry.
 /// @param point Input point
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructors
 struct tg_geom *tg_geom_new_point(struct tg_point point) {
@@ -4407,7 +4407,7 @@ static void boxed_point_free(struct boxed_point *point) {
 /// Creates a Point geometry that includes a Z coordinate.
 /// @param point Input point
 /// @param z The Z coordinate
-/// @return A newly allocated geometry, or NULL if system is out of 
+/// @return A newly allocated geometry, or NULL if system is out of
 /// memory. The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructorsEx
 struct tg_geom *tg_geom_new_point_z(struct tg_point point, double z) {
@@ -4422,7 +4422,7 @@ struct tg_geom *tg_geom_new_point_z(struct tg_point point, double z) {
 /// Creates a Point geometry that includes an M coordinate.
 /// @param point Input point
 /// @param m The M coordinate
-/// @return A newly allocated geometry, or NULL if system is out of 
+/// @return A newly allocated geometry, or NULL if system is out of
 /// memory. The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructorsEx
 struct tg_geom *tg_geom_new_point_m(struct tg_point point, double m) {
@@ -4438,7 +4438,7 @@ struct tg_geom *tg_geom_new_point_m(struct tg_point point, double m) {
 /// @param point Input point
 /// @param z The Z coordinate
 /// @param m The M coordinate
-/// @return A newly allocated geometry, or NULL if system is out of 
+/// @return A newly allocated geometry, or NULL if system is out of
 /// memory. The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructorsEx
 struct tg_geom *tg_geom_new_point_zm(struct tg_point point, double z, double m)
@@ -4453,7 +4453,7 @@ struct tg_geom *tg_geom_new_point_zm(struct tg_point point, double z, double m)
 }
 
 /// Creates an empty Point geometry.
-/// @return A newly allocated geometry, or NULL if system is out of 
+/// @return A newly allocated geometry, or NULL if system is out of
 /// memory. The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructorsEx
 struct tg_geom *tg_geom_new_point_empty(void) {
@@ -4463,7 +4463,7 @@ struct tg_geom *tg_geom_new_point_empty(void) {
 /// Creates a LineString geometry.
 /// @param line Input line, caller retains ownership.
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructors
 struct tg_geom *tg_geom_new_linestring(const struct tg_line *line) {
@@ -4472,7 +4472,7 @@ struct tg_geom *tg_geom_new_linestring(const struct tg_line *line) {
 
 /// Creates an empty LineString geometry.
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructorsEx
 struct tg_geom *tg_geom_new_linestring_empty(void) {
@@ -4482,7 +4482,7 @@ struct tg_geom *tg_geom_new_linestring_empty(void) {
 /// Creates a Polygon geometry.
 /// @param poly Input polygon, caller retains ownership.
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructors
 struct tg_geom *tg_geom_new_polygon(const struct tg_poly *poly) {
@@ -4491,7 +4491,7 @@ struct tg_geom *tg_geom_new_polygon(const struct tg_poly *poly) {
 
 /// Creates an empty Polygon geometry.
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructorsEx
 struct tg_geom *tg_geom_new_polygon_empty(void) {
@@ -4552,13 +4552,13 @@ static uint32_t hilbert_xy_to_index(uint32_t x, uint32_t y) {
     B = (a >> 1) ^ a;
     C = ((c >> 1) ^ (b & (d >> 1))) ^ c;
     D = ((a & (c >> 1)) ^ (d >> 1)) ^ d;
-    // Round (2) 
+    // Round (2)
     a = A; b = B; c = C; d = D;
     A = ((a & (a >> 2)) ^ (b & (b >> 2)));
     B = ((a & (b >> 2)) ^ (b & ((a ^ b) >> 2)));
     C ^= ((a & (c >> 2)) ^ (b & (d >> 2)));
     D ^= ((b & (c >> 2)) ^ ((a ^ b) & (d >> 2)));
-    // Round (3) 
+    // Round (3)
     a = A; b = B; c = C; d = D;
     A = ((a & (a >> 4)) ^ (b & (b >> 4)));
     B = ((a & (b >> 4)) ^ (b & ((a ^ b) >> 4)));
@@ -4720,14 +4720,14 @@ int tg_geom_multi_index_num_levels(const struct tg_geom *geom) {
     return index_num_levels(index);
 }
 
-int tg_geom_multi_index_level_num_rects(const struct tg_geom *geom, 
+int tg_geom_multi_index_level_num_rects(const struct tg_geom *geom,
     int levelidx)
 {
     const struct index *index = geom_multi_index(geom);
     return index_level_num_rects(index, levelidx);
 }
 
-struct tg_rect tg_geom_multi_index_level_rect(const struct tg_geom *geom, 
+struct tg_rect tg_geom_multi_index_level_rect(const struct tg_geom *geom,
     int levelidx, int rectidx)
 {
     const struct index *index = geom_multi_index(geom);
@@ -4738,7 +4738,7 @@ struct tg_rect tg_geom_multi_index_level_rect(const struct tg_geom *geom,
 /// @param points An array of points, caller retains ownership.
 /// @param npoints The number of points in array
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructors
 struct tg_geom *tg_geom_new_multipoint(const struct tg_point *points,
@@ -4758,7 +4758,7 @@ struct tg_geom *tg_geom_new_multipoint(const struct tg_point *points,
 
 /// Creates an empty MultiPoint geometry.
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructorsEx
 struct tg_geom *tg_geom_new_multipoint_empty(void) {
@@ -4769,7 +4769,7 @@ struct tg_geom *tg_geom_new_multipoint_empty(void) {
 /// @param lines An array of lines, caller retains ownership.
 /// @param nlines The number of lines in array
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructors
 struct tg_geom *tg_geom_new_multilinestring(const struct tg_line *const lines[],
@@ -4785,7 +4785,7 @@ struct tg_geom *tg_geom_new_multilinestring(const struct tg_line *const lines[],
 
 /// Creates an empty MultiLineString geometry.
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructorsEx
 struct tg_geom *tg_geom_new_multilinestring_empty(void) {
@@ -4796,10 +4796,10 @@ struct tg_geom *tg_geom_new_multilinestring_empty(void) {
 /// @param polys An array of polygons, caller retains ownership.
 /// @param npolys The number of polygons in array
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructors
-struct tg_geom *tg_geom_new_multipolygon(const struct tg_poly *const polys[], 
+struct tg_geom *tg_geom_new_multipolygon(const struct tg_poly *const polys[],
     int npolys)
 {
     struct tg_geom *geom = geom_new_multi(TG_MULTIPOLYGON, npolys);
@@ -4812,7 +4812,7 @@ struct tg_geom *tg_geom_new_multipolygon(const struct tg_poly *const polys[],
 
 /// Creates an empty MultiPolygon geometry.
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructorsEx
 struct tg_geom *tg_geom_new_multipolygon_empty(void) {
@@ -4823,7 +4823,7 @@ struct tg_geom *tg_geom_new_multipolygon_empty(void) {
 /// @param geoms An array of geometries, caller retains ownership.
 /// @param ngeoms The number of geometries in array
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructors
 struct tg_geom *tg_geom_new_geometrycollection(
@@ -4839,7 +4839,7 @@ struct tg_geom *tg_geom_new_geometrycollection(
 
 /// Creates an empty GeometryCollection geometry.
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructorsEx
 struct tg_geom *tg_geom_new_geometrycollection_empty(void) {
@@ -4872,10 +4872,10 @@ static struct tg_geom *fill_extra_coords(struct tg_geom *geom,
 /// retains ownership.
 /// @param ncoords Number of doubles in array.
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructorsEx
-struct tg_geom *tg_geom_new_linestring_z(const struct tg_line *line, 
+struct tg_geom *tg_geom_new_linestring_z(const struct tg_line *line,
     const double *coords, int ncoords)
 {
     struct tg_geom *geom = geom_new(TG_LINESTRING);
@@ -4890,10 +4890,10 @@ struct tg_geom *tg_geom_new_linestring_z(const struct tg_line *line,
 /// retains ownership.
 /// @param ncoords Number of doubles in array.
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructorsEx
-struct tg_geom *tg_geom_new_linestring_m(const struct tg_line *line, 
+struct tg_geom *tg_geom_new_linestring_m(const struct tg_line *line,
     const double *coords, int ncoords)
 {
     struct tg_geom *geom = geom_new(TG_LINESTRING);
@@ -4904,14 +4904,14 @@ struct tg_geom *tg_geom_new_linestring_m(const struct tg_line *line,
 
 /// Creates a LineString geometry that includes ZM coordinates.
 /// @param line Input line, caller retains ownership.
-/// @param coords Array of doubles representing each Z and M coordinate, 
+/// @param coords Array of doubles representing each Z and M coordinate,
 /// interleaved. Caller retains ownership.
 /// @param ncoords Number of doubles in array.
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructorsEx
-struct tg_geom *tg_geom_new_linestring_zm(const struct tg_line *line, 
+struct tg_geom *tg_geom_new_linestring_zm(const struct tg_line *line,
     const double *coords, int ncoords)
 {
     struct tg_geom *geom = geom_new(TG_LINESTRING);
@@ -4926,10 +4926,10 @@ struct tg_geom *tg_geom_new_linestring_zm(const struct tg_line *line,
 /// retains ownership.
 /// @param ncoords Number of doubles in array.
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructorsEx
-struct tg_geom *tg_geom_new_polygon_z(const struct tg_poly *poly, 
+struct tg_geom *tg_geom_new_polygon_z(const struct tg_poly *poly,
     const double *coords, int ncoords)
 {
     struct tg_geom *geom = geom_new(TG_POLYGON);
@@ -4944,10 +4944,10 @@ struct tg_geom *tg_geom_new_polygon_z(const struct tg_poly *poly,
 /// retains ownership.
 /// @param ncoords Number of doubles in array.
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructorsEx
-struct tg_geom *tg_geom_new_polygon_m(const struct tg_poly *poly, 
+struct tg_geom *tg_geom_new_polygon_m(const struct tg_poly *poly,
     const double *coords, int ncoords)
 {
     struct tg_geom *geom = geom_new(TG_POLYGON);
@@ -4958,14 +4958,14 @@ struct tg_geom *tg_geom_new_polygon_m(const struct tg_poly *poly,
 
 /// Creates a Polygon geometry that includes ZM coordinates.
 /// @param poly Input polygon, caller retains ownership.
-/// @param coords Array of doubles representing each Z and M coordinate, 
+/// @param coords Array of doubles representing each Z and M coordinate,
 /// interleaved. Caller retains ownership.
 /// @param ncoords Number of doubles in array.
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructorsEx
-struct tg_geom *tg_geom_new_polygon_zm(const struct tg_poly *poly, 
+struct tg_geom *tg_geom_new_polygon_zm(const struct tg_poly *poly,
     const double *coords, int ncoords)
 {
     struct tg_geom *geom = geom_new(TG_POLYGON);
@@ -4981,10 +4981,10 @@ struct tg_geom *tg_geom_new_polygon_zm(const struct tg_poly *poly,
 /// retains ownership.
 /// @param ncoords Number of doubles in array.
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructorsEx
-struct tg_geom *tg_geom_new_multipoint_z(const struct tg_point *points, 
+struct tg_geom *tg_geom_new_multipoint_z(const struct tg_point *points,
     int npoints, const double *coords, int ncoords)
 {
     struct tg_geom *geom = tg_geom_new_multipoint(points, npoints);
@@ -4999,10 +4999,10 @@ struct tg_geom *tg_geom_new_multipoint_z(const struct tg_point *points,
 /// retains ownership.
 /// @param ncoords Number of doubles in array.
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructorsEx
-struct tg_geom *tg_geom_new_multipoint_m(const struct tg_point *points, 
+struct tg_geom *tg_geom_new_multipoint_m(const struct tg_point *points,
     int npoints, const double *coords, int ncoords)
 {
     struct tg_geom *geom = tg_geom_new_multipoint(points, npoints);
@@ -5013,14 +5013,14 @@ struct tg_geom *tg_geom_new_multipoint_m(const struct tg_point *points,
 /// Creates a MultiPoint geometry that includes ZM coordinates.
 /// @param points An array of points, caller retains ownership.
 /// @param npoints The number of points in array
-/// @param coords Array of doubles representing each Z and M coordinate, 
+/// @param coords Array of doubles representing each Z and M coordinate,
 /// interleaved. Caller retains ownership.
 /// @param ncoords Number of doubles in array.
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructorsEx
-struct tg_geom *tg_geom_new_multipoint_zm(const struct tg_point *points, 
+struct tg_geom *tg_geom_new_multipoint_zm(const struct tg_point *points,
     int npoints, const double *coords, int ncoords)
 {
     struct tg_geom *geom = tg_geom_new_multipoint(points, npoints);
@@ -5035,7 +5035,7 @@ struct tg_geom *tg_geom_new_multipoint_zm(const struct tg_point *points,
 /// retains ownership.
 /// @param ncoords Number of doubles in array.
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructorsEx
 struct tg_geom *tg_geom_new_multilinestring_z(
@@ -5054,7 +5054,7 @@ struct tg_geom *tg_geom_new_multilinestring_z(
 /// retains ownership.
 /// @param ncoords Number of doubles in array.
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructorsEx
 struct tg_geom *tg_geom_new_multilinestring_m(
@@ -5069,15 +5069,15 @@ struct tg_geom *tg_geom_new_multilinestring_m(
 /// Creates a MultiLineString geometry that includes ZM coordinates.
 /// @param lines An array of lines, caller retains ownership.
 /// @param nlines The number of lines in array
-/// @param coords Array of doubles representing each Z and M coordinate, 
+/// @param coords Array of doubles representing each Z and M coordinate,
 /// interleaved. Caller retains ownership.
 /// @param ncoords Number of doubles in array.
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructorsEx
 struct tg_geom *tg_geom_new_multilinestring_zm(
-    const struct tg_line *const lines[], int nlines, 
+    const struct tg_line *const lines[], int nlines,
     const double *coords, int ncoords)
 {
     struct tg_geom *geom = tg_geom_new_multilinestring(lines, nlines);
@@ -5092,7 +5092,7 @@ struct tg_geom *tg_geom_new_multilinestring_zm(
 /// retains ownership.
 /// @param ncoords Number of doubles in array.
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructorsEx
 struct tg_geom *tg_geom_new_multipolygon_z(
@@ -5111,7 +5111,7 @@ struct tg_geom *tg_geom_new_multipolygon_z(
 /// retains ownership.
 /// @param ncoords Number of doubles in array.
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructorsEx
 struct tg_geom *tg_geom_new_multipolygon_m(
@@ -5126,11 +5126,11 @@ struct tg_geom *tg_geom_new_multipolygon_m(
 /// Creates a MultiPolygon geometry that includes ZM coordinates.
 /// @param polys An array of polygons, caller retains ownership.
 /// @param npolys The number of polygons in array
-/// @param coords Array of doubles representing each Z and M coordinate, 
+/// @param coords Array of doubles representing each Z and M coordinate,
 /// interleaved. Caller retains ownership.
 /// @param ncoords Number of doubles in array.
 /// @return A newly allocated geometry.
-/// @return NULL if system is out of memory. 
+/// @return NULL if system is out of memory.
 /// @note The caller is responsible for freeing with tg_geom_free().
 /// @see GeometryConstructorsEx
 struct tg_geom *tg_geom_new_multipolygon_zm(
@@ -5144,9 +5144,9 @@ struct tg_geom *tg_geom_new_multipolygon_zm(
 
 /// Clones a geometry
 /// @param geom Input geometry, caller retains ownership.
-/// @return A duplicate of the provided geometry. 
+/// @return A duplicate of the provided geometry.
 /// @note The caller is responsible for freeing with tg_geom_free().
-/// @note This method of cloning uses implicit sharing through an atomic 
+/// @note This method of cloning uses implicit sharing through an atomic
 /// reference counter.
 /// @see GeometryConstructors
 struct tg_geom *tg_geom_clone(const struct tg_geom *geom) {
@@ -5214,7 +5214,7 @@ void tg_geom_free(struct tg_geom *geom) {
     case BASE_GEOM:
         geom_free(geom);
         break;
-    case BASE_POINT: 
+    case BASE_POINT:
         boxed_point_free((struct boxed_point*)geom);
         break;
     case BASE_LINE:
@@ -5261,7 +5261,7 @@ static struct tg_rect geom_rect(const struct tg_geom *geom) {
     switch (geom->head.type) {
     case TG_POINT:
         return tg_point_rect(geom->point);
-    case TG_LINESTRING: 
+    case TG_LINESTRING:
         return tg_line_rect(geom->line);
     case TG_POLYGON:
         return tg_poly_rect(geom->poly);
@@ -5286,7 +5286,7 @@ struct tg_rect tg_geom_rect(const struct tg_geom *geom) {
         switch (geom->head.base) {
         case BASE_GEOM:
             return geom_rect(geom);
-        case BASE_POINT: 
+        case BASE_POINT:
             return tg_point_rect(((struct boxed_point*)geom)->point);
         case BASE_LINE:
             return tg_line_rect((struct tg_line*)geom);
@@ -5315,8 +5315,8 @@ struct tg_point tg_geom_point(const struct tg_geom *geom) {
         return geom->point;
     }
     struct tg_rect rect = tg_geom_rect(geom);
-    return (struct tg_point) { 
-        (rect.min.x + rect.max.x) / 2, 
+    return (struct tg_point) {
+        (rect.min.x + rect.max.x) / 2,
         (rect.min.y + rect.max.y) / 2,
     };
 }
@@ -5329,13 +5329,13 @@ static size_t geom_memsize(const struct tg_geom *geom) {
     case TG_LINESTRING:
         size += tg_line_memsize(geom->line);
         break;
-    case TG_POLYGON: 
+    case TG_POLYGON:
         size += tg_poly_memsize(geom->poly);
         break;
-    case TG_MULTIPOINT: 
-    case TG_MULTILINESTRING: 
+    case TG_MULTIPOINT:
+    case TG_MULTILINESTRING:
     case TG_MULTIPOLYGON:
-    case TG_GEOMETRYCOLLECTION: 
+    case TG_GEOMETRYCOLLECTION:
         if (geom->multi) {
             size += sizeof(struct multi);
             size += geom->multi->ngeoms*sizeof(struct tg_geom*);
@@ -5369,7 +5369,7 @@ size_t tg_geom_memsize(const struct tg_geom *geom) {
         switch (geom->head.base) {
         case BASE_GEOM:
             return geom_memsize(geom);
-        case BASE_POINT: 
+        case BASE_POINT:
             return sizeof(struct boxed_point);
         case BASE_LINE:
             return tg_line_memsize((struct tg_line*)geom);
@@ -5472,7 +5472,7 @@ int tg_geom_num_polys(const struct tg_geom *geom) {
 /// @see GeometryAccessors
 int tg_geom_num_geometries(const struct tg_geom *geom) {
     if (!geom) return 0;
-    if (geom->head.base == BASE_GEOM && 
+    if (geom->head.base == BASE_GEOM &&
         geom->head.type == TG_GEOMETRYCOLLECTION && geom->multi)
     {
         return geom->multi->ngeoms;
@@ -5488,8 +5488,8 @@ int tg_geom_num_geometries(const struct tg_geom *geom) {
 /// @see tg_geom_num_points()
 /// @see GeometryAccessors
 struct tg_point tg_geom_point_at(const struct tg_geom *geom, int index) {
-    if (geom && geom->head.base == BASE_GEOM && 
-        geom->head.type == TG_MULTIPOINT && 
+    if (geom && geom->head.base == BASE_GEOM &&
+        geom->head.type == TG_MULTIPOINT &&
         geom->multi &&index >= 0 && index <= geom->multi->ngeoms)
     {
         return ((struct boxed_point*)geom->multi->geoms[index])->point;
@@ -5500,13 +5500,13 @@ struct tg_point tg_geom_point_at(const struct tg_geom *geom, int index) {
 /// Returns the line at index for a MultiLineString geometry.
 /// @param geom Input geometry
 /// @param index Index of line
-/// @return The line at index. Returns NULL if the geometry type is not 
+/// @return The line at index. Returns NULL if the geometry type is not
 /// TG_MULTILINE or when the provided index is out of range.
 /// @see tg_geom_num_lines()
 /// @see GeometryAccessors
 const struct tg_line *tg_geom_line_at(const struct tg_geom *geom, int index) {
-    if (geom && geom->head.base == BASE_GEOM && 
-        geom->head.type == TG_MULTILINESTRING && 
+    if (geom && geom->head.base == BASE_GEOM &&
+        geom->head.type == TG_MULTILINESTRING &&
         geom->multi &&index >= 0 && index <= geom->multi->ngeoms)
     {
         return (struct tg_line*)geom->multi->geoms[index];
@@ -5517,13 +5517,13 @@ const struct tg_line *tg_geom_line_at(const struct tg_geom *geom, int index) {
 /// Returns the polygon at index for a MultiPolygon geometry.
 /// @param geom Input geometry
 /// @param index Index of polygon
-/// @return The polygon at index. Returns NULL if the geometry type is not 
+/// @return The polygon at index. Returns NULL if the geometry type is not
 /// TG_MULTIPOLYGON or when the provided index is out of range.
 /// @see tg_geom_num_polys()
 /// @see GeometryAccessors
 const struct tg_poly *tg_geom_poly_at(const struct tg_geom *geom, int index) {
-    if (geom && geom->head.base == BASE_GEOM && 
-        geom->head.type == TG_MULTIPOLYGON && 
+    if (geom && geom->head.base == BASE_GEOM &&
+        geom->head.type == TG_MULTIPOLYGON &&
         geom->multi && index >= 0 && index <= geom->multi->ngeoms)
     {
         return (struct tg_poly *)geom->multi->geoms[index];
@@ -5541,11 +5541,11 @@ const struct tg_poly *tg_geom_poly_at(const struct tg_geom *geom, int index) {
 /// @see tg_geom_geometry_at()
 /// @see tg_geom_is_featurecollection()
 /// @see GeometryAccessors
-const struct tg_geom *tg_geom_geometry_at(const struct tg_geom *geom, 
+const struct tg_geom *tg_geom_geometry_at(const struct tg_geom *geom,
     int index)
 {
-    if (geom && geom->head.base == BASE_GEOM && 
-        geom->head.type == TG_GEOMETRYCOLLECTION && 
+    if (geom && geom->head.base == BASE_GEOM &&
+        geom->head.type == TG_GEOMETRYCOLLECTION &&
         geom->multi && index >= 0 && index <= geom->multi->ngeoms)
     {
         return geom->multi->geoms[index];
@@ -5581,7 +5581,7 @@ static bool geom_foreach(const struct tg_geom *geom,
 
 /// tg_geom_foreach flattens a Multi* or GeometryCollection, iterating over
 /// every child (or child of child in case of nested geometry collection).
-/// If the provided geometry is not a Multi* or GeometryCollection then only 
+/// If the provided geometry is not a Multi* or GeometryCollection then only
 /// that geometry is returned by the iter.
 /// Empty geometries are not returned.
 void tg_geom_foreach(const struct tg_geom *geom,
@@ -5594,7 +5594,7 @@ void tg_geom_foreach(const struct tg_geom *geom,
 struct predicates_supported_pair_ctx {
     const struct tg_geom *target;
     const struct tg_geom *first;
-    bool supported;
+    bool intersects;
 };
 
 static bool predicates_supported_pair_iter(const struct tg_geom *second,
@@ -5605,80 +5605,52 @@ static bool predicates_supported_pair_iter(const struct tg_geom *second,
         tg_geom_intersects(ctx->first, second) &&
         tg_geom_intersects(second, ctx->target))
     {
-        ctx->supported = false;
+        ctx->intersects = true;
         return false;
     }
     return true;
 }
 
-struct predicates_supported_source_ctx {
-    const struct tg_geom *source;
+struct predicates_supported_collection_ctx {
+    const struct tg_geom *collection;
     const struct tg_geom *target;
     bool supported;
-    bool covered;
 };
 
-static bool predicates_supported_cover_iter(const struct tg_geom *source,
+static bool predicates_supported_collection_iter(const struct tg_geom *first,
     void *udata)
 {
-    struct predicates_supported_source_ctx *ctx = udata;
-    if (tg_geom_covers(source, ctx->target)) {
-        ctx->covered = true;
-        return false;
-    }
-    return true;
-}
-
-static bool predicates_supported_source_iter(const struct tg_geom *first,
-    void *udata)
-{
-    struct predicates_supported_source_ctx *ctx = udata;
+    struct predicates_supported_collection_ctx *ctx = udata;
     if (!tg_geom_intersects(first, ctx->target)) {
         return true;
     }
     struct predicates_supported_pair_ctx pair = {
         .target = ctx->target,
         .first = first,
-        .supported = true,
     };
-    tg_geom_foreach(ctx->source, predicates_supported_pair_iter, &pair);
-    if (!pair.supported) {
+    tg_geom_foreach(ctx->collection, predicates_supported_pair_iter, &pair);
+    if (pair.intersects) {
         ctx->supported = false;
         return false;
     }
     return true;
 }
 
-static bool predicates_supported_target_iter(const struct tg_geom *target,
-    void *udata)
-{
-    struct predicates_supported_source_ctx *ctx = udata;
-    ctx->target = target;
-    ctx->covered = false;
-    tg_geom_foreach(ctx->source, predicates_supported_cover_iter, ctx);
-    if (ctx->covered) {
-        return true;
-    }
-    tg_geom_foreach(ctx->source, predicates_supported_source_iter, ctx);
-    return ctx->supported;
-}
-
-static bool geom_predicates_supported_one(const struct tg_geom *source,
+static bool geom_predicates_supported_one(const struct tg_geom *collection,
     const struct tg_geom *target)
 {
-    struct predicates_supported_source_ctx ctx = {
-        .source = source,
+    struct predicates_supported_collection_ctx ctx = {
+        .collection = collection,
+        .target = target,
         .supported = true,
     };
-    tg_geom_foreach(target, predicates_supported_target_iter, &ctx);
+    tg_geom_foreach(collection, predicates_supported_collection_iter, &ctx);
     return ctx.supported;
 }
 
-/// Tests whether predicates can be evaluated without combining intersecting
-/// collection components. Returns false conservatively when a component of
-/// either geometry intersects multiple interacting components of the other
-/// geometry and no single component covers it. In that case a correct
-/// predicate may require evaluating the components as a union.
+/// Tests whether contains and covered-by predicates are supported for the two
+/// geometries. They are unsupported when a non-point target intersects two
+/// collection components that also intersect one another.
 bool tg_geom_containment_predicates_supported(const struct tg_geom *a,
     const struct tg_geom *b)
 {
@@ -5687,13 +5659,15 @@ bool tg_geom_containment_predicates_supported(const struct tg_geom *a,
     }
     bool a_is_collection = a->head.type >= TG_MULTIPOINT;
     bool b_is_collection = b->head.type >= TG_MULTIPOINT;
-    if (a->head.type == TG_POINT || b->head.type == TG_POINT ||
-        (!a_is_collection && !b_is_collection))
-    {
-        return true;
+    if (a_is_collection && tg_geom_de9im_dims(b) > 0 &&
+        !geom_predicates_supported_one(a, b)) {
+        return false;
     }
-    return geom_predicates_supported_one(a, b) &&
-        geom_predicates_supported_one(b, a);
+    if (b_is_collection && tg_geom_de9im_dims(a) > 0 &&
+        !geom_predicates_supported_one(b, a)) {
+        return false;
+    }
+    return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -5710,14 +5684,14 @@ static bool point_intersects_base_geom(struct tg_point point,
 {
     if ((geom->head.flags&IS_EMPTY) != IS_EMPTY) {
         switch (geom->head.type) {
-        case TG_POINT: 
-            return tg_point_intersects_point(point, geom->point); 
-        case TG_LINESTRING: 
+        case TG_POINT:
+            return tg_point_intersects_point(point, geom->point);
+        case TG_LINESTRING:
             return tg_point_intersects_line(point, geom->line);
-        case TG_POLYGON: 
+        case TG_POLYGON:
             return tg_point_intersects_poly(point, geom->poly);
-        case TG_MULTIPOINT: 
-        case TG_MULTILINESTRING: 
+        case TG_MULTIPOINT:
+        case TG_MULTILINESTRING:
         case TG_MULTIPOLYGON:
         case TG_GEOMETRYCOLLECTION:
             if (geom->multi) {
@@ -5741,8 +5715,8 @@ static bool point_intersects_geom(struct tg_point point,
         case BASE_GEOM:
             return point_intersects_base_geom(point, geom);
         case BASE_POINT:
-            return tg_point_intersects_point(point, 
-                ((struct boxed_point*)geom)->point); 
+            return tg_point_intersects_point(point,
+                ((struct boxed_point*)geom)->point);
         case BASE_LINE:
             return tg_point_intersects_line(point, ((struct tg_line*)geom));
         case BASE_RING:
@@ -5762,16 +5736,16 @@ static bool line_intersects_base_geom(struct tg_line *line,
 {
     if ((geom->head.flags&IS_EMPTY) != IS_EMPTY) {
         switch (geom->head.type) {
-        case TG_POINT: 
-            return tg_line_intersects_point(line, geom->point); 
-        case TG_LINESTRING: 
+        case TG_POINT:
+            return tg_line_intersects_point(line, geom->point);
+        case TG_LINESTRING:
             return tg_line_intersects_line(line, geom->line);
-        case TG_POLYGON: 
+        case TG_POLYGON:
             return tg_line_intersects_poly(line, geom->poly);
-        case TG_MULTIPOINT: 
-        case TG_MULTILINESTRING: 
+        case TG_MULTIPOINT:
+        case TG_MULTILINESTRING:
         case TG_MULTIPOLYGON:
-        case TG_GEOMETRYCOLLECTION: 
+        case TG_GEOMETRYCOLLECTION:
             if (geom->multi) {
                 for (int i = 0; i < geom->multi->ngeoms; i++) {
                     if (line_intersects_geom(line, geom->multi->geoms[i])) {
@@ -5793,8 +5767,8 @@ static bool line_intersects_geom(struct tg_line *line,
         case BASE_GEOM:
             return line_intersects_base_geom(line, geom);
         case BASE_POINT:
-            return tg_line_intersects_point(line, 
-                ((struct boxed_point*)geom)->point); 
+            return tg_line_intersects_point(line,
+                ((struct boxed_point*)geom)->point);
         case BASE_LINE:
             return tg_line_intersects_line(line, ((struct tg_line*)geom));
         case BASE_RING:
@@ -5806,24 +5780,24 @@ static bool line_intersects_geom(struct tg_line *line,
     return false;
 }
 
-static bool poly_intersects_geom(struct tg_poly *poly, 
+static bool poly_intersects_geom(struct tg_poly *poly,
     const struct tg_geom *geom);
 
-static bool poly_intersects_base_geom(struct tg_poly *poly, 
+static bool poly_intersects_base_geom(struct tg_poly *poly,
     const struct tg_geom *geom)
 {
     if ((geom->head.flags&IS_EMPTY) != IS_EMPTY) {
         switch (geom->head.type) {
-        case TG_POINT: 
-            return tg_poly_intersects_point(poly, geom->point); 
-        case TG_LINESTRING: 
+        case TG_POINT:
+            return tg_poly_intersects_point(poly, geom->point);
+        case TG_LINESTRING:
             return tg_poly_intersects_line(poly, geom->line);
-        case TG_POLYGON: 
+        case TG_POLYGON:
             return tg_poly_intersects_poly(poly, geom->poly);
-        case TG_MULTIPOINT: 
-        case TG_MULTILINESTRING: 
+        case TG_MULTIPOINT:
+        case TG_MULTILINESTRING:
         case TG_MULTIPOLYGON:
-        case TG_GEOMETRYCOLLECTION: 
+        case TG_GEOMETRYCOLLECTION:
             if (geom->multi) {
                 for (int i = 0; i < geom->multi->ngeoms; i++) {
                     if (poly_intersects_geom(poly, geom->multi->geoms[i])) {
@@ -5837,7 +5811,7 @@ static bool poly_intersects_base_geom(struct tg_poly *poly,
     return false;
 }
 
-static bool poly_intersects_geom(struct tg_poly *poly, 
+static bool poly_intersects_geom(struct tg_poly *poly,
     const struct tg_geom *geom)
 {
     if (geom) {
@@ -5845,8 +5819,8 @@ static bool poly_intersects_geom(struct tg_poly *poly,
         case BASE_GEOM:
             return poly_intersects_base_geom(poly, geom);
         case BASE_POINT:
-            return tg_poly_intersects_point(poly, 
-                ((struct boxed_point*)geom)->point); 
+            return tg_poly_intersects_point(poly,
+                ((struct boxed_point*)geom)->point);
         case BASE_LINE:
             return tg_poly_intersects_line(poly, ((struct tg_line*)geom));
         case BASE_RING:
@@ -5873,19 +5847,19 @@ static bool multiiter(const struct tg_geom *geom, int index, void *udata) {
     return true;
 }
 
-static bool base_geom_intersects_geom(const struct tg_geom *geom, 
+static bool base_geom_intersects_geom(const struct tg_geom *geom,
     const struct tg_geom *other)
 {
     if ((geom->head.flags&IS_EMPTY) != IS_EMPTY) {
         switch (geom->head.type) {
-        case TG_POINT: 
+        case TG_POINT:
             return point_intersects_geom(geom->point, other);
-        case TG_LINESTRING: 
+        case TG_LINESTRING:
             return line_intersects_geom(geom->line, other);
-        case TG_POLYGON: 
+        case TG_POLYGON:
             return poly_intersects_geom(geom->poly, other);
-        case TG_MULTIPOINT: 
-        case TG_MULTILINESTRING: 
+        case TG_MULTIPOINT:
+        case TG_MULTILINESTRING:
         case TG_MULTIPOLYGON:
         case TG_GEOMETRYCOLLECTION: {
             struct multiiterctx ctx = { .other = other };
@@ -5898,15 +5872,15 @@ static bool base_geom_intersects_geom(const struct tg_geom *geom,
 
 /// Tests whether two geometries intersect.
 /// @see GeometryPredicates
-bool tg_geom_intersects(const struct tg_geom *geom, 
+bool tg_geom_intersects(const struct tg_geom *geom,
     const struct tg_geom *other)
 {
     if (geom) {
         switch (geom->head.base) {
         case BASE_GEOM:
             return base_geom_intersects_geom(geom, other);
-        case BASE_POINT: 
-            return point_intersects_geom(((struct boxed_point*)geom)->point, 
+        case BASE_POINT:
+            return point_intersects_geom(((struct boxed_point*)geom)->point,
                 other);
         case BASE_LINE:
             return line_intersects_geom((struct tg_line*)geom, other);
@@ -5933,16 +5907,16 @@ static bool point_covers_base_geom(struct tg_point point,
 {
     if ((geom->head.flags&IS_EMPTY) != IS_EMPTY) {
         switch (geom->head.type) {
-        case TG_POINT: 
-            return tg_point_covers_point(point, geom->point); 
-        case TG_LINESTRING: 
+        case TG_POINT:
+            return tg_point_covers_point(point, geom->point);
+        case TG_LINESTRING:
             return tg_point_covers_line(point, geom->line);
-        case TG_POLYGON: 
+        case TG_POLYGON:
             return tg_point_covers_poly(point, geom->poly);
         case TG_MULTIPOINT:
         case TG_MULTILINESTRING:
         case TG_MULTIPOLYGON:
-        case TG_GEOMETRYCOLLECTION: 
+        case TG_GEOMETRYCOLLECTION:
             if (!geom->multi || geom->multi->ngeoms == 0) return false;
             for (int i = 0; i < geom->multi->ngeoms; i++) {
                 if (!point_covers_geom(point, geom->multi->geoms[i])) {
@@ -5963,8 +5937,8 @@ static bool point_covers_geom(struct tg_point point,
         case BASE_GEOM:
             return point_covers_base_geom(point, geom);
         case BASE_POINT:
-            return tg_point_covers_point(point, 
-                ((struct boxed_point*)geom)->point); 
+            return tg_point_covers_point(point,
+                ((struct boxed_point*)geom)->point);
         case BASE_LINE:
             return tg_point_covers_line(point, ((struct tg_line*)geom));
         case BASE_RING:
@@ -5984,16 +5958,16 @@ static bool line_covers_base_geom(struct tg_line *line,
 {
     if ((geom->head.flags&IS_EMPTY) != IS_EMPTY) {
         switch (geom->head.type) {
-        case TG_POINT: 
-            return tg_line_covers_point(line, geom->point); 
-        case TG_LINESTRING: 
+        case TG_POINT:
+            return tg_line_covers_point(line, geom->point);
+        case TG_LINESTRING:
             return tg_line_covers_line(line, geom->line);
-        case TG_POLYGON: 
+        case TG_POLYGON:
             return tg_line_covers_poly(line, geom->poly);
-        case TG_MULTIPOINT: 
-        case TG_MULTILINESTRING: 
+        case TG_MULTIPOINT:
+        case TG_MULTILINESTRING:
         case TG_MULTIPOLYGON:
-        case TG_GEOMETRYCOLLECTION: 
+        case TG_GEOMETRYCOLLECTION:
             if (!geom->multi || geom->multi->ngeoms == 0) return false;
             for (int i = 0; i < geom->multi->ngeoms; i++) {
                 if (!line_covers_geom(line, geom->multi->geoms[i])) {
@@ -6014,8 +5988,8 @@ static bool line_covers_geom(struct tg_line *line,
         case BASE_GEOM:
             return line_covers_base_geom(line, geom);
         case BASE_POINT:
-            return tg_line_covers_point(line, 
-                ((struct boxed_point*)geom)->point); 
+            return tg_line_covers_point(line,
+                ((struct boxed_point*)geom)->point);
         case BASE_LINE:
             return tg_line_covers_line(line, ((struct tg_line*)geom));
         case BASE_RING:
@@ -6027,24 +6001,24 @@ static bool line_covers_geom(struct tg_line *line,
     return false;
 }
 
-static bool poly_covers_geom(struct tg_poly *poly, 
+static bool poly_covers_geom(struct tg_poly *poly,
     const struct tg_geom *geom);
 
-static bool poly_covers_base_geom(struct tg_poly *poly, 
+static bool poly_covers_base_geom(struct tg_poly *poly,
     const struct tg_geom *geom)
 {
     if ((geom->head.flags&IS_EMPTY) != IS_EMPTY) {
         switch (geom->head.type) {
-        case TG_POINT: 
-            return tg_poly_covers_point(poly, geom->point); 
-        case TG_LINESTRING: 
+        case TG_POINT:
+            return tg_poly_covers_point(poly, geom->point);
+        case TG_LINESTRING:
             return tg_poly_covers_line(poly, geom->line);
-        case TG_POLYGON: 
+        case TG_POLYGON:
             return tg_poly_covers_poly(poly, geom->poly);
-        case TG_MULTIPOINT: 
-        case TG_MULTILINESTRING: 
+        case TG_MULTIPOINT:
+        case TG_MULTILINESTRING:
         case TG_MULTIPOLYGON:
-        case TG_GEOMETRYCOLLECTION: 
+        case TG_GEOMETRYCOLLECTION:
             if (!geom->multi || geom->multi->ngeoms == 0) return false;
             for (int i = 0; i < geom->multi->ngeoms; i++) {
                 if (!poly_covers_geom(poly, geom->multi->geoms[i])) {
@@ -6057,7 +6031,7 @@ static bool poly_covers_base_geom(struct tg_poly *poly,
     return false;
 }
 
-static bool poly_covers_geom(struct tg_poly *poly, 
+static bool poly_covers_geom(struct tg_poly *poly,
     const struct tg_geom *geom)
 {
     if (geom) {
@@ -6065,8 +6039,8 @@ static bool poly_covers_geom(struct tg_poly *poly,
         case BASE_GEOM:
             return poly_covers_base_geom(poly, geom);
         case BASE_POINT:
-            return tg_poly_covers_point(poly, 
-                ((struct boxed_point*)geom)->point); 
+            return tg_poly_covers_point(poly,
+                ((struct boxed_point*)geom)->point);
         case BASE_LINE:
             return tg_poly_covers_line(poly, ((struct tg_line*)geom));
         case BASE_RING:
@@ -6159,7 +6133,7 @@ static bool geom_covers_iter(const struct tg_geom *geom, void *udata) {
     return true;
 }
 
-static bool base_geom_covers_geom(const struct tg_geom *geom, 
+static bool base_geom_covers_geom(const struct tg_geom *geom,
     const struct tg_geom *other)
 {
     if ((geom->head.flags&IS_EMPTY) != IS_EMPTY) {
@@ -6191,7 +6165,7 @@ bool tg_geom_covers(const struct tg_geom *geom, const struct tg_geom *other) {
         switch (geom->head.base) {
         case BASE_GEOM:
             return base_geom_covers_geom(geom, other);
-        case BASE_POINT: 
+        case BASE_POINT:
             return point_covers_geom(((struct boxed_point*)geom)->point,
                 other);
         case BASE_LINE:
@@ -6211,22 +6185,22 @@ bool tg_geom_covers(const struct tg_geom *geom, const struct tg_geom *other) {
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
-static bool poly_contains_geom(struct tg_poly *poly, 
+static bool poly_contains_geom(struct tg_poly *poly,
     const struct tg_geom *geom);
 
-static bool poly_contains_base_geom(struct tg_poly *poly, 
+static bool poly_contains_base_geom(struct tg_poly *poly,
     const struct tg_geom *geom)
 {
     if ((geom->head.flags&IS_EMPTY) != IS_EMPTY) {
         switch (geom->head.type) {
-        case TG_POINT: 
-            return tg_poly_contains_point(poly, geom->point); 
-        case TG_LINESTRING: 
+        case TG_POINT:
+            return tg_poly_contains_point(poly, geom->point);
+        case TG_LINESTRING:
             return tg_poly_contains_line(poly, geom->line);
-        case TG_POLYGON: 
+        case TG_POLYGON:
             return tg_poly_contains_poly(poly, geom->poly);
-        case TG_MULTIPOINT: 
-        case TG_MULTILINESTRING: 
+        case TG_MULTIPOINT:
+        case TG_MULTILINESTRING:
         case TG_MULTIPOLYGON:
         case TG_GEOMETRYCOLLECTION: {
             bool contains = false;
@@ -6245,7 +6219,7 @@ static bool poly_contains_base_geom(struct tg_poly *poly,
     return false;
 }
 
-static bool poly_contains_geom(struct tg_poly *poly, 
+static bool poly_contains_geom(struct tg_poly *poly,
     const struct tg_geom *geom)
 {
     if (geom) {
@@ -6253,8 +6227,8 @@ static bool poly_contains_geom(struct tg_poly *poly,
         case BASE_GEOM:
             return poly_contains_base_geom(poly, geom);
         case BASE_POINT:
-            return tg_poly_contains_point(poly, 
-                ((struct boxed_point*)geom)->point); 
+            return tg_poly_contains_point(poly,
+                ((struct boxed_point*)geom)->point);
         case BASE_LINE:
             return tg_poly_contains_line(poly, ((struct tg_line*)geom));
         case BASE_RING:
@@ -6274,14 +6248,14 @@ static bool line_contains_base_geom(struct tg_line *line,
 {
     if ((geom->head.flags&IS_EMPTY) != IS_EMPTY) {
         switch (geom->head.type) {
-        case TG_POINT: 
-            return tg_line_contains_point(line, geom->point); 
-        case TG_LINESTRING: 
+        case TG_POINT:
+            return tg_line_contains_point(line, geom->point);
+        case TG_LINESTRING:
             return tg_line_contains_line(line, geom->line);
-        case TG_POLYGON: 
+        case TG_POLYGON:
             return tg_line_contains_poly(line, geom->poly);
-        case TG_MULTIPOINT: 
-        case TG_MULTILINESTRING: 
+        case TG_MULTIPOINT:
+        case TG_MULTILINESTRING:
         case TG_MULTIPOLYGON:
         case TG_GEOMETRYCOLLECTION: {
             bool contains = false;
@@ -6308,8 +6282,8 @@ static bool line_contains_geom(struct tg_line *line,
         case BASE_GEOM:
             return line_contains_base_geom(line, geom);
         case BASE_POINT:
-            return tg_line_contains_point(line, 
-                ((struct boxed_point*)geom)->point); 
+            return tg_line_contains_point(line,
+                ((struct boxed_point*)geom)->point);
         case BASE_LINE:
             return tg_line_contains_line(line, ((struct tg_line*)geom));
         case BASE_RING:
@@ -6330,11 +6304,11 @@ static bool point_contains_base_geom(struct tg_point point,
 {
     if ((geom->head.flags&IS_EMPTY) != IS_EMPTY) {
         switch (geom->head.type) {
-        case TG_POINT: 
-            return tg_point_contains_point(point, geom->point); 
-        case TG_LINESTRING: 
+        case TG_POINT:
+            return tg_point_contains_point(point, geom->point);
+        case TG_LINESTRING:
             return tg_point_contains_line(point, geom->line);
-        case TG_POLYGON: 
+        case TG_POLYGON:
             return tg_point_contains_poly(point, geom->poly);
         case TG_MULTIPOINT:
         case TG_MULTILINESTRING:
@@ -6428,7 +6402,7 @@ static bool multi_contains_geom(const struct tg_geom *geom,
     return ctx.result;
 }
 
-static bool base_geom_contains_geom(const struct tg_geom *geom, 
+static bool base_geom_contains_geom(const struct tg_geom *geom,
     const struct tg_geom *other)
 {
     if ((geom->head.flags&IS_EMPTY) != IS_EMPTY) {
@@ -6473,8 +6447,8 @@ static bool point_contains_geom(struct tg_point point,
         case BASE_GEOM:
             return point_contains_base_geom(point, geom);
         case BASE_POINT:
-            return tg_point_contains_point(point, 
-                ((struct boxed_point*)geom)->point); 
+            return tg_point_contains_point(point,
+                ((struct boxed_point*)geom)->point);
         case BASE_LINE:
             return tg_point_contains_line(point, ((struct tg_line*)geom));
         case BASE_RING:
@@ -6500,7 +6474,7 @@ static bool multilinestring_contains_point(const struct tg_geom *geom,
 /// @note Works the same as `tg_geom_within(b, a)`
 /// @warning This predicate returns **false** when geometry 'b' is *on* or
 /// *touching* the boundary of geometry 'a'. Such as when a point is on the
-/// edge of a polygon.  
+/// edge of a polygon.
 /// For full coverage, consider using @ref tg_geom_covers.
 /// @see GeometryPredicates
 bool tg_geom_contains(const struct tg_geom *geom, const struct tg_geom *other) {
@@ -6508,7 +6482,7 @@ bool tg_geom_contains(const struct tg_geom *geom, const struct tg_geom *other) {
         switch (geom->head.base) {
         case BASE_GEOM:
             return base_geom_contains_geom(geom, other);
-        case BASE_POINT: 
+        case BASE_POINT:
             return point_contains_geom(((struct boxed_point*)geom)->point,
                 other);
         case BASE_LINE:
@@ -6557,11 +6531,11 @@ static bool point_touches_base_geom(struct tg_point point,
 {
     if ((geom->head.flags&IS_EMPTY) != IS_EMPTY) {
         switch (geom->head.type) {
-        case TG_POINT: 
-            return tg_point_touches_point(point, geom->point); 
-        case TG_LINESTRING: 
+        case TG_POINT:
+            return tg_point_touches_point(point, geom->point);
+        case TG_LINESTRING:
             return tg_point_touches_line(point, geom->line);
-        case TG_POLYGON: 
+        case TG_POLYGON:
             return tg_point_touches_poly(point, geom->poly);
         case TG_MULTILINESTRING:
             return multilinestring_touches_point(geom, point);
@@ -6589,8 +6563,8 @@ static bool point_touches_geom(struct tg_point point,
         case BASE_GEOM:
             return point_touches_base_geom(point, geom);
         case BASE_POINT:
-            return tg_point_touches_point(point, 
-                ((struct boxed_point*)geom)->point); 
+            return tg_point_touches_point(point,
+                ((struct boxed_point*)geom)->point);
         case BASE_LINE:
             return tg_point_touches_line(point, ((struct tg_line*)geom));
         case BASE_RING:
@@ -6610,11 +6584,11 @@ static bool line_touches_base_geom(struct tg_line *line,
 {
     if ((geom->head.flags&IS_EMPTY) != IS_EMPTY) {
         switch (geom->head.type) {
-        case TG_POINT: 
-            return tg_line_touches_point(line, geom->point); 
-        case TG_LINESTRING: 
+        case TG_POINT:
+            return tg_line_touches_point(line, geom->point);
+        case TG_LINESTRING:
             return tg_line_touches_line(line, geom->line);
-        case TG_POLYGON: 
+        case TG_POLYGON:
             return tg_line_touches_poly(line, geom->poly);
         case TG_MULTILINESTRING:
             return multilinestring_touches_line(geom, line);
@@ -6646,8 +6620,8 @@ static bool line_touches_geom(struct tg_line *line,
         case BASE_GEOM:
             return line_touches_base_geom(line, geom);
         case BASE_POINT:
-            return tg_line_touches_point(line, 
-                ((struct boxed_point*)geom)->point); 
+            return tg_line_touches_point(line,
+                ((struct boxed_point*)geom)->point);
         case BASE_LINE:
             return tg_line_touches_line(line, ((struct tg_line*)geom));
         case BASE_RING:
@@ -6659,22 +6633,22 @@ static bool line_touches_geom(struct tg_line *line,
     return false;
 }
 
-static bool poly_touches_geom(struct tg_poly *poly, 
+static bool poly_touches_geom(struct tg_poly *poly,
     const struct tg_geom *geom);
 
-static bool poly_touches_base_geom(struct tg_poly *poly, 
+static bool poly_touches_base_geom(struct tg_poly *poly,
     const struct tg_geom *geom)
 {
     if ((geom->head.flags&IS_EMPTY) != IS_EMPTY) {
         switch (geom->head.type) {
-        case TG_POINT: 
-            return tg_poly_touches_point(poly, geom->point); 
-        case TG_LINESTRING: 
+        case TG_POINT:
+            return tg_poly_touches_point(poly, geom->point);
+        case TG_LINESTRING:
             return tg_poly_touches_line(poly, geom->line);
-        case TG_POLYGON: 
+        case TG_POLYGON:
             return tg_poly_touches_poly(poly, geom->poly);
-        case TG_MULTIPOINT: 
-        case TG_MULTILINESTRING: 
+        case TG_MULTIPOINT:
+        case TG_MULTILINESTRING:
         case TG_MULTIPOLYGON:
         case TG_GEOMETRYCOLLECTION: {
             bool touches = false;
@@ -6694,7 +6668,7 @@ static bool poly_touches_base_geom(struct tg_poly *poly,
     return false;
 }
 
-static bool poly_touches_geom(struct tg_poly *poly, 
+static bool poly_touches_geom(struct tg_poly *poly,
     const struct tg_geom *geom)
 {
     if (geom) {
@@ -6702,8 +6676,8 @@ static bool poly_touches_geom(struct tg_poly *poly,
         case BASE_GEOM:
             return poly_touches_base_geom(poly, geom);
         case BASE_POINT:
-            return tg_poly_touches_point(poly, 
-                ((struct boxed_point*)geom)->point); 
+            return tg_poly_touches_point(poly,
+                ((struct boxed_point*)geom)->point);
         case BASE_LINE:
             return tg_poly_touches_line(poly, ((struct tg_line*)geom));
         case BASE_RING:
@@ -6735,7 +6709,7 @@ static bool multi_touches_geom(const struct tg_geom *geom,
 static bool geometrycollection_touches_geom(const struct tg_geom *geom,
     const struct tg_geom *other);
 
-static bool base_geom_touches_geom(const struct tg_geom *geom, 
+static bool base_geom_touches_geom(const struct tg_geom *geom,
     const struct tg_geom *other)
 {
     if (other && other->head.base == BASE_GEOM &&
@@ -6745,11 +6719,11 @@ static bool base_geom_touches_geom(const struct tg_geom *geom,
     }
     if ((geom->head.flags&IS_EMPTY) != IS_EMPTY) {
         switch (geom->head.type) {
-        case TG_POINT: 
+        case TG_POINT:
             return point_touches_geom(geom->point, other);
-        case TG_LINESTRING: 
+        case TG_LINESTRING:
             return line_touches_geom(geom->line, other);
-        case TG_POLYGON: 
+        case TG_POLYGON:
             return poly_touches_geom(geom->poly, other);
         case TG_MULTILINESTRING:
             if (other) {
@@ -7008,7 +6982,7 @@ static bool geometrycollection_touches_geom(const struct tg_geom *geom,
     return ctx.touches && !ctx.interior_intersects;
 }
 
-/// Tests whether a geometry 'a' touches 'b'. 
+/// Tests whether a geometry 'a' touches 'b'.
 /// They have at least one point in common, but their interiors do not
 /// intersect.
 /// @see GeometryPredicates
@@ -7088,8 +7062,8 @@ bool tg_geom_intersects_xy(const struct tg_geom *a, double x, double y) {
 /// Get the extra coordinates for a geometry.
 /// @param geom Input geometry
 /// @return Array of coordinates
-/// @return NULL if there are no extra coordinates 
-/// @note These are the raw coordinates provided by a constructor like 
+/// @return NULL if there are no extra coordinates
+/// @note These are the raw coordinates provided by a constructor like
 /// tg_geom_new_polygon_z() or from a parsed source like WKT "POLYGON Z ...".
 /// @see tg_geom_num_extra_coords()
 const double *tg_geom_extra_coords(const struct tg_geom *geom) {
@@ -7161,10 +7135,10 @@ double tg_geom_m(const struct tg_geom *geom) {
 }
 
 /// Returns the indexing spread for a ring.
-/// 
-/// The "spread" is the number of segments or rectangles that are grouped 
+///
+/// The "spread" is the number of segments or rectangles that are grouped
 /// together to produce a unioned rectangle that is stored at a higher level.
-/// 
+///
 /// For a tree based structure, this would be the number of items per node.
 ///
 /// @param ring Input ring
@@ -7217,14 +7191,14 @@ int tg_ring_index_level_num_rects(const struct tg_ring *ring, int levelidx) {
 /// @see tg_ring_index_num_levels()
 /// @see tg_ring_index_level_num_rects()
 /// @see RingFuncs
-struct tg_rect tg_ring_index_level_rect(const struct tg_ring *ring, 
+struct tg_rect tg_ring_index_level_rect(const struct tg_ring *ring,
     int levelidx, int rectidx)
 {
     struct index *index = ring ? ring->index : NULL;
     return index_level_rect(index, levelidx, rectidx);
 }
 
-/// Get the string representation of a geometry type. 
+/// Get the string representation of a geometry type.
 /// e.g. "Point", "Polygon", "LineString".
 /// @param type Input geometry type
 /// @return A string representing the type
@@ -7281,7 +7255,7 @@ const char *tg_geom_type_string(enum tg_geom_type type) {
 #ifndef JSON_STATIC
 #include "json.h"
 #else
-enum json_type { 
+enum json_type {
     JSON_NULL,
     JSON_FALSE,
     JSON_NUMBER,
@@ -7348,7 +7322,7 @@ static inline int64_t vesc(const uint8_t *json, int64_t jlen, int64_t i) {
     i += 1;
     if (i == jlen) return -(i+1);
     switch (json[i]) {
-    case '"': case '\\': case '/': case 'b': case 'f': case 'n': 
+    case '"': case '\\': case '/': case 'b': case 'f': case 'n':
     case 'r': case 't': return i+1;
     case 'u':
         for (int j = 0; j < 4; j++) {
@@ -7413,7 +7387,7 @@ static int64_t vstring(const uint8_t *json, int64_t jlen, int64_t i) {
         } else {
             break;
         }
-    } 
+    }
     return -(i+1);
 }
 
@@ -7425,7 +7399,7 @@ static int64_t vnumber(const uint8_t *data, int64_t dlen, int64_t i) {
         if (i == dlen) return -(i+1);
         if (data[i] < '0' || data[i] > '9') return -(i+1);
     }
-    // int 
+    // int
     if (data[i] == '0') {
         i++;
     } else {
@@ -7571,7 +7545,7 @@ static int64_t vany(const uint8_t *data, int64_t dlen, int64_t i, int depth) {
         case 't': return vtrue(data, dlen, i+1);
         case 'f': return vfalse(data, dlen, i+1);
         case 'n': return vnull(data, dlen, i+1);
-        case '-': case '0': case '1': case '2': case '3': case '4': 
+        case '-': case '0': case '1': case '2': case '3': case '4':
         case '5': case '6': case '7': case '8': case '9':
             return vnumber(data, dlen, i+1);
         }
@@ -7750,7 +7724,7 @@ static struct json peek_any(uint8_t *raw, uint8_t *end) {
         case 'n': return take_literal(raw, end, 4);
         case 't': return take_literal(raw, end, 4);
         case 'f': return take_literal(raw, end, 5);
-        case '-': case '0': case '1': case '2': case '3': case '4': case '5': 
+        case '-': case '0': case '1': case '2': case '3': case '4': case '5':
         case '6': case '7': case '8': case '9': return take_number(raw, end);
         }
         raw++;
@@ -7823,7 +7797,7 @@ static int strcmpn(const char *a, size_t alen, const char *b, size_t blen) {
     return cmp;
 }
 
-static const uint8_t hextoks[256] = { 
+static const uint8_t hextoks[256] = {
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,3,4,5,6,7,8,9,0,0,0,0,0,0,
     0,10,11,12,13,14,15,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -7870,7 +7844,7 @@ static inline int encode_codepoint(uint8_t dst[], uint32_t cp) {
 }
 
 // for_each_utf8 iterates over each UTF-8 bytes in jstr, unescaping along the
-// way. 'f' is a loop expression that will make available the 'ch' char which 
+// way. 'f' is a loop expression that will make available the 'ch' char which
 // is just a single byte in a UTF-8 series.
 #define for_each_utf8(jstr, len, f) { \
     size_t nn = (len); \
@@ -7918,7 +7892,7 @@ static inline int encode_codepoint(uint8_t dst[], uint32_t cp) {
     } \
 }
 
-JSON_EXTERN 
+JSON_EXTERN
 int json_raw_comparen(struct json json, const char *str, size_t len) {
     char *raw = (char*)jraw(json);
     if (!raw) raw = "";
@@ -7945,7 +7919,7 @@ JSON_EXTERN size_t json_string_length(struct json json) {
     return count;
 }
 
-JSON_EXTERN 
+JSON_EXTERN
 int json_string_comparen(struct json json, const char *str, size_t slen) {
     if (json_type(json) != JSON_STRING) {
         return json_raw_comparen(json, str, slen);
@@ -7974,7 +7948,7 @@ done:
     return cmp;
 }
 
-JSON_EXTERN 
+JSON_EXTERN
 int json_string_compare(struct json json, const char *str) {
     return json_string_comparen(json, str, str?strlen(str):0);
 }
@@ -8164,7 +8138,7 @@ JSON_EXTERN bool json_bool(struct json json) {
     case JSON_TRUE:
         return true;
     case JSON_NUMBER:
-         return json_double(json) != 0.0; 
+         return json_double(json) != 0.0;
     case JSON_STRING: {
         char *trues[] = { "1", "t", "T", "true", "TRUE", "True" };
         for (size_t i = 0; i < sizeof(trues)/sizeof(char*); i++) {
@@ -8177,16 +8151,16 @@ JSON_EXTERN bool json_bool(struct json json) {
     }
 }
 
-struct jesc_buf { 
+struct jesc_buf {
     uint8_t *esc;
     size_t esclen;
     size_t count;
 };
 
 static void jesc_append(struct jesc_buf *buf, uint8_t ch) {
-    if (buf->esclen > 1) { 
+    if (buf->esclen > 1) {
         *(buf->esc++) = ch;
-        buf->esclen--; 
+        buf->esclen--;
     }
     buf->count++;
 }
@@ -8197,7 +8171,7 @@ static void jesc_append2(struct jesc_buf *buf, uint8_t c1, uint8_t c2) {
 
 static const uint8_t hexchars[] = "0123456789abcdef";
 
-static void 
+static void
 jesc_append_ux(struct jesc_buf *buf, uint8_t c1, uint8_t c2, uint16_t x) {
     jesc_append2(buf, c1, c2);
     jesc_append2(buf, hexchars[x>>12&0xF], hexchars[x>>8&0xF]);
@@ -8279,7 +8253,7 @@ struct json json_getn(const char *json_str, size_t len, const char *path) {
             if (*end && *end != '.') { i = 0; break; }
             json = json_array_get(json, index);
         } else {
-            i = 0; 
+            i = 0;
             break;
         }
     }
@@ -8350,14 +8324,14 @@ static struct tg_geom *make_parse_error(const char *format, ...) {
 ///     tg_geom_free(geom);
 ///
 ///     // !!
-///     // DO NOT use the return value of tg_geom_error() after calling 
+///     // DO NOT use the return value of tg_geom_error() after calling
 ///     // tg_geom_free(). If you need to hang onto the error for a longer
 ///     // period of time then you must copy it before freeing.
 ///     // !!
 ///
 ///     return;
 /// } else {
-///     // ... Parsing succeeded 
+///     // ... Parsing succeeded
 /// }
 /// ```
 ///
@@ -8374,15 +8348,15 @@ const char *tg_geom_error(const struct tg_geom *geom) {
     return (geom->head.flags&IS_ERROR) == IS_ERROR ? geom->error : NULL;
 }
 
-static bool buf_append_json_pair(struct tg_buf *buf, struct json key, 
+static bool buf_append_json_pair(struct tg_buf *buf, struct json key,
     struct json val)
 {
     size_t len = buf->len;
     if (!tg_buf_append_byte(buf, buf->len == 0 ? '{' : ',') ||
-        !tg_buf_append_bytes(buf, (uint8_t*)json_raw(key), 
-            json_raw_length(key)) || 
-        !tg_buf_append_byte(buf, ':') || 
-        !tg_buf_append_bytes(buf, (uint8_t*)json_raw(val), 
+        !tg_buf_append_bytes(buf, (uint8_t*)json_raw(key),
+            json_raw_length(key)) ||
+        !tg_buf_append_byte(buf, ':') ||
+        !tg_buf_append_bytes(buf, (uint8_t*)json_raw(val),
             json_raw_length(val)))
     {
         buf->len = len;
@@ -8392,8 +8366,8 @@ static bool buf_append_json_pair(struct tg_buf *buf, struct json key,
 }
 
 // returns an error message constant if there's an error. Do not free.
-static const char *take_basic_geojson(struct json json, 
-    const char *target_name, struct json *targetout, 
+static const char *take_basic_geojson(struct json json,
+    const char *target_name, struct json *targetout,
     enum flags *flagsout, char **extraout, bool *okout
 ) {
     enum flags flags = 0;
@@ -8434,7 +8408,7 @@ static const char *take_basic_geojson(struct json json,
                     if (has_id) {
                         skip_val = true;
                     } else {
-                        if (json_type(val) != JSON_STRING && 
+                        if (json_type(val) != JSON_STRING &&
                             json_type(val) != JSON_NUMBER)
                         {
                             err = "'id' must be a string or number";
@@ -8615,15 +8589,15 @@ static struct tg_geom *parse_geojson_point(struct json json, bool req_geom,
         geom = tg_geom_new_point(xy);
     } else {
         switch (dims) {
-        case 2: 
+        case 2:
             geom = geom_new(TG_POINT);
             if (!geom) goto fail;
             geom->point = xy;
             break;
-        case 3: 
+        case 3:
             geom = tg_geom_new_point_z(xy, z);
             break;
-        default: 
+        default:
             geom = tg_geom_new_point_zm(xy, z, m);
             break;
         }
@@ -8658,8 +8632,8 @@ static bool check_parse_posns(enum base base, double *posns, int nposns,
 }
 
 // return the dims or -1 if error
-static int parse_geojson_posns(enum base base, int dims, int depth, 
-    struct json coords, struct dvec *posns, struct dvec *xcoords, 
+static int parse_geojson_posns(enum base base, int dims, int depth,
+    struct json coords, struct dvec *posns, struct dvec *xcoords,
     const char **err)
 {
     struct json val0 = json_first(coords);
@@ -8706,7 +8680,7 @@ static int parse_geojson_posns(enum base base, int dims, int depth,
     return dims;
 }
 
-static struct tg_geom *parse_geojson_linestring(struct json json, 
+static struct tg_geom *parse_geojson_linestring(struct json json,
     bool req_geom, enum tg_index ix)
 {
     struct tg_line *line = NULL;
@@ -8730,14 +8704,14 @@ static struct tg_geom *parse_geojson_linestring(struct json json,
         geom = tg_geom_new_linestring(line);
     } else {
         switch (dims) {
-        case 2: 
+        case 2:
             geom = geom_new(TG_LINESTRING);
             if (geom) geom->line = tg_line_clone(line);
             break;
-        case 3: 
+        case 3:
             geom = tg_geom_new_linestring_z(line, xcoords.data, xcoords.len);
             break;
-        default: 
+        default:
             geom = tg_geom_new_linestring_zm(line, xcoords.data, xcoords.len);
             break;
         }
@@ -8750,8 +8724,8 @@ static struct tg_geom *parse_geojson_linestring(struct json json,
 }
 
 // returns the dims or -1 if error
-static int parse_geojson_multi_posns(enum base base, int dims, int depth, 
-    struct json coords, struct dvec *posns, struct rvec *rings,  
+static int parse_geojson_multi_posns(enum base base, int dims, int depth,
+    struct json coords, struct dvec *posns, struct rvec *rings,
     struct tg_poly **poly, struct dvec *xcoords, enum tg_index ix,
     const char **err)
 {
@@ -8762,10 +8736,10 @@ static int parse_geojson_multi_posns(enum base base, int dims, int depth,
             return -1;
         }
         posns->len = 0;
-        dims = parse_geojson_posns(base, dims, depth, val0, posns, 
+        dims = parse_geojson_posns(base, dims, depth, val0, posns,
             xcoords, err);
         if (dims == -1) return -1;
-        struct tg_ring *ring = tg_ring_new_ix((struct tg_point*)posns->data, 
+        struct tg_ring *ring = tg_ring_new_ix((struct tg_point*)posns->data,
             posns->len / 2, ix);
         if (!ring) return -1;
         if (!rvec_append(rings, ring)) {
@@ -8778,7 +8752,7 @@ static int parse_geojson_multi_posns(enum base base, int dims, int depth,
         *err = "polygons must have one or more rings";
         return -1;
     }
-    *poly = tg_poly_new(rings->data[0], 
+    *poly = tg_poly_new(rings->data[0],
         (struct tg_ring const*const*)rings->data+1, rings->len-1);
     if (!*poly) return -1;
     for (size_t i = 0; i < rings->len; i++) {
@@ -8801,7 +8775,7 @@ static struct tg_geom *parse_geojson_polygon(struct json json, bool req_geom,
         geom = tg_geom_new_polygon_empty();
         goto done;
     }
-    int dims = parse_geojson_multi_posns(BASE_RING, 0, 2, target, &posns, 
+    int dims = parse_geojson_multi_posns(BASE_RING, 0, 2, target, &posns,
         &rings, &poly, &xcoords, ix, &err);
     if (dims == -1) {
         gerr = err ? make_parse_error("%s", err) : NULL;
@@ -8811,14 +8785,14 @@ static struct tg_geom *parse_geojson_polygon(struct json json, bool req_geom,
         geom = tg_geom_new_polygon(poly);
     } else {
         switch (dims) {
-        case 2: 
+        case 2:
             geom = geom_new(TG_POLYGON);
             if (geom) geom->poly = tg_poly_clone(poly);
             break;
-        case 3: 
+        case 3:
             geom = tg_geom_new_polygon_z(poly, xcoords.data, xcoords.len);
             break;
-        default: 
+        default:
             geom = tg_geom_new_polygon_zm(poly, xcoords.data, xcoords.len);
             break;
         }
@@ -8853,15 +8827,15 @@ static struct tg_geom *parse_geojson_multipoint(struct json json,
     const struct tg_point *points = (struct tg_point*)posns.data;
     int npoints = posns.len/2;
     switch (dims) {
-    case 2: 
+    case 2:
         geom = tg_geom_new_multipoint(points, npoints);
         break;
-    case 3: 
-        geom = tg_geom_new_multipoint_z(points, npoints, 
+    case 3:
+        geom = tg_geom_new_multipoint_z(points, npoints,
             xcoords.data, xcoords.len);
         break;
-    default: 
-        geom = tg_geom_new_multipoint_zm(points, npoints, 
+    default:
+        geom = tg_geom_new_multipoint_zm(points, npoints,
             xcoords.data, xcoords.len);
         break;
     }
@@ -8893,7 +8867,7 @@ static struct tg_geom *parse_geojson_multilinestring(struct json json,
             gerr = err ? make_parse_error("%s", err) : NULL;
             goto fail;
         }
-        struct tg_line *line = tg_line_new_ix((struct tg_point*)posns.data, 
+        struct tg_line *line = tg_line_new_ix((struct tg_point*)posns.data,
             posns.len / 2, ix);
         if (!line) goto fail;
         if (!lvec_append(&lines, line)) {
@@ -8903,16 +8877,16 @@ static struct tg_geom *parse_geojson_multilinestring(struct json json,
         val0 = json_next(val0);
     }
     switch (dims) {
-    case 2: 
+    case 2:
         geom = tg_geom_new_multilinestring(
                 (struct tg_line const*const*)lines.data, lines.len);
         break;
-    case 3: 
+    case 3:
         geom = tg_geom_new_multilinestring_z(
             (struct tg_line const*const*)lines.data, lines.len,
             xcoords.data, xcoords.len);
         break;
-    default: 
+    default:
         geom = tg_geom_new_multilinestring_zm(
             (struct tg_line const*const*)lines.data, lines.len,
             xcoords.data, xcoords.len);
@@ -8949,7 +8923,7 @@ static struct tg_geom *parse_geojson_multipolygon(struct json json,
         }
         posns.len = 0;
         rings.len = 0;
-        dims = parse_geojson_multi_posns(BASE_RING, dims, 3, val0, &posns, 
+        dims = parse_geojson_multi_posns(BASE_RING, dims, 3, val0, &posns,
             &rings, &poly, &xcoords, ix, &err);
         if (dims == -1) {
             gerr = err ? make_parse_error("%s", err) : NULL;
@@ -8962,16 +8936,16 @@ static struct tg_geom *parse_geojson_multipolygon(struct json json,
         val0 = json_next(val0);
     }
     switch (dims) {
-    case 2: 
+    case 2:
         geom = tg_geom_new_multipolygon(
                 (struct tg_poly const*const*)polys.data, polys.len);
         break;
-    case 3: 
+    case 3:
         geom = tg_geom_new_multipolygon_z(
             (struct tg_poly const*const*)polys.data, polys.len,
             xcoords.data, xcoords.len);
         break;
-    default: 
+    default:
         geom = tg_geom_new_multipolygon_zm(
             (struct tg_poly const*const*)polys.data, polys.len,
             xcoords.data, xcoords.len);
@@ -8995,11 +8969,11 @@ static struct tg_geom *parse_geojson_multipolygon(struct json json,
     })
 }
 
-static struct tg_geom *parse_geojson(struct json json, bool req_geom, 
+static struct tg_geom *parse_geojson(struct json json, bool req_geom,
     enum tg_index ix);
 
 static struct tg_geom *parse_geojson_geometrycollection(struct json json,
-    enum tg_index ix) 
+    enum tg_index ix)
 {
     struct gvec geoms = { 0 };
     PARSE_GEOJSON_BASIC_HEAD("geometries")
@@ -9008,7 +8982,7 @@ static struct tg_geom *parse_geojson_geometrycollection(struct json json,
         struct tg_geom *child = parse_geojson(val0, false, ix);
         if (!child) goto fail;
         if (tg_geom_error(child)) {
-            gerr = child; 
+            gerr = child;
             child = NULL;
             goto fail;
         }
@@ -9068,10 +9042,10 @@ static struct tg_geom *parse_geojson_feature(struct json json, enum tg_index ix)
         // combine the two together as '[feature-extra,geometry-extra]'
         size_t xn0 = extra ? strlen(extra) : 0;
         size_t xn1 = strlen(geom->xjson);
-        if (!tg_buf_append_byte(&combined, '[') || 
-            !tg_buf_append_bytes(&combined, 
+        if (!tg_buf_append_byte(&combined, '[') ||
+            !tg_buf_append_bytes(&combined,
                 (uint8_t*)(xn0 ? extra : "{}"), (xn0 ? xn0 : 2)) ||
-            !tg_buf_append_byte(&combined, ',') || 
+            !tg_buf_append_byte(&combined, ',') ||
             !tg_buf_append_bytes(&combined, (uint8_t*)geom->xjson, xn1) ||
             !tg_buf_append_byte(&combined, ']') ||
             !tg_buf_append_byte(&combined, '\0'))
@@ -9083,7 +9057,7 @@ static struct tg_geom *parse_geojson_feature(struct json json, enum tg_index ix)
         extra = (char*)combined.data;
         combined = (struct tg_buf) { 0 };
     }
-        
+
     PARSE_GEOJSON_BASIC_TAIL({
         if (combined.data) tg_free(combined.data);
     })
@@ -9168,7 +9142,7 @@ static struct tg_geom *parse_geojson(struct json json, bool req_geom,
 /// @param geojson Geojson data. Must be UTF8.
 /// @param len Length of data
 /// @returns A geometry or an error. Use tg_geom_error() after parsing to check
-/// for errors. 
+/// for errors.
 /// @see tg_parse_geojson()
 /// @see GeometryParsing
 struct tg_geom *tg_parse_geojsonn(const char *geojson, size_t len) {
@@ -9182,7 +9156,7 @@ struct tg_geom *tg_parse_geojsonn(const char *geojson, size_t len) {
 /// arbitrary JSON members.
 /// @param geojson A geojson string. Must be UTF8 and null-terminated.
 /// @returns A geometry or an error. Use tg_geom_error() after parsing to check
-/// for errors. 
+/// for errors.
 /// @see tg_parse_geojsonn()
 /// @see tg_parse_geojson_ix()
 /// @see tg_parse_geojsonn_ix()
@@ -9197,7 +9171,7 @@ struct tg_geom *tg_parse_geojson(const char *geojson) {
 /// @param geojson A geojson string. Must be UTF8 and null-terminated.
 /// @param ix Indexing option, e.g. TG_NONE, TG_NATURAL, TG_YSTRIPES
 /// @returns A geometry or an error. Use tg_geom_error() after parsing to check
-/// for errors. 
+/// for errors.
 /// @see [tg_index](.#tg_index)
 /// @see tg_parse_geojson()
 /// @see tg_parse_geojsonn_ix()
@@ -9206,17 +9180,17 @@ struct tg_geom *tg_parse_geojson_ix(const char *geojson, enum tg_index ix) {
     return tg_parse_geojsonn_ix(geojson, geojson?strlen(geojson):0, ix);
 }
 
-/// Parse geojson using provided indexing option. 
+/// Parse geojson using provided indexing option.
 /// @param geojson Geojson data. Must be UTF8.
 /// @param len Length of data
 /// @param ix Indexing option, e.g. TG_NONE, TG_NATURAL, TG_YSTRIPES
 /// @returns A geometry or an error. Use tg_geom_error() after parsing to check
-/// for errors. 
+/// for errors.
 /// @see [tg_index](.#tg_index)
 /// @see tg_parse_geojson()
 /// @see tg_parse_geojson_ix()
 /// @see GeometryParsing
-struct tg_geom *tg_parse_geojsonn_ix(const char *geojson, size_t len, 
+struct tg_geom *tg_parse_geojsonn_ix(const char *geojson, size_t len,
     enum tg_index ix)
 {
     struct tg_geom *geom = NULL;
@@ -9381,7 +9355,7 @@ static inline uint32_t log10Pow5(const int32_t e) {
     return (((uint32_t) e) * 732923) >> 20;
 }
 
-static inline int copy_special_str(char * const result, const bool sign, 
+static inline int copy_special_str(char * const result, const bool sign,
     const bool exponent, const bool mantissa)
 {
     if (mantissa) {
@@ -9562,7 +9536,7 @@ static inline bool multipleOfPowerOf2(const uint64_t value, const uint32_t p) {
 #if defined(HAS_UINT128)
 
 // Best case: use 128-bit type.
-static inline uint64_t mulShift64(const uint64_t m, const uint64_t* const mul, 
+static inline uint64_t mulShift64(const uint64_t m, const uint64_t* const mul,
     const int32_t j)
 {
     const uint128_t b0 = ((uint128_t) m) * mul[0];
@@ -9571,8 +9545,8 @@ static inline uint64_t mulShift64(const uint64_t m, const uint64_t* const mul,
 }
 
 static inline uint64_t mulShiftAll64(const uint64_t m, const uint64_t*
-    const mul, const int32_t j, uint64_t* const vp, uint64_t* const vm, 
-    const uint32_t mmShift) 
+    const mul, const int32_t j, uint64_t* const vp, uint64_t* const vm,
+    const uint32_t mmShift)
 {
     *vp = mulShift64(4 * m + 2, mul, j);
     *vm = mulShift64(4 * m - 1 - mmShift, mul, j);
@@ -9597,8 +9571,8 @@ static inline uint64_t mulShift64(const uint64_t m, const uint64_t* const mul,
   }
 
 // This is faster if we don't have a 64x64->128-bit multiplication.
-static inline uint64_t mulShiftAll64(uint64_t m, const uint64_t* const mul, 
-    const int32_t j, uint64_t* const vp, uint64_t* const vm, 
+static inline uint64_t mulShiftAll64(uint64_t m, const uint64_t* const mul,
+    const int32_t j, uint64_t* const vp, uint64_t* const vm,
     const uint32_t mmShift)
 {
     m <<= 1;
@@ -9608,12 +9582,12 @@ static inline uint64_t mulShiftAll64(uint64_t m, const uint64_t* const mul,
     uint64_t hi;
     const uint64_t mid = tmp + umul128(m, mul[1], &hi);
     hi += mid < tmp; // overflow into hi
-  
+
     const uint64_t lo2 = lo + mul[0];
     const uint64_t mid2 = mid + mul[1] + (lo2 < lo);
     const uint64_t hi2 = hi + (mid2 < mid);
     *vp = shiftright128(mid2, hi2, (uint32_t) (j - 64 - 1));
-  
+
     if (mmShift == 1) {
         const uint64_t lo3 = lo - mul[0];
         const uint64_t mid3 = mid - mul[1] - (lo3 > lo);
@@ -9628,7 +9602,7 @@ static inline uint64_t mulShiftAll64(uint64_t m, const uint64_t* const mul,
         const uint64_t hi4 = hi3 - (mid4 > mid3);
         *vm = shiftright128(mid4, hi4, (uint32_t) (j - 64));
     }
-  
+
     return shiftright128(mid, hi, (uint32_t) (j - 64 - 1));
 }
 
@@ -9642,9 +9616,9 @@ static inline uint64_t mulShiftAll64(uint64_t m, const uint64_t* const mul,
 #define DOUBLE_POW5_TABLE_SIZE 326
 
 static const uint64_t DOUBLE_POW5_INV_SPLIT[DOUBLE_POW5_INV_TABLE_SIZE][2] = {
-    {                    1u, 2305843009213693952u }, 
+    {                    1u, 2305843009213693952u },
     { 11068046444225730970u, 1844674407370955161u },
-    {  5165088340638674453u, 1475739525896764129u }, 
+    {  5165088340638674453u, 1475739525896764129u },
     {  7821419487252849886u, 1180591620717411303u },
     {  8824922364862649494u, 1888946593147858085u },
     {  7059937891890119595u, 1511157274518286468u },
@@ -9987,331 +9961,331 @@ static const uint64_t DOUBLE_POW5_INV_SPLIT[DOUBLE_POW5_INV_TABLE_SIZE][2] = {
 };
 
 static const uint64_t DOUBLE_POW5_SPLIT[DOUBLE_POW5_TABLE_SIZE][2] = {
-    {                    0u, 1152921504606846976u }, 
+    {                    0u, 1152921504606846976u },
     {                    0u, 1441151880758558720u },
-    {                    0u, 1801439850948198400u }, 
+    {                    0u, 1801439850948198400u },
     {                    0u, 2251799813685248000u },
-    {                    0u, 1407374883553280000u }, 
+    {                    0u, 1407374883553280000u },
     {                    0u, 1759218604441600000u },
-    {                    0u, 2199023255552000000u }, 
+    {                    0u, 2199023255552000000u },
     {                    0u, 1374389534720000000u },
-    {                    0u, 1717986918400000000u }, 
+    {                    0u, 1717986918400000000u },
     {                    0u, 2147483648000000000u },
-    {                    0u, 1342177280000000000u }, 
+    {                    0u, 1342177280000000000u },
     {                    0u, 1677721600000000000u },
-    {                    0u, 2097152000000000000u }, 
+    {                    0u, 2097152000000000000u },
     {                    0u, 1310720000000000000u },
-    {                    0u, 1638400000000000000u }, 
+    {                    0u, 1638400000000000000u },
     {                    0u, 2048000000000000000u },
-    {                    0u, 1280000000000000000u }, 
+    {                    0u, 1280000000000000000u },
     {                    0u, 1600000000000000000u },
-    {                    0u, 2000000000000000000u }, 
+    {                    0u, 2000000000000000000u },
     {                    0u, 1250000000000000000u },
-    {                    0u, 1562500000000000000u }, 
+    {                    0u, 1562500000000000000u },
     {                    0u, 1953125000000000000u },
-    {                    0u, 1220703125000000000u }, 
+    {                    0u, 1220703125000000000u },
     {                    0u, 1525878906250000000u },
-    {                    0u, 1907348632812500000u }, 
+    {                    0u, 1907348632812500000u },
     {                    0u, 1192092895507812500u },
-    {                    0u, 1490116119384765625u }, 
+    {                    0u, 1490116119384765625u },
     {  4611686018427387904u, 1862645149230957031u },
-    {  9799832789158199296u, 1164153218269348144u }, 
+    {  9799832789158199296u, 1164153218269348144u },
     { 12249790986447749120u, 1455191522836685180u },
-    { 15312238733059686400u, 1818989403545856475u }, 
+    { 15312238733059686400u, 1818989403545856475u },
     { 14528612397897220096u, 2273736754432320594u },
-    { 13692068767113150464u, 1421085471520200371u }, 
+    { 13692068767113150464u, 1421085471520200371u },
     { 12503399940464050176u, 1776356839400250464u },
-    { 15629249925580062720u, 2220446049250313080u }, 
+    { 15629249925580062720u, 2220446049250313080u },
     {  9768281203487539200u, 1387778780781445675u },
-    {  7598665485932036096u, 1734723475976807094u }, 
+    {  7598665485932036096u, 1734723475976807094u },
     {   274959820560269312u, 2168404344971008868u },
-    {  9395221924704944128u, 1355252715606880542u }, 
+    {  9395221924704944128u, 1355252715606880542u },
     {  2520655369026404352u, 1694065894508600678u },
-    { 12374191248137781248u, 2117582368135750847u }, 
+    { 12374191248137781248u, 2117582368135750847u },
     { 14651398557727195136u, 1323488980084844279u },
-    { 13702562178731606016u, 1654361225106055349u }, 
+    { 13702562178731606016u, 1654361225106055349u },
     {  3293144668132343808u, 2067951531382569187u },
-    { 18199116482078572544u, 1292469707114105741u }, 
+    { 18199116482078572544u, 1292469707114105741u },
     {  8913837547316051968u, 1615587133892632177u },
-    { 15753982952572452864u, 2019483917365790221u }, 
+    { 15753982952572452864u, 2019483917365790221u },
     { 12152082354571476992u, 1262177448353618888u },
-    { 15190102943214346240u, 1577721810442023610u }, 
+    { 15190102943214346240u, 1577721810442023610u },
     {  9764256642163156992u, 1972152263052529513u },
-    { 17631875447420442880u, 1232595164407830945u }, 
+    { 17631875447420442880u, 1232595164407830945u },
     {  8204786253993389888u, 1540743955509788682u },
-    {  1032610780636961552u, 1925929944387235853u }, 
+    {  1032610780636961552u, 1925929944387235853u },
     {  2951224747111794922u, 1203706215242022408u },
-    {  3689030933889743652u, 1504632769052528010u }, 
+    {  3689030933889743652u, 1504632769052528010u },
     { 13834660704216955373u, 1880790961315660012u },
-    { 17870034976990372916u, 1175494350822287507u }, 
+    { 17870034976990372916u, 1175494350822287507u },
     { 17725857702810578241u, 1469367938527859384u },
-    {  3710578054803671186u, 1836709923159824231u }, 
+    {  3710578054803671186u, 1836709923159824231u },
     {    26536550077201078u, 2295887403949780289u },
-    { 11545800389866720434u, 1434929627468612680u }, 
+    { 11545800389866720434u, 1434929627468612680u },
     { 14432250487333400542u, 1793662034335765850u },
-    {  8816941072311974870u, 2242077542919707313u }, 
+    {  8816941072311974870u, 2242077542919707313u },
     { 17039803216263454053u, 1401298464324817070u },
-    { 12076381983474541759u, 1751623080406021338u }, 
+    { 12076381983474541759u, 1751623080406021338u },
     {  5872105442488401391u, 2189528850507526673u },
-    { 15199280947623720629u, 1368455531567204170u }, 
+    { 15199280947623720629u, 1368455531567204170u },
     {  9775729147674874978u, 1710569414459005213u },
-    { 16831347453020981627u, 2138211768073756516u }, 
+    { 16831347453020981627u, 2138211768073756516u },
     {  1296220121283337709u, 1336382355046097823u },
-    { 15455333206886335848u, 1670477943807622278u }, 
+    { 15455333206886335848u, 1670477943807622278u },
     { 10095794471753144002u, 2088097429759527848u },
-    {  6309871544845715001u, 1305060893599704905u }, 
+    {  6309871544845715001u, 1305060893599704905u },
     { 12499025449484531656u, 1631326116999631131u },
-    { 11012095793428276666u, 2039157646249538914u }, 
+    { 11012095793428276666u, 2039157646249538914u },
     { 11494245889320060820u, 1274473528905961821u },
-    {   532749306367912313u, 1593091911132452277u }, 
+    {   532749306367912313u, 1593091911132452277u },
     {  5277622651387278295u, 1991364888915565346u },
-    {  7910200175544436838u, 1244603055572228341u }, 
+    {  7910200175544436838u, 1244603055572228341u },
     { 14499436237857933952u, 1555753819465285426u },
-    {  8900923260467641632u, 1944692274331606783u }, 
+    {  8900923260467641632u, 1944692274331606783u },
     { 12480606065433357876u, 1215432671457254239u },
-    { 10989071563364309441u, 1519290839321567799u }, 
+    { 10989071563364309441u, 1519290839321567799u },
     {  9124653435777998898u, 1899113549151959749u },
-    {  8008751406574943263u, 1186945968219974843u }, 
+    {  8008751406574943263u, 1186945968219974843u },
     {  5399253239791291175u, 1483682460274968554u },
-    { 15972438586593889776u, 1854603075343710692u }, 
+    { 15972438586593889776u, 1854603075343710692u },
     {   759402079766405302u, 1159126922089819183u },
-    { 14784310654990170340u, 1448908652612273978u }, 
+    { 14784310654990170340u, 1448908652612273978u },
     {  9257016281882937117u, 1811135815765342473u },
-    { 16182956370781059300u, 2263919769706678091u }, 
+    { 16182956370781059300u, 2263919769706678091u },
     {  7808504722524468110u, 1414949856066673807u },
-    {  5148944884728197234u, 1768687320083342259u }, 
+    {  5148944884728197234u, 1768687320083342259u },
     {  1824495087482858639u, 2210859150104177824u },
-    {  1140309429676786649u, 1381786968815111140u }, 
+    {  1140309429676786649u, 1381786968815111140u },
     {  1425386787095983311u, 1727233711018888925u },
-    {  6393419502297367043u, 2159042138773611156u }, 
+    {  6393419502297367043u, 2159042138773611156u },
     { 13219259225790630210u, 1349401336733506972u },
-    { 16524074032238287762u, 1686751670916883715u }, 
+    { 16524074032238287762u, 1686751670916883715u },
     { 16043406521870471799u, 2108439588646104644u },
-    {   803757039314269066u, 1317774742903815403u }, 
+    {   803757039314269066u, 1317774742903815403u },
     { 14839754354425000045u, 1647218428629769253u },
-    {  4714634887749086344u, 2059023035787211567u }, 
+    {  4714634887749086344u, 2059023035787211567u },
     {  9864175832484260821u, 1286889397367007229u },
-    { 16941905809032713930u, 1608611746708759036u }, 
+    { 16941905809032713930u, 1608611746708759036u },
     {  2730638187581340797u, 2010764683385948796u },
-    { 10930020904093113806u, 1256727927116217997u }, 
+    { 10930020904093113806u, 1256727927116217997u },
     { 18274212148543780162u, 1570909908895272496u },
-    {  4396021111970173586u, 1963637386119090621u }, 
+    {  4396021111970173586u, 1963637386119090621u },
     {  5053356204195052443u, 1227273366324431638u },
-    { 15540067292098591362u, 1534091707905539547u }, 
+    { 15540067292098591362u, 1534091707905539547u },
     { 14813398096695851299u, 1917614634881924434u },
-    { 13870059828862294966u, 1198509146801202771u }, 
+    { 13870059828862294966u, 1198509146801202771u },
     { 12725888767650480803u, 1498136433501503464u },
-    { 15907360959563101004u, 1872670541876879330u }, 
+    { 15907360959563101004u, 1872670541876879330u },
     { 14553786618154326031u, 1170419088673049581u },
-    {  4357175217410743827u, 1463023860841311977u }, 
+    {  4357175217410743827u, 1463023860841311977u },
     { 10058155040190817688u, 1828779826051639971u },
-    {  7961007781811134206u, 2285974782564549964u }, 
+    {  7961007781811134206u, 2285974782564549964u },
     { 14199001900486734687u, 1428734239102843727u },
-    { 13137066357181030455u, 1785917798878554659u }, 
+    { 13137066357181030455u, 1785917798878554659u },
     { 11809646928048900164u, 2232397248598193324u },
-    { 16604401366885338411u, 1395248280373870827u }, 
+    { 16604401366885338411u, 1395248280373870827u },
     { 16143815690179285109u, 1744060350467338534u },
-    { 10956397575869330579u, 2180075438084173168u }, 
+    { 10956397575869330579u, 2180075438084173168u },
     {  6847748484918331612u, 1362547148802608230u },
-    { 17783057643002690323u, 1703183936003260287u }, 
+    { 17783057643002690323u, 1703183936003260287u },
     { 17617136035325974999u, 2128979920004075359u },
-    { 17928239049719816230u, 1330612450002547099u }, 
+    { 17928239049719816230u, 1330612450002547099u },
     { 17798612793722382384u, 1663265562503183874u },
-    { 13024893955298202172u, 2079081953128979843u }, 
+    { 13024893955298202172u, 2079081953128979843u },
     {  5834715712847682405u, 1299426220705612402u },
-    { 16516766677914378815u, 1624282775882015502u }, 
+    { 16516766677914378815u, 1624282775882015502u },
     { 11422586310538197711u, 2030353469852519378u },
-    { 11750802462513761473u, 1268970918657824611u }, 
+    { 11750802462513761473u, 1268970918657824611u },
     { 10076817059714813937u, 1586213648322280764u },
-    { 12596021324643517422u, 1982767060402850955u }, 
+    { 12596021324643517422u, 1982767060402850955u },
     {  5566670318688504437u, 1239229412751781847u },
-    {  2346651879933242642u, 1549036765939727309u }, 
+    {  2346651879933242642u, 1549036765939727309u },
     {  7545000868343941206u, 1936295957424659136u },
-    {  4715625542714963254u, 1210184973390411960u }, 
+    {  4715625542714963254u, 1210184973390411960u },
     {  5894531928393704067u, 1512731216738014950u },
-    { 16591536947346905892u, 1890914020922518687u }, 
+    { 16591536947346905892u, 1890914020922518687u },
     { 17287239619732898039u, 1181821263076574179u },
-    { 16997363506238734644u, 1477276578845717724u }, 
+    { 16997363506238734644u, 1477276578845717724u },
     {  2799960309088866689u, 1846595723557147156u },
-    { 10973347230035317489u, 1154122327223216972u }, 
+    { 10973347230035317489u, 1154122327223216972u },
     { 13716684037544146861u, 1442652909029021215u },
-    { 12534169028502795672u, 1803316136286276519u }, 
+    { 12534169028502795672u, 1803316136286276519u },
     { 11056025267201106687u, 2254145170357845649u },
-    { 18439230838069161439u, 1408840731473653530u }, 
+    { 18439230838069161439u, 1408840731473653530u },
     { 13825666510731675991u, 1761050914342066913u },
-    {  3447025083132431277u, 2201313642927583642u }, 
+    {  3447025083132431277u, 2201313642927583642u },
     {  6766076695385157452u, 1375821026829739776u },
-    {  8457595869231446815u, 1719776283537174720u }, 
+    {  8457595869231446815u, 1719776283537174720u },
     { 10571994836539308519u, 2149720354421468400u },
-    {  6607496772837067824u, 1343575221513417750u }, 
+    {  6607496772837067824u, 1343575221513417750u },
     { 17482743002901110588u, 1679469026891772187u },
-    { 17241742735199000331u, 2099336283614715234u }, 
+    { 17241742735199000331u, 2099336283614715234u },
     { 15387775227926763111u, 1312085177259197021u },
-    {  5399660979626290177u, 1640106471573996277u }, 
+    {  5399660979626290177u, 1640106471573996277u },
     { 11361262242960250625u, 2050133089467495346u },
-    { 11712474920277544544u, 1281333180917184591u }, 
+    { 11712474920277544544u, 1281333180917184591u },
     { 10028907631919542777u, 1601666476146480739u },
-    {  7924448521472040567u, 2002083095183100924u }, 
+    {  7924448521472040567u, 2002083095183100924u },
     { 14176152362774801162u, 1251301934489438077u },
-    {  3885132398186337741u, 1564127418111797597u }, 
+    {  3885132398186337741u, 1564127418111797597u },
     {  9468101516160310080u, 1955159272639746996u },
-    { 15140935484454969608u, 1221974545399841872u }, 
+    { 15140935484454969608u, 1221974545399841872u },
     {   479425281859160394u, 1527468181749802341u },
-    {  5210967620751338397u, 1909335227187252926u }, 
+    {  5210967620751338397u, 1909335227187252926u },
     { 17091912818251750210u, 1193334516992033078u },
-    { 12141518985959911954u, 1491668146240041348u }, 
+    { 12141518985959911954u, 1491668146240041348u },
     { 15176898732449889943u, 1864585182800051685u },
-    { 11791404716994875166u, 1165365739250032303u }, 
+    { 11791404716994875166u, 1165365739250032303u },
     { 10127569877816206054u, 1456707174062540379u },
-    {  8047776328842869663u, 1820883967578175474u }, 
+    {  8047776328842869663u, 1820883967578175474u },
     {   836348374198811271u, 2276104959472719343u },
-    {  7440246761515338900u, 1422565599670449589u }, 
+    {  7440246761515338900u, 1422565599670449589u },
     { 13911994470321561530u, 1778206999588061986u },
-    {  8166621051047176104u, 2222758749485077483u }, 
+    {  8166621051047176104u, 2222758749485077483u },
     {  2798295147690791113u, 1389224218428173427u },
-    { 17332926989895652603u, 1736530273035216783u }, 
+    { 17332926989895652603u, 1736530273035216783u },
     { 17054472718942177850u, 2170662841294020979u },
-    {  8353202440125167204u, 1356664275808763112u }, 
+    {  8353202440125167204u, 1356664275808763112u },
     { 10441503050156459005u, 1695830344760953890u },
-    {  3828506775840797949u, 2119787930951192363u }, 
+    {  3828506775840797949u, 2119787930951192363u },
     {    86973725686804766u, 1324867456844495227u },
-    { 13943775212390669669u, 1656084321055619033u }, 
+    { 13943775212390669669u, 1656084321055619033u },
     {  3594660960206173375u, 2070105401319523792u },
-    {  2246663100128858359u, 1293815875824702370u }, 
+    {  2246663100128858359u, 1293815875824702370u },
     { 12031700912015848757u, 1617269844780877962u },
-    {  5816254103165035138u, 2021587305976097453u }, 
+    {  5816254103165035138u, 2021587305976097453u },
     {  5941001823691840913u, 1263492066235060908u },
-    {  7426252279614801142u, 1579365082793826135u }, 
+    {  7426252279614801142u, 1579365082793826135u },
     {  4671129331091113523u, 1974206353492282669u },
-    {  5225298841145639904u, 1233878970932676668u }, 
+    {  5225298841145639904u, 1233878970932676668u },
     {  6531623551432049880u, 1542348713665845835u },
-    {  3552843420862674446u, 1927935892082307294u }, 
+    {  3552843420862674446u, 1927935892082307294u },
     { 16055585193321335241u, 1204959932551442058u },
-    { 10846109454796893243u, 1506199915689302573u }, 
+    { 10846109454796893243u, 1506199915689302573u },
     { 18169322836923504458u, 1882749894611628216u },
-    { 11355826773077190286u, 1176718684132267635u }, 
+    { 11355826773077190286u, 1176718684132267635u },
     {  9583097447919099954u, 1470898355165334544u },
-    { 11978871809898874942u, 1838622943956668180u }, 
+    { 11978871809898874942u, 1838622943956668180u },
     { 14973589762373593678u, 2298278679945835225u },
-    {  2440964573842414192u, 1436424174966147016u }, 
+    {  2440964573842414192u, 1436424174966147016u },
     {  3051205717303017741u, 1795530218707683770u },
-    { 13037379183483547984u, 2244412773384604712u }, 
+    { 13037379183483547984u, 2244412773384604712u },
     {  8148361989677217490u, 1402757983365377945u },
-    { 14797138505523909766u, 1753447479206722431u }, 
+    { 14797138505523909766u, 1753447479206722431u },
     { 13884737113477499304u, 2191809349008403039u },
-    { 15595489723564518921u, 1369880843130251899u }, 
+    { 15595489723564518921u, 1369880843130251899u },
     { 14882676136028260747u, 1712351053912814874u },
-    {  9379973133180550126u, 2140438817391018593u }, 
+    {  9379973133180550126u, 2140438817391018593u },
     { 17391698254306313589u, 1337774260869386620u },
-    {  3292878744173340370u, 1672217826086733276u }, 
+    {  3292878744173340370u, 1672217826086733276u },
     {  4116098430216675462u, 2090272282608416595u },
-    {   266718509671728212u, 1306420176630260372u }, 
+    {   266718509671728212u, 1306420176630260372u },
     {   333398137089660265u, 1633025220787825465u },
-    {  5028433689789463235u, 2041281525984781831u }, 
+    {  5028433689789463235u, 2041281525984781831u },
     { 10060300083759496378u, 1275800953740488644u },
-    { 12575375104699370472u, 1594751192175610805u }, 
+    { 12575375104699370472u, 1594751192175610805u },
     {  1884160825592049379u, 1993438990219513507u },
-    { 17318501580490888525u, 1245899368887195941u }, 
+    { 17318501580490888525u, 1245899368887195941u },
     {  7813068920331446945u, 1557374211108994927u },
-    {  5154650131986920777u, 1946717763886243659u }, 
+    {  5154650131986920777u, 1946717763886243659u },
     {   915813323278131534u, 1216698602428902287u },
-    { 14979824709379828129u, 1520873253036127858u }, 
+    { 14979824709379828129u, 1520873253036127858u },
     {  9501408849870009354u, 1901091566295159823u },
-    { 12855909558809837702u, 1188182228934474889u }, 
+    { 12855909558809837702u, 1188182228934474889u },
     {  2234828893230133415u, 1485227786168093612u },
-    {  2793536116537666769u, 1856534732710117015u }, 
+    {  2793536116537666769u, 1856534732710117015u },
     {  8663489100477123587u, 1160334207943823134u },
-    {  1605989338741628675u, 1450417759929778918u }, 
+    {  1605989338741628675u, 1450417759929778918u },
     { 11230858710281811652u, 1813022199912223647u },
-    {  9426887369424876662u, 2266277749890279559u }, 
+    {  9426887369424876662u, 2266277749890279559u },
     { 12809333633531629769u, 1416423593681424724u },
-    { 16011667041914537212u, 1770529492101780905u }, 
+    { 16011667041914537212u, 1770529492101780905u },
     {  6179525747111007803u, 2213161865127226132u },
-    { 13085575628799155685u, 1383226165704516332u }, 
+    { 13085575628799155685u, 1383226165704516332u },
     { 16356969535998944606u, 1729032707130645415u },
-    { 15834525901571292854u, 2161290883913306769u }, 
+    { 15834525901571292854u, 2161290883913306769u },
     {  2979049660840976177u, 1350806802445816731u },
-    { 17558870131333383934u, 1688508503057270913u }, 
+    { 17558870131333383934u, 1688508503057270913u },
     {  8113529608884566205u, 2110635628821588642u },
-    {  9682642023980241782u, 1319147268013492901u }, 
+    {  9682642023980241782u, 1319147268013492901u },
     { 16714988548402690132u, 1648934085016866126u },
-    { 11670363648648586857u, 2061167606271082658u }, 
+    { 11670363648648586857u, 2061167606271082658u },
     { 11905663298832754689u, 1288229753919426661u },
-    {  1047021068258779650u, 1610287192399283327u }, 
+    {  1047021068258779650u, 1610287192399283327u },
     { 15143834390605638274u, 2012858990499104158u },
-    {  4853210475701136017u, 1258036869061940099u }, 
+    {  4853210475701136017u, 1258036869061940099u },
     {  1454827076199032118u, 1572546086327425124u },
-    {  1818533845248790147u, 1965682607909281405u }, 
+    {  1818533845248790147u, 1965682607909281405u },
     {  3442426662494187794u, 1228551629943300878u },
-    { 13526405364972510550u, 1535689537429126097u }, 
+    { 13526405364972510550u, 1535689537429126097u },
     {  3072948650933474476u, 1919611921786407622u },
-    { 15755650962115585259u, 1199757451116504763u }, 
+    { 15755650962115585259u, 1199757451116504763u },
     { 15082877684217093670u, 1499696813895630954u },
-    {  9630225068416591280u, 1874621017369538693u }, 
+    {  9630225068416591280u, 1874621017369538693u },
     {  8324733676974063502u, 1171638135855961683u },
-    {  5794231077790191473u, 1464547669819952104u }, 
+    {  5794231077790191473u, 1464547669819952104u },
     {  7242788847237739342u, 1830684587274940130u },
-    { 18276858095901949986u, 2288355734093675162u }, 
+    { 18276858095901949986u, 2288355734093675162u },
     { 16034722328366106645u, 1430222333808546976u },
-    {  1596658836748081690u, 1787777917260683721u }, 
+    {  1596658836748081690u, 1787777917260683721u },
     {  6607509564362490017u, 2234722396575854651u },
-    {  1823850468512862308u, 1396701497859909157u }, 
+    {  1823850468512862308u, 1396701497859909157u },
     {  6891499104068465790u, 1745876872324886446u },
-    { 17837745916940358045u, 2182346090406108057u }, 
+    { 17837745916940358045u, 2182346090406108057u },
     {  4231062170446641922u, 1363966306503817536u },
-    {  5288827713058302403u, 1704957883129771920u }, 
+    {  5288827713058302403u, 1704957883129771920u },
     {  6611034641322878003u, 2131197353912214900u },
-    { 13355268687681574560u, 1331998346195134312u }, 
+    { 13355268687681574560u, 1331998346195134312u },
     { 16694085859601968200u, 1664997932743917890u },
-    { 11644235287647684442u, 2081247415929897363u }, 
+    { 11644235287647684442u, 2081247415929897363u },
     {  4971804045566108824u, 1300779634956185852u },
-    {  6214755056957636030u, 1625974543695232315u }, 
+    {  6214755056957636030u, 1625974543695232315u },
     {  3156757802769657134u, 2032468179619040394u },
-    {  6584659645158423613u, 1270292612261900246u }, 
+    {  6584659645158423613u, 1270292612261900246u },
     { 17454196593302805324u, 1587865765327375307u },
-    { 17206059723201118751u, 1984832206659219134u }, 
+    { 17206059723201118751u, 1984832206659219134u },
     {  6142101308573311315u, 1240520129162011959u },
-    {  3065940617289251240u, 1550650161452514949u }, 
+    {  3065940617289251240u, 1550650161452514949u },
     {  8444111790038951954u, 1938312701815643686u },
-    {   665883850346957067u, 1211445438634777304u }, 
+    {   665883850346957067u, 1211445438634777304u },
     {   832354812933696334u, 1514306798293471630u },
-    { 10263815553021896226u, 1892883497866839537u }, 
+    { 10263815553021896226u, 1892883497866839537u },
     { 17944099766707154901u, 1183052186166774710u },
-    { 13206752671529167818u, 1478815232708468388u }, 
+    { 13206752671529167818u, 1478815232708468388u },
     { 16508440839411459773u, 1848519040885585485u },
-    { 12623618533845856310u, 1155324400553490928u }, 
+    { 12623618533845856310u, 1155324400553490928u },
     { 15779523167307320387u, 1444155500691863660u },
-    {  1277659885424598868u, 1805194375864829576u }, 
+    {  1277659885424598868u, 1805194375864829576u },
     {  1597074856780748586u, 2256492969831036970u },
-    {  5609857803915355770u, 1410308106144398106u }, 
+    {  5609857803915355770u, 1410308106144398106u },
     { 16235694291748970521u, 1762885132680497632u },
-    {  1847873790976661535u, 2203606415850622041u }, 
+    {  1847873790976661535u, 2203606415850622041u },
     { 12684136165428883219u, 1377254009906638775u },
-    { 11243484188358716120u, 1721567512383298469u }, 
+    { 11243484188358716120u, 1721567512383298469u },
     {   219297180166231438u, 2151959390479123087u },
-    {  7054589765244976505u, 1344974619049451929u }, 
+    {  7054589765244976505u, 1344974619049451929u },
     { 13429923224983608535u, 1681218273811814911u },
-    { 12175718012802122765u, 2101522842264768639u }, 
+    { 12175718012802122765u, 2101522842264768639u },
     { 14527352785642408584u, 1313451776415480399u },
-    { 13547504963625622826u, 1641814720519350499u }, 
+    { 13547504963625622826u, 1641814720519350499u },
     { 12322695186104640628u, 2052268400649188124u },
-    { 16925056528170176201u, 1282667750405742577u }, 
+    { 16925056528170176201u, 1282667750405742577u },
     {  7321262604930556539u, 1603334688007178222u },
-    { 18374950293017971482u, 2004168360008972777u }, 
+    { 18374950293017971482u, 2004168360008972777u },
     {  4566814905495150320u, 1252605225005607986u },
-    { 14931890668723713708u, 1565756531257009982u }, 
+    { 14931890668723713708u, 1565756531257009982u },
     {  9441491299049866327u, 1957195664071262478u },
-    {  1289246043478778550u, 1223247290044539049u }, 
+    {  1289246043478778550u, 1223247290044539049u },
     {  6223243572775861092u, 1529059112555673811u },
-    {  3167368447542438461u, 1911323890694592264u }, 
+    {  3167368447542438461u, 1911323890694592264u },
     {  1979605279714024038u, 1194577431684120165u },
-    {  7086192618069917952u, 1493221789605150206u }, 
+    {  7086192618069917952u, 1493221789605150206u },
     { 18081112809442173248u, 1866527237006437757u },
-    { 13606538515115052232u, 1166579523129023598u }, 
+    { 13606538515115052232u, 1166579523129023598u },
     {  7784801107039039482u, 1458224403911279498u },
-    {   507629346944023544u, 1822780504889099373u }, 
+    {   507629346944023544u, 1822780504889099373u },
     {  5246222702107417334u, 2278475631111374216u },
-    {  3278889188817135834u, 1424047269444608885u }, 
+    {  3278889188817135834u, 1424047269444608885u },
     {  8710297504448807696u, 1780059086805761106u }
 };
 
@@ -10393,7 +10367,7 @@ static inline floating_decimal_64 d2d(const uint64_t ieeeMantissa,
         const int32_t i = -e2 + (int32_t) q + k;
         vr = mulShiftAll64(m2, DOUBLE_POW5_INV_SPLIT[q], i, &vp, &vm, mmShift);
         if (q <= 21) {
-            // This should use q <= 22, but I think 21 is also safe. Smaller 
+            // This should use q <= 22, but I think 21 is also safe. Smaller
             // values may still be safe, but it's more difficult to reason
             // about them. Only one of mp, mv, and mm can be a multiple of 5,
             // if any.
@@ -10424,7 +10398,7 @@ static inline floating_decimal_64 d2d(const uint64_t ieeeMantissa,
             // trailing 0 bits.
             vrIsTrailingZeros = true;
             if (acceptBounds) {
-                // mm = mv - 1 - mmShift, so it has 1 trailing 0 bit iff 
+                // mm = mv - 1 - mmShift, so it has 1 trailing 0 bit iff
                 // mmShift == 1.
                 vmIsTrailingZeros = mmShift == 1;
             } else {
@@ -10432,7 +10406,7 @@ static inline floating_decimal_64 d2d(const uint64_t ieeeMantissa,
                 --vp;
             }
         } else if (q < 63) { // TODO(ulfjack): Use a tighter bound here.
-            // We want to know if the full product has at least q trailing 
+            // We want to know if the full product has at least q trailing
             // zeros.
             // We need to compute min(p2(mv), p5(mv) - e2) >= q
             // <=> p2(mv) >= q && p5(mv) - e2 >= q
@@ -10441,7 +10415,7 @@ static inline floating_decimal_64 d2d(const uint64_t ieeeMantissa,
         }
     }
 
-      // Step 4: Find the shortest decimal representation in the interval of 
+      // Step 4: Find the shortest decimal representation in the interval of
       // valid representations.
       int32_t removed = 0;
       uint8_t lastRemovedDigit = 0;
@@ -10455,7 +10429,7 @@ static inline floating_decimal_64 d2d(const uint64_t ieeeMantissa,
               if (vpDiv10 <= vmDiv10) {
                   break;
               }
-              const uint32_t vmMod10 = ((uint32_t) vm) - 10 * 
+              const uint32_t vmMod10 = ((uint32_t) vm) - 10 *
                   ((uint32_t) vmDiv10);
               const uint64_t vrDiv10 = div10(vr);
               const uint32_t vrMod10 = ((uint32_t) vr) - 10 *
@@ -10471,14 +10445,14 @@ static inline floating_decimal_64 d2d(const uint64_t ieeeMantissa,
         if (vmIsTrailingZeros) {
             for (;;) {
                 const uint64_t vmDiv10 = div10(vm);
-                const uint32_t vmMod10 = ((uint32_t) vm) - 10 * 
+                const uint32_t vmMod10 = ((uint32_t) vm) - 10 *
                     ((uint32_t) vmDiv10);
                 if (vmMod10 != 0) {
                     break;
                 }
                 const uint64_t vpDiv10 = div10(vp);
                 const uint64_t vrDiv10 = div10(vr);
-                const uint32_t vrMod10 = ((uint32_t) vr) - 10 * 
+                const uint32_t vrMod10 = ((uint32_t) vr) - 10 *
                     ((uint32_t) vrDiv10);
                 vrIsTrailingZeros &= lastRemovedDigit == 0;
                 lastRemovedDigit = (uint8_t) vrMod10;
@@ -10492,19 +10466,19 @@ static inline floating_decimal_64 d2d(const uint64_t ieeeMantissa,
             // Round even if the exact number is .....50..0.
             lastRemovedDigit = 4;
         }
-        // We need to take vr + 1 if vr is outside bounds or we need to round 
+        // We need to take vr + 1 if vr is outside bounds or we need to round
         // up.
-        output = vr + ((vr == vm && (!acceptBounds || !vmIsTrailingZeros)) || 
+        output = vr + ((vr == vm && (!acceptBounds || !vmIsTrailingZeros)) ||
             lastRemovedDigit >= 5);
     } else {
-        // Specialized for the common case (~99.3%). Percentages below are 
+        // Specialized for the common case (~99.3%). Percentages below are
         // relative to this.
         bool roundUp = false;
         const uint64_t vpDiv100 = div100(vp);
         const uint64_t vmDiv100 = div100(vm);
         if (vpDiv100 > vmDiv100) { // Opt: remove two digits at a time (~86.2%).
             const uint64_t vrDiv100 = div100(vr);
-            const uint32_t vrMod100 = ((uint32_t) vr) - 100 * 
+            const uint32_t vrMod100 = ((uint32_t) vr) - 100 *
                 ((uint32_t) vrDiv100);
             roundUp = vrMod100 >= 50;
             vr = vrDiv100;
@@ -10523,7 +10497,7 @@ static inline floating_decimal_64 d2d(const uint64_t ieeeMantissa,
                 break;
             }
             const uint64_t vrDiv10 = div10(vr);
-            const uint32_t vrMod10 = ((uint32_t) vr) - 10 * 
+            const uint32_t vrMod10 = ((uint32_t) vr) - 10 *
                 ((uint32_t) vrDiv10);
             roundUp = vrMod10 >= 5;
             vr = vrDiv10;
@@ -10531,7 +10505,7 @@ static inline floating_decimal_64 d2d(const uint64_t ieeeMantissa,
             vm = vmDiv10;
             ++removed;
         }
-        // We need to take vr + 1 if vr is outside bounds or we need to round 
+        // We need to take vr + 1 if vr is outside bounds or we need to round
         // up.
         output = vr + (vr == vm || roundUp);
     }
@@ -10543,7 +10517,7 @@ static inline floating_decimal_64 d2d(const uint64_t ieeeMantissa,
     return fd;
 }
 
-static inline int to_chars64(const floating_decimal_64 v, const bool sign, 
+static inline int to_chars64(const floating_decimal_64 v, const bool sign,
     char* const result)
 {
     // Step 5: Print the decimal representation.
@@ -10609,7 +10583,7 @@ static inline int to_chars64(const floating_decimal_64 v, const bool sign,
     }
     if (output2 >= 10) {
         const uint32_t c = output2 << 1;
-        // We can't use memcpy here: the decimal dot goes between these two 
+        // We can't use memcpy here: the decimal dot goes between these two
         // digits.
         result[index + olength - i] = DIGIT_TABLE[c + 1];
         result[index] = DIGIT_TABLE[c];
@@ -10652,7 +10626,7 @@ static inline bool d2d_small_int(const uint64_t ieeeMantissa,
     const uint32_t ieeeExponent, floating_decimal_64* const v)
 {
     const uint64_t m2 = (1ull << DOUBLE_MANTISSA_BITS) | ieeeMantissa;
-    const int32_t e2 = (int32_t) ieeeExponent - DOUBLE_BIAS - 
+    const int32_t e2 = (int32_t) ieeeExponent - DOUBLE_BIAS -
         DOUBLE_MANTISSA_BITS;
 
     if (e2 > 0) {
@@ -10689,13 +10663,13 @@ static int d2s_buffered_n(double f, char* result) {
     const uint64_t bits = double_to_bits(f);
 
     // Decode bits into sign, mantissa, and exponent.
-    const bool ieeeSign = ((bits >> (DOUBLE_MANTISSA_BITS + 
+    const bool ieeeSign = ((bits >> (DOUBLE_MANTISSA_BITS +
         DOUBLE_EXPONENT_BITS)) & 1) != 0;
     const uint64_t ieeeMantissa = bits & ((1ull << DOUBLE_MANTISSA_BITS) - 1);
-    const uint32_t ieeeExponent = (uint32_t) ((bits >> DOUBLE_MANTISSA_BITS) & 
+    const uint32_t ieeeExponent = (uint32_t) ((bits >> DOUBLE_MANTISSA_BITS) &
         ((1u << DOUBLE_EXPONENT_BITS) - 1));
     // Case distinction; exit early for the easy cases.
-    if (ieeeExponent == ((1u << DOUBLE_EXPONENT_BITS) - 1u) || 
+    if (ieeeExponent == ((1u << DOUBLE_EXPONENT_BITS) - 1u) ||
         (ieeeExponent == 0 && ieeeMantissa == 0))
     {
         return copy_special_str(result, ieeeSign, ieeeExponent, ieeeMantissa);
@@ -10704,9 +10678,9 @@ static int d2s_buffered_n(double f, char* result) {
     floating_decimal_64 v;
     const bool isSmallInt = d2d_small_int(ieeeMantissa, ieeeExponent, &v);
     if (isSmallInt) {
-        // For small integers in the range [1, 2^53), v.mantissa might contain 
+        // For small integers in the range [1, 2^53), v.mantissa might contain
         // trailing (decimal) zeros.
-        // For scientific notation we need to move these zeros into the 
+        // For scientific notation we need to move these zeros into the
         // exponent.
         // (This is not needed for fixed-point notation, so it might be
         // beneficial to trim
@@ -10736,7 +10710,7 @@ static void d2s_buffered(double f, char* result) {
     result[index] = '\0';
 }
 
-// Returns the number of decimal digits in v, which must not contain more than 
+// Returns the number of decimal digits in v, which must not contain more than
 // 9 digits.
 static inline uint32_t decimalLength9(const uint32_t v) {
     // Function precondition: v is not a 10-digit number.
@@ -10884,7 +10858,7 @@ static inline floating_decimal_32 f2d(const uint32_t ieeeMantissa,
             // 32-bit arithmetic is faster even on 64-bit machines.
             const int32_t l = FLOAT_POW5_INV_BITCOUNT +
                 pow5bits((int32_t)(q - 1)) - 1;
-            lastRemovedDigit = (uint8_t) (mulPow5InvDivPow2(mv, q - 1, -e2 + 
+            lastRemovedDigit = (uint8_t) (mulPow5InvDivPow2(mv, q - 1, -e2 +
                 (int32_t) q - 1 + l) % 10);
         }
         if (q <= 9) {
@@ -10910,7 +10884,7 @@ static inline floating_decimal_32 f2d(const uint32_t ieeeMantissa,
         vm = mulPow5divPow2(mm, (uint32_t) i, j);
         if (q != 0 && (vp - 1) / 10 <= vm / 10) {
             j = (int32_t) q - 1 - (pow5bits(i + 1) - FLOAT_POW5_BITCOUNT);
-            lastRemovedDigit = (uint8_t) (mulPow5divPow2(mv, 
+            lastRemovedDigit = (uint8_t) (mulPow5divPow2(mv,
                 (uint32_t) (i + 1), j) % 10);
         }
         if (q <= 1) {
@@ -10919,7 +10893,7 @@ static inline floating_decimal_32 f2d(const uint32_t ieeeMantissa,
             // mv = 4 * m2, so it always has at least two trailing 0 bits.
             vrIsTrailingZeros = true;
             if (acceptBounds) {
-                // mm = mv - 1 - mmShift, so it has 1 trailing 0 bit iff 
+                // mm = mv - 1 - mmShift, so it has 1 trailing 0 bit iff
                 // mmShift == 1.
                 vmIsTrailingZeros = mmShift == 1;
             } else {
@@ -10968,7 +10942,7 @@ static inline floating_decimal_32 f2d(const uint32_t ieeeMantissa,
         }
         // We need to take vr + 1 if vr is outside bounds or we need to round
         // up.
-        output = vr + ((vr == vm && (!acceptBounds || !vmIsTrailingZeros)) || 
+        output = vr + ((vr == vm && (!acceptBounds || !vmIsTrailingZeros)) ||
             lastRemovedDigit >= 5);
     } else {
         // Specialized for the common case (~96.0%). Percentages below are
@@ -10987,7 +10961,7 @@ static inline floating_decimal_32 f2d(const uint32_t ieeeMantissa,
         output = vr + (vr == vm || lastRemovedDigit >= 5);
     }
     const int32_t exp = e10 + removed;
-  
+
     floating_decimal_32 fd;
     fd.exponent = exp;
     fd.mantissa = output;
@@ -11077,14 +11051,14 @@ static int f2s_buffered_n(float f, char* result) {
 
 
     // Decode bits into sign, mantissa, and exponent.
-    const bool ieeeSign = ((bits >> (FLOAT_MANTISSA_BITS + 
+    const bool ieeeSign = ((bits >> (FLOAT_MANTISSA_BITS +
         FLOAT_EXPONENT_BITS)) & 1) != 0;
     const uint32_t ieeeMantissa = bits & ((1u << FLOAT_MANTISSA_BITS) - 1);
-    const uint32_t ieeeExponent = (bits >> FLOAT_MANTISSA_BITS) & 
+    const uint32_t ieeeExponent = (bits >> FLOAT_MANTISSA_BITS) &
         ((1u << FLOAT_EXPONENT_BITS) - 1);
 
     // Case distinction; exit early for the easy cases.
-    if (ieeeExponent == ((1u << FLOAT_EXPONENT_BITS) - 1u) || 
+    if (ieeeExponent == ((1u << FLOAT_EXPONENT_BITS) - 1u) ||
         (ieeeExponent == 0 && ieeeMantissa == 0))
     {
         return copy_special_str(result, ieeeSign, ieeeExponent, ieeeMantissa);
@@ -11269,10 +11243,10 @@ static enum RyuStatus s2d_n(const char * buffer, const int len, double * result)
         // turn requires that the largest power of 2 that divides m10 + e10 is
         // greater than e2. If e2 is less than e10, then the result must be
         // exact. Otherwise we use the existing multipleOfPowerOf2 function.
-        trailingZeros = e2 < e10 || (e2 - e10 < 64 && multipleOfPowerOf2(m10, 
+        trailingZeros = e2 < e10 || (e2 - e10 < 64 && multipleOfPowerOf2(m10,
             e2 - e10));
     } else {
-        e2 = floor_log2(m10) + e10 - ceil_log2pow5(-e10) - 
+        e2 = floor_log2(m10) + e10 - ceil_log2pow5(-e10) -
             (DOUBLE_MANTISSA_BITS + 1);
         int j = e2 - e10 + ceil_log2pow5(-e10) - 1 + DOUBLE_POW5_INV_BITCOUNT;
         assert(-e10 < DOUBLE_POW5_INV_TABLE_SIZE);
@@ -11281,25 +11255,25 @@ static enum RyuStatus s2d_n(const char * buffer, const int len, double * result)
     }
 
     // Compute the final IEEE exponent.
-    uint32_t ieee_e2 = (uint32_t) max32(0, e2 + DOUBLE_EXPONENT_BIAS + 
+    uint32_t ieee_e2 = (uint32_t) max32(0, e2 + DOUBLE_EXPONENT_BIAS +
         floor_log2(m2));
 
     if (ieee_e2 > 0x7fe) {
-        // Final IEEE exponent is larger than the maximum representable; 
+        // Final IEEE exponent is larger than the maximum representable;
         // return +/-Infinity.
-        uint64_t ieee = (((uint64_t) signedM) << (DOUBLE_EXPONENT_BITS + 
+        uint64_t ieee = (((uint64_t) signedM) << (DOUBLE_EXPONENT_BITS +
             DOUBLE_MANTISSA_BITS)) | (0x7ffull << DOUBLE_MANTISSA_BITS);
         *result = int64Bits2Double(ieee);
         return RYU_SUCCESS;
     }
 
-    // We need to figure out how much we need to shift m2. The tricky part is 
+    // We need to figure out how much we need to shift m2. The tricky part is
     // that we need to take the final IEEE exponent into account, so we need to
     // reverse the bias and also special-case the value 0.
-    int32_t shift = (ieee_e2 == 0 ? 1 : ieee_e2) - e2 - DOUBLE_EXPONENT_BIAS - 
+    int32_t shift = (ieee_e2 == 0 ? 1 : ieee_e2) - e2 - DOUBLE_EXPONENT_BIAS -
         DOUBLE_MANTISSA_BITS;
     assert(shift >= 0);
-    
+
     // We need to round up if the exact value is more than 0.5 above the value
     // we computed. That's equivalent to checking if the last removed bit was 1
     // and either the value was not just trailing zeros or the result would
@@ -11320,8 +11294,8 @@ static enum RyuStatus s2d_n(const char * buffer, const int len, double * result)
         // for overflow here.
         ieee_e2++;
     }
-    
-    uint64_t ieee = (((((uint64_t) signedM) << DOUBLE_EXPONENT_BITS) | 
+
+    uint64_t ieee = (((((uint64_t) signedM) << DOUBLE_EXPONENT_BITS) |
         (uint64_t)ieee_e2) << DOUBLE_MANTISSA_BITS) | ieee_m2;
     *result = int64Bits2Double(ieee);
     return RYU_SUCCESS;
@@ -11413,7 +11387,7 @@ static enum RyuStatus s2f_n(const char * buffer, const int len, float * result){
     }
 
     if ((m10digits + e10 <= -46) || (m10 == 0)) {
-        // Number is less than 1e-46, which should be rounded down to 0; 
+        // Number is less than 1e-46, which should be rounded down to 0;
         // return +/-0.0.
         uint32_t ieee = ((uint32_t) signedM) << (FLOAT_EXPONENT_BITS +
             FLOAT_MANTISSA_BITS);
@@ -11422,20 +11396,20 @@ static enum RyuStatus s2f_n(const char * buffer, const int len, float * result){
     }
     if (m10digits + e10 >= 40) {
         // Number is larger than 1e+39, which should be rounded to +/-Infinity.
-        uint32_t ieee = (((uint32_t) signedM) << (FLOAT_EXPONENT_BITS + 
+        uint32_t ieee = (((uint32_t) signedM) << (FLOAT_EXPONENT_BITS +
             FLOAT_MANTISSA_BITS)) | (0xffu << FLOAT_MANTISSA_BITS);
         *result = int32Bits2Float(ieee);
         return RYU_SUCCESS;
     }
 
-    // Convert to binary float m2 * 2^e2, while retaining information about 
+    // Convert to binary float m2 * 2^e2, while retaining information about
     // whether the conversion was exact (trailingZeros).
     int32_t e2;
     uint32_t m2;
     bool trailingZeros;
     if (e10 >= 0) {
         // The length of m * 10^e in bits is:
-        //   log2(m10 * 10^e10) = log2(m10) + e10 log2(10) = log2(m10) + e10 + 
+        //   log2(m10 * 10^e10) = log2(m10) + e10 log2(10) = log2(m10) + e10 +
         //   e10 * log2(5)
         //
         // We want to compute the FLOAT_MANTISSA_BITS + 1 top-most bits (+1 for
@@ -11443,9 +11417,9 @@ static enum RyuStatus s2f_n(const char * buffer, const int len, float * result){
         // binary output exponent of
         //   log2(m10 * 10^e10) - (FLOAT_MANTISSA_BITS + 1).
         //
-        // We use floor(log2(5^e10)) so that we get at least this many bits; 
+        // We use floor(log2(5^e10)) so that we get at least this many bits;
         // better to have an additional bit than to not have enough bits.
-        e2 = floor_log2_32(m10) + e10 + log2pow5(e10) - (FLOAT_MANTISSA_BITS + 
+        e2 = floor_log2_32(m10) + e10 + log2pow5(e10) - (FLOAT_MANTISSA_BITS +
             1);
 
         // We now compute [m10 * 10^e10 / 2^e2] = [m10 * 5^e10 / 2^(e2-e10)].
@@ -11458,12 +11432,12 @@ static enum RyuStatus s2f_n(const char * buffer, const int len, float * result){
         //   [m10 * 10^e10 / 2^e2] == m10 * 10^e10 / 2^e2.
         // This can only be the case if 2^e2 divides m10 * 10^e10, which in
         // turn requires that the largest power of 2 that divides m10 + e10 is
-        // greater than e2. If e2 is less than e10, then the result must be 
+        // greater than e2. If e2 is less than e10, then the result must be
         // exact. Otherwise we use the existing multipleOfPowerOf2 function.
         trailingZeros = e2 < e10 || (e2 - e10 < 32 && multipleOfPowerOf2_32(m10,
             e2 - e10));
     } else {
-        e2 = floor_log2_32(m10) + e10 - ceil_log2pow5(-e10) - 
+        e2 = floor_log2_32(m10) + e10 - ceil_log2pow5(-e10) -
             (FLOAT_MANTISSA_BITS + 1);
 
         // We now compute [m10 * 10^e10 / 2^e2] = [m10 / (5^(-e10) 2^(e2-e10))].
@@ -11474,39 +11448,39 @@ static enum RyuStatus s2f_n(const char * buffer, const int len, float * result){
         //   [m10 / (5^(-e10) 2^(e2-e10))] == m10 / (5^(-e10) 2^(e2-e10))
         //
         // If e2-e10 >= 0, we need to check whether (5^(-e10) 2^(e2-e10))
-        // divides m10, which is the case iff pow5(m10) >= -e10 AND 
+        // divides m10, which is the case iff pow5(m10) >= -e10 AND
         //    pow2(m10) >= e2-e10.
         //
         // If e2-e10 < 0, we have actually computed
         //    [m10 * 2^(e10 e2) / 5^(-e10)] above, and we need to check
         // whether 5^(-e10) divides (m10 * 2^(e10-e2)), which is the case iff
         // pow5(m10 * 2^(e10-e2)) = pow5(m10) >= -e10.
-        trailingZeros = (e2 < e10 || (e2 - e10 < 32 && 
-            multipleOfPowerOf2_32(m10, e2 - e10))) && 
+        trailingZeros = (e2 < e10 || (e2 - e10 < 32 &&
+            multipleOfPowerOf2_32(m10, e2 - e10))) &&
             multipleOfPowerOf5_32(m10, -e10);
     }
 
     // Compute the final IEEE exponent.
-    uint32_t ieee_e2 = (uint32_t) max32(0, e2 + FLOAT_EXPONENT_BIAS + 
+    uint32_t ieee_e2 = (uint32_t) max32(0, e2 + FLOAT_EXPONENT_BIAS +
         floor_log2_32(m2));
 
     if (ieee_e2 > 0xfe) {
-        // Final IEEE exponent is larger than the maximum representable; 
+        // Final IEEE exponent is larger than the maximum representable;
         // return +/-Infinity.
-        uint32_t ieee = (((uint32_t) signedM) << (FLOAT_EXPONENT_BITS + 
+        uint32_t ieee = (((uint32_t) signedM) << (FLOAT_EXPONENT_BITS +
             FLOAT_MANTISSA_BITS)) | (0xffu << FLOAT_MANTISSA_BITS);
         *result = int32Bits2Float(ieee);
         return RYU_SUCCESS;
     }
 
-    // We need to figure out how much we need to shift m2. The tricky part is 
+    // We need to figure out how much we need to shift m2. The tricky part is
     // that we need to take the final IEEE exponent into account, so we need
     // to reverse the bias and also special-case the value 0.
-    int32_t shift = (ieee_e2 == 0 ? 1 : ieee_e2) - e2 - FLOAT_EXPONENT_BIAS - 
+    int32_t shift = (ieee_e2 == 0 ? 1 : ieee_e2) - e2 - FLOAT_EXPONENT_BIAS -
         FLOAT_MANTISSA_BITS;
     assert(shift >= 0);
 
-    // We need to round up if the exact value is more than 0.5 above the value 
+    // We need to round up if the exact value is more than 0.5 above the value
     // we computed. That's equivalent to checking if the last removed bit was
     // 1 and either the value was not just trailing zeros or the result would
     // otherwise be odd.
@@ -11515,7 +11489,7 @@ static enum RyuStatus s2f_n(const char * buffer, const int len, float * result){
     // exponent ieee_e2 now.
     trailingZeros &= (m2 & ((1u << (shift - 1)) - 1)) == 0;
     uint32_t lastRemovedBit = (m2 >> (shift - 1)) & 1;
-    bool roundUp = (lastRemovedBit != 0) && (!trailingZeros || (((m2 >> shift) 
+    bool roundUp = (lastRemovedBit != 0) && (!trailingZeros || (((m2 >> shift)
         & 1) != 0));
 
     uint32_t ieee_m2 = (m2 >> shift) + roundUp;
@@ -11529,7 +11503,7 @@ static enum RyuStatus s2f_n(const char * buffer, const int len, float * result){
         // for overflow here.
         ieee_e2++;
     }
-    uint32_t ieee = (((((uint32_t) signedM) << FLOAT_EXPONENT_BITS) | 
+    uint32_t ieee = (((((uint32_t) signedM) << FLOAT_EXPONENT_BITS) |
         (uint32_t)ieee_e2) << FLOAT_MANTISSA_BITS) | ieee_m2;
     *result = int32Bits2Float(ieee);
     return RYU_SUCCESS;
@@ -11701,7 +11675,7 @@ static size_t fp_utoa(union fpoint fpoint, int bits, char fmt,
             e = end;
         }
         end++;
-    } 
+    }
     if (!e) {
         if (*p == 'i' || *p == 'I') {
             strcpy(p, "Infinity");
@@ -11784,12 +11758,12 @@ static size_t fp_utoa(union fpoint fpoint, int bits, char fmt,
 /// to store the double into the C string buffer.
 /// If the returned length is greater than nbytes-1, then only a partial copy
 /// occurred.
-/// 
-/// The format is one of 
+///
+/// The format is one of
 ///   'e' (-d.ddddedd, a decimal exponent)
 ///   'E' (-d.ddddEdd, a decimal exponent)
 ///   'f' (-ddd.dddd, no exponent)
-///   'g' ('e' for large exponents, 'f' otherwise) 
+///   'g' ('e' for large exponents, 'f' otherwise)
 ///   'G' ('E' for large exponents, 'f' otherwise)
 ///   'j' ('e' for large exponents, 'f' otherwise) (matches javascript format)
 ///   'J' ('E' for large exponents, 'f' otherwise) (matches javascript format)
@@ -11804,12 +11778,12 @@ FP_EXTERN size_t fp_dtoa(double d, char fmt, char dst[], size_t n) {
 /// to store the float into the C string buffer.
 /// If the returned length is greater than nbytes-1, then only a partial copy
 /// occurred.
-/// 
-/// The format is one of 
+///
+/// The format is one of
 ///   'e' (-d.ddddedd, a decimal exponent)
 ///   'E' (-d.ddddEdd, a decimal exponent)
 ///   'f' (-ddd.dddd, no exponent)
-///   'g' ('e' for large exponents, 'f' otherwise) 
+///   'g' ('e' for large exponents, 'f' otherwise)
 ///   'G' ('E' for large exponents, 'f' otherwise)
 ///   'j' ('e' for large exponents, 'f' otherwise) (matches javascript format)
 ///   'J' ('E' for large exponents, 'f' otherwise) (matches javascript format)
@@ -11881,7 +11855,7 @@ static void write_posn_geojson(struct writer *wr, struct tg_point posn) {
     write_char(wr, ']');
 }
 
-static void write_posn_geojson_3(struct writer *wr, struct tg_point posn, 
+static void write_posn_geojson_3(struct writer *wr, struct tg_point posn,
     double z)
 {
     write_char(wr, '[');
@@ -11892,7 +11866,7 @@ static void write_posn_geojson_3(struct writer *wr, struct tg_point posn,
     write_string_double(wr, z);
     write_char(wr, ']');
 }
-static void write_posn_geojson_4(struct writer *wr, struct tg_point posn, 
+static void write_posn_geojson_4(struct writer *wr, struct tg_point posn,
     double z, double m)
 {
     write_char(wr, '[');
@@ -11918,7 +11892,7 @@ static int write_ring_points_geojson(struct writer *wr,
     return ring->npoints;
 }
 
-static int write_ring_points_geojson_3(struct writer *wr, 
+static int write_ring_points_geojson_3(struct writer *wr,
     const struct tg_ring *ring, const double *coords, int ncoords)
 {
     double z;
@@ -11933,7 +11907,7 @@ static int write_ring_points_geojson_3(struct writer *wr,
     return ring->npoints;
 }
 
-static int write_ring_points_geojson_4(struct writer *wr, 
+static int write_ring_points_geojson_4(struct writer *wr,
     const struct tg_ring *ring, const double *coords, int ncoords)
 {
     double z, m;
@@ -11949,7 +11923,7 @@ static int write_ring_points_geojson_4(struct writer *wr,
     return ring->npoints;
 }
 
-static int write_poly_points_geojson(struct writer *wr, 
+static int write_poly_points_geojson(struct writer *wr,
     const struct tg_poly *poly)
 {
     int count = 0;
@@ -11964,7 +11938,7 @@ static int write_poly_points_geojson(struct writer *wr,
     return count;
 }
 
-static int write_poly_points_geojson_3(struct writer *wr, 
+static int write_poly_points_geojson_3(struct writer *wr,
     const struct tg_poly *poly, const double *coords, int ncoords)
 {
     int count = 0;
@@ -11990,7 +11964,7 @@ static int write_poly_points_geojson_3(struct writer *wr,
     return count;
 }
 
-static int write_poly_points_geojson_4(struct writer *wr, 
+static int write_poly_points_geojson_4(struct writer *wr,
     const struct tg_poly *poly, const double *coords, int ncoords)
 {
     int count = 0;
@@ -12047,11 +12021,11 @@ static void write_geom_linestring_geojson(const struct tg_geom *geom,
     } else {
         switch (tg_geom_dims(geom)) {
         case 3:
-            write_ring_points_geojson_3(wr, (struct tg_ring*)geom->line, 
+            write_ring_points_geojson_3(wr, (struct tg_ring*)geom->line,
                 geom->coords, geom->ncoords);
             break;
         case 4:
-            write_ring_points_geojson_4(wr, (struct tg_ring*)geom->line, 
+            write_ring_points_geojson_4(wr, (struct tg_ring*)geom->line,
                 geom->coords, geom->ncoords);
             break;
         default:
@@ -12071,11 +12045,11 @@ static void write_geom_polygon_geojson(const struct tg_geom *geom,
     } else {
         switch (tg_geom_dims(geom)) {
         case 3:
-            write_poly_points_geojson_3(wr, geom->poly, 
+            write_poly_points_geojson_3(wr, geom->poly,
                 geom->coords, geom->ncoords);
             break;
         case 4:
-            write_poly_points_geojson_4(wr, geom->poly, 
+            write_poly_points_geojson_4(wr, geom->poly,
                 geom->coords, geom->ncoords);
             break;
         default: // 2
@@ -12291,7 +12265,7 @@ static void write_base_geom_geojson(const struct tg_geom *geom,
                     write_stringn(wr, json_raw(key), json_raw_length(key));
                     write_char(wr, ':');
                     write_stringn(wr, json_raw(val), json_raw_length(val));
-                    if (!wrote_props && 
+                    if (!wrote_props &&
                         json_raw_compare(key, "\"properties\"") == 0)
                     {
                         wrote_props = true;
@@ -12413,7 +12387,7 @@ static void write_geom_geojson(const struct tg_geom *geom, struct writer *wr) {
 /// @param geom Input geometry
 /// @param dst Buffer where the resulting content is stored.
 /// @param n Maximum number of bytes to be used in the buffer.
-/// @return  The number of characters, not including the null-terminator, 
+/// @return  The number of characters, not including the null-terminator,
 /// needed to store the content into the C string buffer.
 /// If the returned length is greater than n-1, then only a partial copy
 /// occurred, for example:
@@ -12475,7 +12449,7 @@ static long wkt_trim_ws(const char *wkt, long len, long i) {
 }
 
 // returns -1 for invalid 'Z', 'M', 'ZM' or 'EMPTY'
-static enum tg_geom_type wkt2type(const char *wkt, long len, 
+static enum tg_geom_type wkt2type(const char *wkt, long len,
     bool *z, bool *m, bool *empty)
 {
     *z = false;
@@ -12561,13 +12535,13 @@ static long wkt_balance_coords(const char *wkt, long len, long i) {
             depth--;
             if (depth == 0) {
                 if (maxdepth > MAXDEPTH) {
-                    return -(i+1); 
+                    return -(i+1);
                 }
                 return i+1;
             }
         }
     }
-    return -(i+1); 
+    return -(i+1);
 }
 
 static long wkt_vnumber(const char *data, long dlen, long i) {
@@ -12623,7 +12597,7 @@ static const char *err_for_wkt_posn(int dims) {
     }
 }
 
-static struct tg_geom *parse_wkt_point(const char *wkt, long len, 
+static struct tg_geom *parse_wkt_point(const char *wkt, long len,
     bool z, bool m, enum tg_index ix)
 {
     (void)ix;
@@ -12772,8 +12746,8 @@ exp_nums:
     return dims;
 }
 
-static int parse_wkt_multi_posns(enum base base, int dims, int depth, 
-    const char *wkt, long len, struct dvec *posns, struct rvec *rings,  
+static int parse_wkt_multi_posns(enum base base, int dims, int depth,
+    const char *wkt, long len, struct dvec *posns, struct rvec *rings,
     struct tg_poly **poly, struct dvec *xcoords, enum tg_index ix,
     const char **err)
 {
@@ -12789,10 +12763,10 @@ static int parse_wkt_multi_posns(enum base base, int dims, int depth,
         long grp_len = j-i-2;
         i = j;
         posns->len = 0;
-        dims = parse_wkt_posns(base, dims, depth, grp_wkt, grp_len, posns, 
+        dims = parse_wkt_posns(base, dims, depth, grp_wkt, grp_len, posns,
             xcoords, err);
         if (dims == -1) return -1;
-        struct tg_ring *ring = tg_ring_new_ix((struct tg_point*)posns->data, 
+        struct tg_ring *ring = tg_ring_new_ix((struct tg_point*)posns->data,
             posns->len / 2, ix);
         if (!ring) return -1;
         if (!rvec_append(rings, ring)) {
@@ -12815,7 +12789,7 @@ static int parse_wkt_multi_posns(enum base base, int dims, int depth,
         *err = "polygons must have one or more rings";
         return -1;
     }
-    *poly = tg_poly_new(rings->data[0], 
+    *poly = tg_poly_new(rings->data[0],
         (struct tg_ring const*const*)rings->data+1, rings->len-1);
     if (!*poly) return -1;
     for (size_t i = 0; i < rings->len; i++) {
@@ -12825,7 +12799,7 @@ static int parse_wkt_multi_posns(enum base base, int dims, int depth,
     return dims;
 }
 
-static struct tg_geom *parse_wkt_linestring(const char *wkt, long len, 
+static struct tg_geom *parse_wkt_linestring(const char *wkt, long len,
     bool z, bool m, enum tg_index ix)
 {
     struct tg_geom *geom = NULL;
@@ -12845,7 +12819,7 @@ static struct tg_geom *parse_wkt_linestring(const char *wkt, long len,
     line = tg_line_new_ix((struct tg_point*)posns.data, posns.len / 2, ix);
     if (!line) goto fail;
     switch (dims) {
-    case 2: 
+    case 2:
         geom = tg_geom_new_linestring(line);
         break;
     case 3:
@@ -12855,7 +12829,7 @@ static struct tg_geom *parse_wkt_linestring(const char *wkt, long len,
             geom = tg_geom_new_linestring_z(line, xcoords.data, xcoords.len);
         }
         break;
-    default: 
+    default:
         geom = tg_geom_new_linestring_zm(line, xcoords.data, xcoords.len);
         break;
     }
@@ -12871,7 +12845,7 @@ fail:
     goto cleanup;
 }
 
-static struct tg_geom *parse_wkt_polygon(const char *wkt, long len, 
+static struct tg_geom *parse_wkt_polygon(const char *wkt, long len,
     bool z, bool m, enum tg_index ix)
 {
     struct tg_geom *geom = NULL;
@@ -12883,14 +12857,14 @@ static struct tg_geom *parse_wkt_polygon(const char *wkt, long len,
     const char *err = NULL;
 
     int dims = z ? m ? 4 : 3 : m ? 3 : 0;
-    dims = parse_wkt_multi_posns(BASE_RING, dims, 2, wkt, len, &posns, 
+    dims = parse_wkt_multi_posns(BASE_RING, dims, 2, wkt, len, &posns,
         &rings, &poly, &xcoords, ix, &err);
     if (dims == -1) {
         gerr = err ? make_parse_error("%s", err) : NULL;
         goto fail;
     }
     switch (dims) {
-    case 2: 
+    case 2:
         geom = tg_geom_new_polygon(poly);
         break;
     case 3:
@@ -12900,7 +12874,7 @@ static struct tg_geom *parse_wkt_polygon(const char *wkt, long len,
             geom = tg_geom_new_polygon_z(poly, xcoords.data, xcoords.len);
         }
         break;
-    default: 
+    default:
         geom = tg_geom_new_polygon_zm(poly, xcoords.data, xcoords.len);
         break;
     }
@@ -12922,7 +12896,7 @@ fail:
     goto cleanup;
 }
 
-static struct tg_geom *parse_wkt_multipoint(const char *wkt, long len, 
+static struct tg_geom *parse_wkt_multipoint(const char *wkt, long len,
     bool z, bool m, enum tg_index ix)
 {
     (void)ix;
@@ -12942,20 +12916,20 @@ static struct tg_geom *parse_wkt_multipoint(const char *wkt, long len,
     const struct tg_point *points = (struct tg_point*)posns.data;
     int npoints = posns.len/2;
     switch (dims) {
-    case 2: 
+    case 2:
         geom = tg_geom_new_multipoint(points, npoints);
         break;
-    case 3: 
+    case 3:
         if (m) {
-            geom = tg_geom_new_multipoint_m(points, npoints, 
+            geom = tg_geom_new_multipoint_m(points, npoints,
                 xcoords.data, xcoords.len);
         } else {
-            geom = tg_geom_new_multipoint_z(points, npoints, 
+            geom = tg_geom_new_multipoint_z(points, npoints,
                 xcoords.data, xcoords.len);
         }
         break;
-    default: 
-        geom = tg_geom_new_multipoint_zm(points, npoints, 
+    default:
+        geom = tg_geom_new_multipoint_zm(points, npoints,
             xcoords.data, xcoords.len);
         break;
     }
@@ -12970,7 +12944,7 @@ fail:
     goto cleanup;
 }
 
-static struct tg_geom *parse_wkt_multilinestring(const char *wkt, long len, 
+static struct tg_geom *parse_wkt_multilinestring(const char *wkt, long len,
     bool z, bool m, enum tg_index ix)
 {
     int dims = z ? m ? 4 : 3 : m ? 3 : 0;
@@ -12997,7 +12971,7 @@ static struct tg_geom *parse_wkt_multilinestring(const char *wkt, long len,
             gerr = err ? make_parse_error("%s", err) : NULL;
             goto fail;
         }
-        struct tg_line *line = tg_line_new_ix((struct tg_point*)posns.data, 
+        struct tg_line *line = tg_line_new_ix((struct tg_point*)posns.data,
             posns.len / 2, ix);
         if (!line) goto fail;
         if (!lvec_append(&lines, line)) {
@@ -13055,7 +13029,7 @@ fail:
     goto cleanup;
 }
 
-static struct tg_geom *parse_wkt_multipolygon(const char *wkt, long len, 
+static struct tg_geom *parse_wkt_multipolygon(const char *wkt, long len,
     bool z, bool m, enum tg_index ix)
 {
     int dims = z ? m ? 4 : 3 : m ? 3 : 0;
@@ -13158,7 +13132,7 @@ static long wkt_next_geometry(const char *wkt, long len, long i) {
 
 static struct tg_geom *parse_wkt(const char *wkt, long len, enum tg_index ix);
 
-static struct tg_geom *parse_wkt_geometrycollection(const char *wkt, long len, 
+static struct tg_geom *parse_wkt_geometrycollection(const char *wkt, long len,
     bool z, bool m, enum tg_index ix)
 {
     (void)z; (void)m; // not used
@@ -13174,7 +13148,7 @@ static struct tg_geom *parse_wkt_geometrycollection(const char *wkt, long len,
             struct tg_geom *child = parse_wkt(wkt+s, i-s, ix);
             if (!child) goto fail;
             if (tg_geom_error(child)) {
-                gerr = child; 
+                gerr = child;
                 child = NULL;
                 goto fail;
             }
@@ -13271,7 +13245,7 @@ static struct tg_geom *parse_wkt(const char *wkt, long len, enum tg_index ix) {
     case TG_LINESTRING: return parse_wkt_linestring(wkt, len, z, m, ix);
     case TG_POLYGON: return parse_wkt_polygon(wkt, len, z, m, ix);
     case TG_MULTIPOINT: return parse_wkt_multipoint(wkt, len, z, m, ix);
-    case TG_MULTILINESTRING: 
+    case TG_MULTILINESTRING:
         return parse_wkt_multilinestring(wkt, len, z, m, ix);
     case TG_MULTIPOLYGON: return parse_wkt_multipolygon(wkt, len, z, m, ix);
     default: return parse_wkt_geometrycollection(wkt, len, z, m, ix);
@@ -13282,7 +13256,7 @@ static struct tg_geom *parse_wkt(const char *wkt, long len, enum tg_index ix) {
 /// @param wkt WKT data
 /// @param len Length of data
 /// @returns A geometry or an error. Use tg_geom_error() after parsing to check
-/// for errors. 
+/// for errors.
 /// @see tg_parse_wkt()
 /// @see GeometryParsing
 struct tg_geom *tg_parse_wktn(const char *wkt, size_t len) {
@@ -13292,7 +13266,7 @@ struct tg_geom *tg_parse_wktn(const char *wkt, size_t len) {
 /// Parse Well-known text (WKT).
 /// @param wkt A WKT string. Must be null-terminated
 /// @returns A geometry or an error. Use tg_geom_error() after parsing to check
-/// for errors. 
+/// for errors.
 /// @see tg_parse_wktn()
 /// @see tg_parse_wkt_ix()
 /// @see tg_parse_wktn_ix()
@@ -13307,7 +13281,7 @@ struct tg_geom *tg_parse_wkt(const char *wkt) {
 /// @param wkt A WKT string. Must be null-terminated
 /// @param ix Indexing option, e.g. TG_NONE, TG_NATURAL, TG_YSTRIPES
 /// @returns A geometry or an error. Use tg_geom_error() after parsing to check
-/// for errors. 
+/// for errors.
 /// @see tg_parse_wkt()
 /// @see tg_parse_wktn_ix()
 /// @see GeometryParsing
@@ -13315,16 +13289,16 @@ struct tg_geom *tg_parse_wkt_ix(const char *wkt, enum tg_index ix) {
     return tg_parse_wktn_ix(wkt, wkt?strlen(wkt):0, ix);
 }
 
-/// Parse Well-known text (WKT) using provided indexing option. 
+/// Parse Well-known text (WKT) using provided indexing option.
 /// @param wkt WKT data
 /// @param len Length of data
 /// @param ix Indexing option, e.g. TG_NONE, TG_NATURAL, TG_YSTRIPES
 /// @returns A geometry or an error. Use tg_geom_error() after parsing to check
-/// for errors. 
+/// for errors.
 /// @see tg_parse_wkt()
 /// @see tg_parse_wkt_ix()
 /// @see GeometryParsing
-struct tg_geom *tg_parse_wktn_ix(const char *wkt, size_t len, 
+struct tg_geom *tg_parse_wktn_ix(const char *wkt, size_t len,
     enum tg_index ix)
 {
     struct tg_geom *geom = parse_wkt(wkt, len, ix);
@@ -13343,7 +13317,7 @@ static void write_posn_wkt(struct writer *wr, struct tg_point posn) {
     write_string_double(wr, posn.y);
 }
 
-static void write_posn_wkt_3(struct writer *wr, struct tg_point posn, 
+static void write_posn_wkt_3(struct writer *wr, struct tg_point posn,
     double z)
 {
     write_string_double(wr, posn.x);
@@ -13353,7 +13327,7 @@ static void write_posn_wkt_3(struct writer *wr, struct tg_point posn,
     write_string_double(wr, z);
 }
 
-static void write_posn_wkt_4(struct writer *wr, struct tg_point posn, 
+static void write_posn_wkt_4(struct writer *wr, struct tg_point posn,
     double z, double m)
 {
     write_string_double(wr, posn.x);
@@ -13365,7 +13339,7 @@ static void write_posn_wkt_4(struct writer *wr, struct tg_point posn,
     write_string_double(wr, m);
 }
 
-static void write_point_wkt(const struct boxed_point *point, 
+static void write_point_wkt(const struct boxed_point *point,
     struct writer *wr)
 {
     write_string(wr, "POINT(");
@@ -13383,7 +13357,7 @@ static int write_ring_points_wkt(struct writer *wr, const struct tg_ring *ring)
 }
 
 
-static int write_ring_points_wkt_3(struct writer *wr, 
+static int write_ring_points_wkt_3(struct writer *wr,
     const struct tg_ring *ring, const double *coords, int ncoords)
 {
     double z;
@@ -13396,7 +13370,7 @@ static int write_ring_points_wkt_3(struct writer *wr,
     return ring->npoints;
 }
 
-static int write_ring_points_wkt_4(struct writer *wr, 
+static int write_ring_points_wkt_4(struct writer *wr,
     const struct tg_ring *ring, const double *coords, int ncoords)
 {
     double z, m;
@@ -13424,7 +13398,7 @@ static void write_ring_wkt(const struct tg_ring *ring, struct writer *wr) {
 }
 
 
-static int write_poly_points_wkt(struct writer *wr, 
+static int write_poly_points_wkt(struct writer *wr,
     const struct tg_poly *poly)
 {
     int count = 0;
@@ -13438,11 +13412,11 @@ static int write_poly_points_wkt(struct writer *wr,
         count += write_ring_points_wkt(wr, tg_poly_hole_at(poly, i));
         write_char(wr, ')');
     }
-    
+
     return count;
 }
 
-static int write_poly_points_wkt_3(struct writer *wr, 
+static int write_poly_points_wkt_3(struct writer *wr,
     const struct tg_poly *poly, const double *coords, int ncoords)
 {
     int count = 0;
@@ -13470,7 +13444,7 @@ static int write_poly_points_wkt_3(struct writer *wr,
     return count;
 }
 
-static int write_poly_points_wkt_4(struct writer *wr, 
+static int write_poly_points_wkt_4(struct writer *wr,
     const struct tg_poly *poly, const double *coords, int ncoords)
 {
     int count = 0;
@@ -13505,14 +13479,14 @@ static void write_poly_wkt(const struct tg_poly *poly, struct writer *wr) {
 }
 
 static void write_zm_def_wkt(struct writer *wr, const struct tg_geom *geom) {
-    if ((geom->head.flags&HAS_M) == HAS_M && 
+    if ((geom->head.flags&HAS_M) == HAS_M &&
                (geom->head.flags&HAS_Z) != HAS_Z)
     {
         write_string(wr, " M");
     }
 }
 
-static void write_geom_point_wkt(const struct tg_geom *geom, 
+static void write_geom_point_wkt(const struct tg_geom *geom,
     struct writer *wr)
 {
     write_string(wr, "POINT");
@@ -13548,11 +13522,11 @@ static void write_geom_linestring_wkt(const struct tg_geom *geom,
     write_char(wr, '(');
     switch (tg_geom_dims(geom)) {
     case 3:
-        write_ring_points_wkt_3(wr, (struct tg_ring*)geom->line, 
+        write_ring_points_wkt_3(wr, (struct tg_ring*)geom->line,
             geom->coords, geom->ncoords);
         break;
     case 4:
-        write_ring_points_wkt_4(wr, (struct tg_ring*)geom->line, 
+        write_ring_points_wkt_4(wr, (struct tg_ring*)geom->line,
             geom->coords, geom->ncoords);
         break;
     default:
@@ -13574,11 +13548,11 @@ static void write_geom_polygon_wkt(const struct tg_geom *geom,
     write_char(wr, '(');
     switch (tg_geom_dims(geom)) {
     case 3:
-        write_poly_points_wkt_3(wr, geom->poly, 
+        write_poly_points_wkt_3(wr, geom->poly,
             geom->coords, geom->ncoords);
         break;
     case 4:
-        write_poly_points_wkt_4(wr, geom->poly, 
+        write_poly_points_wkt_4(wr, geom->poly,
             geom->coords, geom->ncoords);
         break;
     default: // 2
@@ -13788,7 +13762,7 @@ static void write_geom_wkt(const struct tg_geom *geom, struct writer *wr) {
 /// @param geom Input geometry
 /// @param dst Buffer where the resulting content is stored.
 /// @param n Maximum number of bytes to be used in the buffer.
-/// @return  The number of characters, not including the null-terminator, 
+/// @return  The number of characters, not including the null-terminator,
 /// needed to store the content into the C string buffer.
 /// If the returned length is greater than n-1, then only a partial copy
 /// occurred, for example:
@@ -13869,7 +13843,7 @@ static const char *wkb_invalid_err(void) {
 #define PARSE_FAIL SIZE_MAX
 
 // returns the updated wkb index.
-static size_t parse_wkb_posns(enum base base, int dims, 
+static size_t parse_wkb_posns(enum base base, int dims,
     const uint8_t *wkb, size_t len, size_t i, bool swap,
     struct dvec *posns, struct dvec *xcoords,
     struct tg_point **points, int *npoints,
@@ -13901,11 +13875,11 @@ static size_t parse_wkb_posns(enum base base, int dims,
         } else
 #endif
         {
-            // Use the point data directly. No allocations. 
+            // Use the point data directly. No allocations.
             *points = (void*)(wkb+i);
         }
         *npoints = count;
-        i += count*2*8; 
+        i += count*2*8;
     } else {
         for (uint32_t j = 0 ; j < count; j++) {
             read_posn(posn);
@@ -13932,9 +13906,9 @@ invalid:
     return PARSE_FAIL;
 }
 
-static size_t parse_wkb_multi_posns(enum base base, int dims, 
-    const uint8_t *wkb, size_t len, size_t i, bool swap, struct dvec *posns, 
-    struct rvec *rings,  struct tg_poly **poly, struct dvec *xcoords, 
+static size_t parse_wkb_multi_posns(enum base base, int dims,
+    const uint8_t *wkb, size_t len, size_t i, bool swap, struct dvec *posns,
+    struct rvec *rings,  struct tg_poly **poly, struct dvec *xcoords,
     enum tg_index ix, const char **err)
 {
     *err = NULL;
@@ -13945,7 +13919,7 @@ static size_t parse_wkb_multi_posns(enum base base, int dims,
         struct tg_point *points = NULL;
         int npoints = 0;
         posns->len = 0;
-        i = parse_wkb_posns(base, dims, wkb, len, i, swap, posns, xcoords, 
+        i = parse_wkb_posns(base, dims, wkb, len, i, swap, posns, xcoords,
             &points, &npoints, err);
         if (i == PARSE_FAIL) return PARSE_FAIL;
         struct tg_ring *ring = tg_ring_new_ix(points, npoints, ix);
@@ -13955,7 +13929,7 @@ static size_t parse_wkb_multi_posns(enum base base, int dims,
             return PARSE_FAIL;
         }
     }
-    *poly = tg_poly_new(rings->data[0], 
+    *poly = tg_poly_new(rings->data[0],
         (struct tg_ring const*const*)rings->data+1, rings->len-1);
     if (!*poly) return PARSE_FAIL;
     for (size_t i = 0; i < rings->len; i++) {
@@ -13969,7 +13943,7 @@ invalid:
 }
 
 static size_t parse_wkb_point(const uint8_t *wkb, size_t len, size_t i,
-    bool swap, bool z, bool m, int depth, enum tg_index ix, 
+    bool swap, bool z, bool m, int depth, enum tg_index ix,
     struct tg_geom **gout)
 {
     (void)depth; (void)ix;
@@ -14010,8 +13984,8 @@ invalid:
     return PARSE_FAIL;
 }
 
-static size_t parse_wkb_linestring(const uint8_t *wkb, size_t len, size_t i, 
-    bool swap, bool z, bool m, int depth, enum tg_index ix, 
+static size_t parse_wkb_linestring(const uint8_t *wkb, size_t len, size_t i,
+    bool swap, bool z, bool m, int depth, enum tg_index ix,
     struct tg_geom **gout)
 {
     (void)depth;
@@ -14024,7 +13998,7 @@ static size_t parse_wkb_linestring(const uint8_t *wkb, size_t len, size_t i,
     int npoints = 0;
     const char *err = NULL;
     int dims = z ? m ? 4 : 3 : m ? 3 : 2;
-    i = parse_wkb_posns(BASE_LINE, dims, wkb, len, i, swap, &posns, &xcoords, 
+    i = parse_wkb_posns(BASE_LINE, dims, wkb, len, i, swap, &posns, &xcoords,
         &points, &npoints, &err);
     if (i == PARSE_FAIL) {
         gerr = err ? make_parse_error("%s", err) : NULL;
@@ -14037,7 +14011,7 @@ static size_t parse_wkb_linestring(const uint8_t *wkb, size_t len, size_t i,
     line = tg_line_new_ix(points, npoints, ix);
     if (!line) goto fail;
     switch (dims) {
-    case 2: 
+    case 2:
         geom = tg_geom_new_linestring(line);
         break;
     case 3:
@@ -14047,7 +14021,7 @@ static size_t parse_wkb_linestring(const uint8_t *wkb, size_t len, size_t i,
             geom = tg_geom_new_linestring_z(line, xcoords.data, xcoords.len);
         }
         break;
-    default: 
+    default:
         geom = tg_geom_new_linestring_zm(line, xcoords.data, xcoords.len);
         break;
     }
@@ -14077,7 +14051,7 @@ static size_t parse_wkb_polygon(const uint8_t *wkb, size_t len,
     struct rvec rings = { 0 };
     const char *err = NULL;
     int dims = z ? m ? 4 : 3 : m ? 3 : 2;
-    i = parse_wkb_multi_posns(BASE_RING, dims, wkb, len, i, swap, &posns, 
+    i = parse_wkb_multi_posns(BASE_RING, dims, wkb, len, i, swap, &posns,
         &rings, &poly, &xcoords, ix, &err);
     if (i == PARSE_FAIL) {
         gerr = err ? make_parse_error("%s", err) : NULL;
@@ -14088,7 +14062,7 @@ static size_t parse_wkb_polygon(const uint8_t *wkb, size_t len,
         goto cleanup;
     }
     switch (dims) {
-    case 2: 
+    case 2:
         geom = tg_geom_new_polygon(poly);
         break;
     case 3:
@@ -14098,7 +14072,7 @@ static size_t parse_wkb_polygon(const uint8_t *wkb, size_t len,
             geom = tg_geom_new_polygon_z(poly, xcoords.data, xcoords.len);
         }
         break;
-    default: 
+    default:
         geom = tg_geom_new_polygon_zm(poly, xcoords.data, xcoords.len);
         break;
     }
@@ -14124,7 +14098,7 @@ fail:
 static size_t parse_wkb(const uint8_t *wkb, size_t len, size_t i, int depth,
     enum tg_index ix, struct tg_geom **g);
 
-static bool wkb_type_match(const struct tg_geom *child, enum tg_geom_type type, 
+static bool wkb_type_match(const struct tg_geom *child, enum tg_geom_type type,
     bool z, bool m)
 {
     bool child_has_z = (child->head.flags&HAS_Z) == HAS_Z;
@@ -14133,7 +14107,7 @@ static bool wkb_type_match(const struct tg_geom *child, enum tg_geom_type type,
 }
 
 static size_t parse_wkb_multipoint(const uint8_t *wkb, size_t len, size_t i,
-    bool swap, bool z, bool m, int depth, enum tg_index ix, 
+    bool swap, bool z, bool m, int depth, enum tg_index ix,
     struct tg_geom **gout)
 {
     int dims = z ? m ? 4 : 3 : m ? 3 : 2;
@@ -14178,20 +14152,20 @@ static size_t parse_wkb_multipoint(const uint8_t *wkb, size_t len, size_t i,
     const struct tg_point *points = (struct tg_point*)posns.data;
     int npoints = posns.len/2;
     switch (dims) {
-    case 2: 
+    case 2:
         geom = tg_geom_new_multipoint(points, npoints);
         break;
-    case 3: 
+    case 3:
         if (m) {
-            geom = tg_geom_new_multipoint_m(points, npoints, 
+            geom = tg_geom_new_multipoint_m(points, npoints,
                 xcoords.data, xcoords.len);
         } else {
-            geom = tg_geom_new_multipoint_z(points, npoints, 
+            geom = tg_geom_new_multipoint_z(points, npoints,
                 xcoords.data, xcoords.len);
         }
         break;
-    default: 
-        geom = tg_geom_new_multipoint_zm(points, npoints, 
+    default:
+        geom = tg_geom_new_multipoint_zm(points, npoints,
             xcoords.data, xcoords.len);
         break;
     }
@@ -14293,7 +14267,7 @@ invalid:
 }
 
 static size_t parse_wkb_multipolygon(const uint8_t *wkb, size_t len,
-    size_t i, bool swap, bool z, bool m, int depth, enum tg_index ix, 
+    size_t i, bool swap, bool z, bool m, int depth, enum tg_index ix,
     struct tg_geom **gout)
 {
     int dims = z ? m ? 4 : 3 : m ? 3 : 2;
@@ -14373,7 +14347,7 @@ invalid:
     goto fail;
 }
 
-static size_t parse_wkb_geometrycollection(const uint8_t *wkb, size_t len, 
+static size_t parse_wkb_geometrycollection(const uint8_t *wkb, size_t len,
     size_t i, bool swap, bool z, bool m, int depth, enum tg_index ix,
     struct tg_geom **gout)
 {
@@ -14426,7 +14400,7 @@ static size_t parse_wkb(const uint8_t *wkb, size_t len, size_t i, int depth,
 {
     if (i == len) goto invalid;
     if (wkb[i] >> 1) goto invalid; // not 1 or 0
-    
+
     int d = depth;
     if (d > MAXDEPTH) goto invalid;
 
@@ -14500,9 +14474,9 @@ struct tg_geom *tg_parse_wkb(const uint8_t *wkb, size_t len) {
 /// @param len Length of data
 /// @param ix Indexing option, e.g. TG_NONE, TG_NATURAL, TG_YSTRIPES
 /// @returns A geometry or an error. Use tg_geom_error() after parsing to check
-/// for errors. 
+/// for errors.
 /// @see tg_parse_wkb()
-struct tg_geom *tg_parse_wkb_ix(const uint8_t *wkb, size_t len, 
+struct tg_geom *tg_parse_wkb_ix(const uint8_t *wkb, size_t len,
     enum tg_index ix)
 {
     struct tg_geom *geom = NULL;
@@ -14557,7 +14531,7 @@ static void write_posn_wkb_3(struct writer *wr, struct tg_point posn, double z)
     write_doublele(wr, z);
 }
 
-static void write_posn_wkb_4(struct writer *wr, struct tg_point posn, 
+static void write_posn_wkb_4(struct writer *wr, struct tg_point posn,
     double z, double m)
 {
 #ifndef IS_BIG_ENDIAN
@@ -14594,7 +14568,7 @@ static int write_ring_points_wkb(struct writer *wr, const struct tg_ring *ring)
     return ring->npoints;
 }
 
-static int write_ring_points_wkb_3(struct writer *wr, 
+static int write_ring_points_wkb_3(struct writer *wr,
     const struct tg_ring *ring, const double *coords, int ncoords)
 {
     write_uint32le(wr, ring->npoints);
@@ -14612,7 +14586,7 @@ static int write_ring_points_wkb_3(struct writer *wr,
     return ring->npoints;
 }
 
-static int write_ring_points_wkb_4(struct writer *wr, 
+static int write_ring_points_wkb_4(struct writer *wr,
     const struct tg_ring *ring, const double *coords, int ncoords)
 {
     write_uint32le(wr, ring->npoints);
@@ -14631,7 +14605,7 @@ static int write_ring_points_wkb_4(struct writer *wr,
     return ring->npoints;
 }
 
-static int write_poly_points_wkb(struct writer *wr, 
+static int write_poly_points_wkb(struct writer *wr,
     const struct tg_poly *poly)
 {
     int count = 0;
@@ -14640,11 +14614,11 @@ static int write_poly_points_wkb(struct writer *wr,
     write_ring_points_wkb(wr, tg_poly_exterior(poly));
     for (int i = 0 ; i < nholes; i++) {
         count += write_ring_points_wkb(wr, tg_poly_hole_at(poly, i));
-    }    
+    }
     return count;
 }
 
-static int write_poly_points_wkb_3(struct writer *wr, 
+static int write_poly_points_wkb_3(struct writer *wr,
     const struct tg_poly *poly, const double *coords, int ncoords)
 {
     int count = 0;
@@ -14668,7 +14642,7 @@ static int write_poly_points_wkb_3(struct writer *wr,
     return count;
 }
 
-static int write_poly_points_wkb_4(struct writer *wr, 
+static int write_poly_points_wkb_4(struct writer *wr,
     const struct tg_poly *poly, const double *coords, int ncoords)
 {
     int count = 0;
@@ -14746,11 +14720,11 @@ static void write_geom_linestring_wkb(const struct tg_geom *geom,
     }
     switch (tg_geom_dims(geom)) {
     case 3:
-        write_ring_points_wkb_3(wr, (struct tg_ring*)geom->line, 
+        write_ring_points_wkb_3(wr, (struct tg_ring*)geom->line,
             geom->coords, geom->ncoords);
         break;
     case 4:
-        write_ring_points_wkb_4(wr, (struct tg_ring*)geom->line, 
+        write_ring_points_wkb_4(wr, (struct tg_ring*)geom->line,
             geom->coords, geom->ncoords);
         break;
     default:
@@ -14769,11 +14743,11 @@ static void write_geom_polygon_wkb(const struct tg_geom *geom,
     }
     switch (tg_geom_dims(geom)) {
     case 3:
-        write_poly_points_wkb_3(wr, geom->poly, 
+        write_poly_points_wkb_3(wr, geom->poly,
             geom->coords, geom->ncoords);
         break;
     case 4:
-        write_poly_points_wkb_4(wr, geom->poly, 
+        write_poly_points_wkb_4(wr, geom->poly,
             geom->coords, geom->ncoords);
         break;
     default: // 2
@@ -14819,7 +14793,7 @@ static void write_geom_multipoint_wkb(const struct tg_geom *geom,
     }
 }
 
-static void write_geom_multilinestring_wkb(const struct tg_geom *geom, 
+static void write_geom_multilinestring_wkb(const struct tg_geom *geom,
     struct writer *wr)
 {
     write_wkb_type(wr, &geom->head);
@@ -14900,7 +14874,7 @@ static void write_geom_multipolygon_wkb(const struct tg_geom *geom,
 
 static void write_geom_wkb(const struct tg_geom *geom, struct writer *wr);
 
-static void write_geom_geometrycollection_wkb(const struct tg_geom *geom, 
+static void write_geom_geometrycollection_wkb(const struct tg_geom *geom,
     struct writer *wr)
 {
     write_wkb_type(wr, &geom->head);
@@ -15000,7 +14974,7 @@ size_t tg_geom_wkb(const struct tg_geom *geom, uint8_t *dst, size_t n) {
 /// @param geom Input geometry
 /// @param dst Buffer where the resulting content is stored.
 /// @param n Maximum number of bytes to be used in the buffer.
-/// @return  The number of characters, not including the null-terminator, 
+/// @return  The number of characters, not including the null-terminator,
 /// needed to store the content into the C string buffer.
 /// If the returned length is greater than n-1, then only a partial copy
 /// occurred, for example:
@@ -15044,13 +15018,13 @@ size_t tg_geom_hex(const struct tg_geom *geom, char *dst, size_t n) {
     return count*2;
 }
 
-static size_t parse_geobin(const uint8_t *geobin, size_t len, size_t i, 
+static size_t parse_geobin(const uint8_t *geobin, size_t len, size_t i,
     size_t depth, enum tg_index ix, struct tg_geom **g);
 
 static struct tg_geom *parse_hex(const char *hex, size_t len, enum tg_index ix)
 {
     #define _ 0
-    static const uint8_t hextoks[256] = { 
+    static const uint8_t hextoks[256] = {
         _,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,
         _,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,01,2,3,4,5,6,7,8,9,10,_,_,_,_,_,
         _,_,11,12,13,14,15,16,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,
@@ -15098,11 +15072,11 @@ invalid:
 /// @param len Length of data
 /// @param ix Indexing option, e.g. TG_NONE, TG_NATURAL, TG_YSTRIPES
 /// @returns A geometry or an error. Use tg_geom_error() after parsing to check
-/// for errors. 
+/// for errors.
 /// @see tg_parse_hex()
 /// @see tg_parse_hex_ix()
 /// @see GeometryParsing
-struct tg_geom *tg_parse_hexn_ix(const char *hex, size_t len, 
+struct tg_geom *tg_parse_hexn_ix(const char *hex, size_t len,
     enum tg_index ix)
 {
     struct tg_geom *geom = parse_hex(hex, len, ix);
@@ -15120,7 +15094,7 @@ struct tg_geom *tg_parse_hexn_ix(const char *hex, size_t len,
 /// @param hex Hex string. Must be null-terminated
 /// @param ix Indexing option, e.g. TG_NONE, TG_NATURAL, TG_YSTRIPES
 /// @returns A geometry or an error. Use tg_geom_error() after parsing to check
-/// for errors. 
+/// for errors.
 /// @see tg_parse_hex()
 /// @see tg_parse_hexn_ix()
 /// @see GeometryParsing
@@ -15128,12 +15102,12 @@ struct tg_geom *tg_parse_hex_ix(const char *hex, enum tg_index ix) {
     return tg_parse_hexn_ix(hex, hex?strlen(hex):0, ix);
 }
 
-/// Parse hex encoded Well-known binary (WKB) or GeoBIN with an included data 
+/// Parse hex encoded Well-known binary (WKB) or GeoBIN with an included data
 /// length.
 /// @param hex Hex data
 /// @param len Length of data
 /// @returns A geometry or an error. Use tg_geom_error() after parsing to check
-/// for errors. 
+/// for errors.
 /// @see tg_parse_hex()
 /// @see GeometryParsing
 struct tg_geom *tg_parse_hexn(const char *hex, size_t len) {
@@ -15143,7 +15117,7 @@ struct tg_geom *tg_parse_hexn(const char *hex, size_t len) {
 /// Parse hex encoded Well-known binary (WKB) or GeoBIN.
 /// @param hex A hex string. Must be null-terminated
 /// @returns A geometry or an error. Use tg_geom_error() after parsing to check
-/// for errors. 
+/// for errors.
 /// @see tg_parse_hexn()
 /// @see tg_parse_hex_ix()
 /// @see tg_parse_hexn_ix()
@@ -15180,7 +15154,7 @@ double tg_ring_perimeter(const struct tg_ring *ring) {
 
 double tg_ring_polsby_popper_score(const struct tg_ring *ring) {
     // Calculate the polsby-popper score for the ring or line
-    // https://en.wikipedia.org/wiki/Polsby–Popper_test 
+    // https://en.wikipedia.org/wiki/Polsby–Popper_test
     //
     // The score is calculated by multiplying the polygon area by 4pi
     // and dividing by the perimeter squared. A perfect circle has a score of 1
@@ -15197,13 +15171,13 @@ double tg_ring_polsby_popper_score(const struct tg_ring *ring) {
 
 double tg_line_polsby_popper_score(const struct tg_line *line) {
     const struct tg_ring *ring = (const struct tg_ring*)line;
-    return tg_ring_polsby_popper_score(ring);    
+    return tg_ring_polsby_popper_score(ring);
 }
 
-struct tg_ring *tg_circle_new_ix(struct tg_point center, double radius, 
+struct tg_ring *tg_circle_new_ix(struct tg_point center, double radius,
     int steps, enum tg_index ix)
 {
-    steps--; 
+    steps--;
     radius = radius < 0 ? 0 : radius;
     steps = steps < 3 ? 3 : steps;
     struct tg_ring *ring = NULL;
@@ -15387,10 +15361,10 @@ static const struct nqentry *nqueue_pop(struct nqueue *queue) {
 /// It's recommended to check the return value for success.
 /// @note The `*more` argument is an optional ref-value that is used for
 /// performing partial step-based or probability-based calculations. A detailed
-/// description of its use is outside the scope of this document. Ignoring it 
+/// description of its use is outside the scope of this document. Ignoring it
 /// altogether is the preferred behavior.
 /// @see RingFuncs
-bool tg_ring_nearest_segment(const struct tg_ring *ring, 
+bool tg_ring_nearest_segment(const struct tg_ring *ring,
     double (*rect_dist)(struct tg_rect rect, int *more, void *udata),
     double (*seg_dist)(struct tg_segment seg, int *more, void *udata),
     bool (*iter)(struct tg_segment seg, double dist, int index, void *udata),
@@ -15420,7 +15394,7 @@ bool tg_ring_nearest_segment(const struct tg_ring *ring,
     } else {
         // Gather all segments
         for (int i = 0; i < ring->nsegs; i++) {
-            struct tg_segment seg = { 
+            struct tg_segment seg = {
                 ring->points[i+0],
                 ring->points[i+1]
             };
@@ -15439,8 +15413,8 @@ bool tg_ring_nearest_segment(const struct tg_ring *ring,
         const struct nqentry *ientry = nqueue_pop(&queue);
         if (!ientry) break;
         if (ientry->kind == NQUEUE_KIND_SEGMENT) {
-            struct tg_segment seg = { 
-                ring->points[ientry->seg_index+0], 
+            struct tg_segment seg = {
+                ring->points[ientry->seg_index+0],
                 ring->points[ientry->seg_index+1],
             };
             if (ientry->more) {
@@ -15518,10 +15492,10 @@ bool tg_ring_nearest_segment(const struct tg_ring *ring,
 }
 
 /// Iterates over segments from nearest to farthest.
-/// @see tg_ring_nearest_segment(), which shares the same interface, for a 
+/// @see tg_ring_nearest_segment(), which shares the same interface, for a
 /// detailed description.
 /// @see LineFuncs
-bool tg_line_nearest_segment(const struct tg_line *line, 
+bool tg_line_nearest_segment(const struct tg_line *line,
     double (*rect_dist)(struct tg_rect rect, int *more, void *udata),
     double (*seg_dist)(struct tg_segment seg, int *more, void *udata),
     bool (*iter)(struct tg_segment seg, double dist, int index, void *udata),
@@ -15565,7 +15539,7 @@ bool tg_geom_disjoint(const struct tg_geom *a, const struct tg_geom *b) {
 /// @note Works the same as `tg_geom_contains(b, a)`
 /// @warning This predicate returns **false** when geometry 'a' is *on* or
 /// *touching* the boundary of geometry 'b'. Such as when a point is on the
-/// edge of a polygon.  
+/// edge of a polygon.
 /// For full coverage, consider using @ref tg_geom_coveredby.
 /// @see GeometryPredicates
 bool tg_geom_within(const struct tg_geom *a, const struct tg_geom *b) {
@@ -15633,7 +15607,7 @@ static void fixup_index_pointers(struct index *dst, const struct index *src) {
 
 // Copy a ring from src to dst. It's expected that dst is an allocation that
 // is exactly the same size as src. Also if dst has ystripes then that must
-// be a defined pointer that is set to dst->ystripes before calling this 
+// be a defined pointer that is set to dst->ystripes before calling this
 // function, and that pointer is to an allocation that is exactly the same
 // size as src->ystripes.
 static void ring_copy(struct tg_ring *dst, const struct tg_ring *src,
@@ -15658,7 +15632,7 @@ static void ring_copy(struct tg_ring *dst, const struct tg_ring *src,
 
 /// Copies a ring
 /// @param ring Input ring, caller retains ownership.
-/// @return A duplicate of the provided ring. 
+/// @return A duplicate of the provided ring.
 /// @return NULL if out of memory
 /// @note The caller is responsible for freeing with tg_ring_free().
 /// @note This method performs a deep copy of the entire geometry to new memory.
@@ -15685,7 +15659,7 @@ struct tg_ring *tg_ring_copy(const struct tg_ring *ring) {
 
 /// Copies a line
 /// @param line Input line, caller retains ownership.
-/// @return A duplicate of the provided line. 
+/// @return A duplicate of the provided line.
 /// @return NULL if out of memory
 /// @note The caller is responsible for freeing with tg_line_free().
 /// @note This method performs a deep copy of the entire geometry to new memory.
@@ -15696,7 +15670,7 @@ struct tg_line *tg_line_copy(const struct tg_line *line) {
 
 /// Copies a polygon.
 /// @param poly Input polygon, caller retains ownership.
-/// @return A duplicate of the provided polygon. 
+/// @return A duplicate of the provided polygon.
 /// @return NULL if out of memory
 /// @note The caller is responsible for freeing with tg_poly_free().
 /// @note This method performs a deep copy of the entire geometry to new memory.
@@ -15802,7 +15776,7 @@ static struct tg_geom *geom_copy(const struct tg_geom *geom) {
                 if (!geom2->multi->index) {
                     goto fail;
                 }
-                memcpy(geom2->multi->index, geom->multi->index, 
+                memcpy(geom2->multi->index, geom->multi->index,
                     geom->multi->index->memsz);
             }
             if (geom->multi->ixgeoms) {
@@ -15919,7 +15893,7 @@ static bool multi_index_search(const struct multi *multi, struct tg_rect rect,
             struct tg_rect brect;
             ixrect_to_tg_rect(&level->rects[i], &brect);
             if (tg_rect_intersects_rect(brect, rect)) {
-                if (!multi_index_search(multi, rect, levelidx+1, 
+                if (!multi_index_search(multi, rect, levelidx+1,
                     i*index->spread, iter, udata))
                 {
                     return false;
@@ -15931,7 +15905,7 @@ static bool multi_index_search(const struct multi *multi, struct tg_rect rect,
 }
 
 /// Iterates over all child geometries in geom that intersect rect
-/// @note Only iterates over collection types: TG_MULTIPOINT, 
+/// @note Only iterates over collection types: TG_MULTIPOINT,
 /// TG_MULTILINESTRING, TG_MULTIPOLYGON, and TG_GEOMETRYCOLLECTION.
 /// @note A GeoJSON FeatureCollection works as well.
 /// @see tg_geom_typeof()
@@ -15953,7 +15927,7 @@ void tg_geom_search(const struct tg_geom *geom, struct tg_rect rect,
                 if (!iter(child, i, udata)) {
                     return;
                 }
-            } 
+            }
         }
     } else {
         // indexed search
@@ -16037,7 +16011,7 @@ geobin:
 
 /// Utility for returning an error message wrapped in a geometry.
 /// This operation does not return a real geometry, only an error message,
-/// which may be useful for generating custom errors from operations 
+/// which may be useful for generating custom errors from operations
 /// outside of the TG library.
 struct tg_geom *tg_geom_new_error(const char *error) {
     return error?make_parse_error("%s", error):0;
@@ -16054,7 +16028,7 @@ void tg_geom_setnoheap(struct tg_geom *geom) {
 /// @param geobin GeoBIN data
 /// @param len Length of data
 /// @returns A geometry or an error. Use tg_geom_error() after parsing to check
-/// for errors. 
+/// for errors.
 /// @see tg_parse_geobin_ix()
 /// @see tg_geom_error()
 /// @see tg_geom_geobin()
@@ -16064,7 +16038,7 @@ struct tg_geom *tg_parse_geobin(const uint8_t *geobin, size_t len) {
     return tg_parse_geobin_ix(geobin, len, 0);
 }
 
-static size_t parse_geobin(const uint8_t *geobin, size_t len, size_t i, 
+static size_t parse_geobin(const uint8_t *geobin, size_t len, size_t i,
     size_t depth, enum tg_index ix, struct tg_geom **g)
 {
     if (i == len) goto invalid;
@@ -16184,7 +16158,7 @@ static size_t parse_geobin(const uint8_t *geobin, size_t len, size_t i,
 invalid:
     *g = make_parse_error("invalid binary");
     return PARSE_FAIL;
-    
+
 }
 
 /// Parse GeoBIN binary using provided indexing option.
@@ -16192,7 +16166,7 @@ invalid:
 /// @param len Length of data
 /// @param ix Indexing option, e.g. TG_NONE, TG_NATURAL, TG_YSTRIPES
 /// @returns A geometry or an error. Use tg_geom_error() after parsing to check
-/// for errors. 
+/// for errors.
 /// @see tg_parse_geobin()
 struct tg_geom *tg_parse_geobin_ix(const uint8_t *geobin, size_t len,
     enum tg_index ix)
@@ -16215,7 +16189,7 @@ static void write_base_geom_geobin(const struct tg_geom *geom,
 {
     // extra json section
     const char *xjson = tg_geom_extra_json(geom);
-    
+
     // write head byte
     if ((geom->head.flags&IS_FEATURE_COL) == IS_FEATURE_COL) {
         write_byte(wr, 0x04);
@@ -16227,7 +16201,7 @@ static void write_base_geom_geobin(const struct tg_geom *geom,
     } else {
         write_byte(wr, 0x02);
     }
-    
+
     // mbr section
     double min[4], max[4];
     int dims = tg_geom_fullrect(geom, min, max);
@@ -16238,12 +16212,12 @@ static void write_base_geom_geobin(const struct tg_geom *geom,
     for (int i = 0; i < dims; i++) {
         write_doublele(wr, max[i]);
     }
-    
+
     if (xjson) {
         write_string(wr, xjson);
     }
     write_byte(wr, 0);
-    
+
     if ((geom->head.flags&IS_FEATURE_COL) == IS_FEATURE_COL) {
         // write feature collection
         int ngeoms = tg_geom_num_geometries(geom);
