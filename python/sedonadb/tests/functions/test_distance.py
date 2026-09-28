@@ -22,6 +22,111 @@ from sedonadb.testing import geom_or_null, PostGIS, SedonaDB
 @pytest.mark.parametrize(
     ("geom1", "geom2", "expected"),
     [
+        # NULL and empty geometries
+        (None, None, None),
+        ("POINT (0 0)", None, None),
+        (None, "POINT (0 0)", None),
+        ("POINT EMPTY", "POINT (0 0)", None),
+        ("POINT (0 0)", "POINT EMPTY", None),
+        ("GEOMETRYCOLLECTION EMPTY", "POINT (0 0)", None),
+        # Point x Point
+        ("POINT (0 0)", "POINT (0 0)", "POINT (0 0)"),
+        ("POINT (0 0)", "POINT (3 4)", "POINT (0 0)"),
+        # Argument order is significant: the result lies on geom1
+        (
+            "POINT (5 0)",
+            "LINESTRING (0 0, 10 10)",
+            "POINT (5 0)",
+        ),
+        (
+            "LINESTRING (0 0, 10 10)",
+            "POINT (5 0)",
+            "POINT (2.5 2.5)",
+        ),
+        # LineString x LineString, both disjoint and intersecting
+        (
+            "LINESTRING (0 0, 10 0)",
+            "LINESTRING (2 2, 8 2)",
+            "POINT (2 0)",
+        ),
+        (
+            "LINESTRING (0 0, 10 10)",
+            "LINESTRING (0 10, 10 0)",
+            "POINT (5 5)",
+        ),
+        # Point and Polygon
+        (
+            "POINT (0.25 0.25)",
+            "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+            "POINT (0.25 0.25)",
+        ),
+        (
+            "POINT (-1 0)",
+            "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+            "POINT (-1 0)",
+        ),
+        (
+            "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+            "POINT (-1 0)",
+            "POINT (0 0)",
+        ),
+        (
+            "POLYGON ((0 0, 2 0, 0 2, 0 0))",
+            "POINT (0.25 0.25)",
+            "POINT (0.25 0.25)",
+        ),
+        # Polygon x Polygon, both disjoint and intersecting
+        (
+            "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))",
+            "POLYGON ((2 0, 3 0, 3 1, 2 1, 2 0))",
+            "POINT (1 0)",
+        ),
+        (
+            "POLYGON ((0 0, 2 0, 2 2, 0 2, 0 0))",
+            "POLYGON ((1 1, 3 1, 3 3, 1 3, 1 1))",
+            "POINT (1 1)",
+        ),
+        # Multi-geometries and collections
+        (
+            "MULTIPOINT ((0 0), (5 5))",
+            "POINT (4 5)",
+            "POINT (5 5)",
+        ),
+        (
+            "MULTILINESTRING ((0 0, 0 1), (5 0, 5 1))",
+            "POINT (4 0.5)",
+            "POINT (5 0.5)",
+        ),
+        (
+            "MULTIPOLYGON (((0 0, 1 0, 1 1, 0 1, 0 0)), ((5 0, 6 0, 6 1, 5 1, 5 0)))",
+            "POINT (4 0.5)",
+            "POINT (5 0.5)",
+        ),
+        (
+            "GEOMETRYCOLLECTION (POINT (0 0), LINESTRING (5 0, 5 1))",
+            "POINT (4 0.5)",
+            "POINT (5 0.5)",
+        ),
+        # ST_ClosestPoint is two-dimensional and ignores Z
+        (
+            "LINESTRING Z (0 0 10, 10 10 20)",
+            "POINT Z (5 0 100)",
+            "POINT (2.5 2.5)",
+        ),
+    ],
+)
+def test_st_closestpoint(eng, geom1, geom2, expected):
+    eng = eng.create_or_skip()
+    eng.assert_query_result(
+        f"SELECT ST_ClosestPoint({geom_or_null(geom1)}, {geom_or_null(geom2)})",
+        expected,
+    )
+
+
+@pytest.mark.parametrize("eng", [SedonaDB, PostGIS])
+@pytest.mark.parametrize(
+    ("geom1", "geom2", "expected"),
+    [
         (None, None, None),
         ("POINT (0 0)", None, None),
         (None, "POINT (0 0)", None),
