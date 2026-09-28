@@ -39,6 +39,11 @@ pub fn st_closest_point_impl() -> Vec<ScalarKernelRef> {
     ItemCrsKernel::wrap_impl(STClosestPoint {})
 }
 
+/// ST_ShortestLine() implementation using GEOS.
+pub fn st_shortest_line_impl() -> Vec<ScalarKernelRef> {
+    ItemCrsKernel::wrap_impl(STShortestLine {})
+}
+
 #[derive(Debug)]
 struct STClosestPoint {}
 
@@ -65,7 +70,7 @@ impl SedonaScalarKernel for STClosestPoint {
 
         executor.execute_wkb_wkb_void(|geom1, geom2| {
             match (geom1, geom2) {
-                (Some(geom1), Some(geom2)) => match invoke_scalar(geom1, geom2)? {
+                (Some(geom1), Some(geom2)) => match invoke_closest_point(geom1, geom2)? {
                     Some(point) => {
                         write_geos_geometry(&point, &mut builder)?;
                         builder.append_value([]);
@@ -81,7 +86,7 @@ impl SedonaScalarKernel for STClosestPoint {
     }
 }
 
-fn invoke_scalar(geom1: &geos::Geometry, geom2: &geos::Geometry) -> Result<Option<Geometry>> {
+fn nearest_points(geom1: &geos::Geometry, geom2: &geos::Geometry) -> Result<Option<CoordSeq>> {
     let geom1_empty = geom1
         .is_empty()
         .map_err(|e| DataFusionError::Execution(format!("Failed to check empty geometry: {e}")))?;
@@ -93,8 +98,18 @@ fn invoke_scalar(geom1: &geos::Geometry, geom2: &geos::Geometry) -> Result<Optio
     }
 
     let nearest = geom1.nearest_points(geom2).map_err(|e| {
-        DataFusionError::Execution(format!("Failed to calculate closest point: {e}"))
+        DataFusionError::Execution(format!("Failed to calculate nearest points: {e}"))
     })?;
+    Ok(Some(nearest))
+}
+
+fn invoke_closest_point(
+    geom1: &geos::Geometry,
+    geom2: &geos::Geometry,
+) -> Result<Option<Geometry>> {
+    let Some(nearest) = nearest_points(geom1, geom2)? else {
+        return Ok(None);
+    };
     let x = nearest.get_x(0).map_err(|e| {
         DataFusionError::Execution(format!("Failed to read closest point x coordinate: {e}"))
     })?;
@@ -109,6 +124,53 @@ fn invoke_scalar(geom1: &geos::Geometry, geom2: &geos::Geometry) -> Result<Optio
     })?;
 
     Ok(Some(point))
+}
+
+#[derive(Debug)]
+struct STShortestLine {}
+
+impl SedonaScalarKernel for STShortestLine {
+    fn return_type(&self, args: &[SedonaType]) -> Result<Option<SedonaType>> {
+        let matcher = ArgMatcher::new(
+            vec![ArgMatcher::is_geometry(), ArgMatcher::is_geometry()],
+            WKB_GEOMETRY,
+        );
+
+        matcher.match_args(args)
+    }
+
+    fn invoke_batch(
+        &self,
+        arg_types: &[SedonaType],
+        args: &[ColumnarValue],
+    ) -> Result<ColumnarValue> {
+        let executor = GeosExecutor::new(arg_types, args);
+        let mut builder = BinaryBuilder::with_capacity(
+            executor.num_iterations(),
+            WKB_MIN_PROBABLE_BYTES * executor.num_iterations(),
+        );
+
+        executor.execute_wkb_wkb_void(|geom1, geom2| {
+            match (geom1, geom2) {
+                (Some(geom1), Some(geom2)) => match nearest_points(geom1, geom2)? {
+                    Some(nearest) => {
+                        let line = Geometry::create_line_string(nearest).map_err(|e| {
+                            DataFusionError::Execution(format!(
+                                "Failed to create shortest line geometry: {e}"
+                            ))
+                        })?;
+                        write_geos_geometry(&line, &mut builder)?;
+                        builder.append_value([]);
+                    }
+                    None => builder.append_null(),
+                },
+                _ => builder.append_null(),
+            }
+            Ok(())
+        })?;
+
+        executor.finish(Arc::new(builder.finish()))
+    }
 }
 
 #[cfg(test)]
@@ -175,5 +237,55 @@ mod tests {
             .invoke_scalar_scalar("LINESTRING (0 0, 10 10)", "POINT (5 0)")
             .unwrap();
         tester.assert_scalar_result_equals(result, "POINT (2.5 2.5)");
+    }
+
+    #[rstest]
+    fn shortest_line_udf(#[values(WKB_GEOMETRY, WKB_VIEW_GEOMETRY)] sedona_type: SedonaType) {
+        let udf = SedonaScalarUDF::from_impl("st_shortestline", st_shortest_line_impl());
+        let tester = ScalarUdfTester::new(udf.into(), vec![sedona_type.clone(), sedona_type]);
+        tester.assert_return_type(WKB_GEOMETRY);
+
+        let result = tester
+            .invoke_scalar_scalar("LINESTRING (0 0, 10 10)", "POINT (5 0)")
+            .unwrap();
+        tester.assert_scalar_result_equals(result, "LINESTRING (2.5 2.5, 5 0)");
+
+        let geom1 = create_array(
+            &[
+                Some("POINT (5 0)"),
+                Some("POINT EMPTY"),
+                Some("POINT (0 0)"),
+                None,
+            ],
+            &WKB_GEOMETRY,
+        );
+        let geom2 = create_array(
+            &[
+                Some("LINESTRING (0 0, 10 10)"),
+                Some("POINT (0 0)"),
+                Some("POINT EMPTY"),
+                Some("POINT (0 0)"),
+            ],
+            &WKB_GEOMETRY,
+        );
+        let expected = create_array(
+            &[Some("LINESTRING (5 0, 2.5 2.5)"), None, None, None],
+            &WKB_GEOMETRY,
+        );
+        assert_array_equal(&tester.invoke_array_array(geom1, geom2).unwrap(), &expected);
+    }
+
+    #[test]
+    fn shortest_line_udf_invoke_item_crs() {
+        let sedona_type = WKB_GEOMETRY_ITEM_CRS.clone();
+        let udf = SedonaScalarUDF::from_impl("st_shortestline", st_shortest_line_impl());
+        let tester =
+            ScalarUdfTester::new(udf.into(), vec![sedona_type.clone(), sedona_type.clone()]);
+        tester.assert_return_type(sedona_type);
+
+        let result = tester
+            .invoke_scalar_scalar("LINESTRING (0 0, 10 10)", "POINT (5 0)")
+            .unwrap();
+        tester.assert_scalar_result_equals(result, "LINESTRING (2.5 2.5, 5 0)");
     }
 }
