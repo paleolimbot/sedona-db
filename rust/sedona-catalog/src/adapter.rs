@@ -15,7 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
@@ -178,60 +177,5 @@ impl SchemaProvider for DataFusionSchema {
 
     fn table_exist(&self, name: &str) -> bool {
         self.inner.table_exist(name)
-    }
-}
-
-/// Adds a Sedona catalog list in front of an existing DataFusion catalog list.
-///
-/// Foreign catalogs win on name collisions; registrations continue to target
-/// the existing list so installing an extension does not replace built-ins.
-pub struct OverlayCatalogList {
-    foreign: SedonaCatalogListRef,
-    fallback: Arc<dyn CatalogProviderList>,
-}
-
-impl OverlayCatalogList {
-    pub fn new(foreign: SedonaCatalogListRef, fallback: Arc<dyn CatalogProviderList>) -> Self {
-        Self { foreign, fallback }
-    }
-
-    pub fn foreign(&self) -> &SedonaCatalogListRef {
-        &self.foreign
-    }
-}
-
-impl Debug for OverlayCatalogList {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("OverlayCatalogList")
-            .field("foreign", &self.foreign)
-            .field("fallback", &self.fallback)
-            .finish()
-    }
-}
-
-impl CatalogProviderList for OverlayCatalogList {
-    fn register_catalog(
-        &self,
-        name: String,
-        catalog: Arc<dyn CatalogProvider>,
-    ) -> Option<Arc<dyn CatalogProvider>> {
-        self.fallback.register_catalog(name, catalog)
-    }
-
-    fn catalog_names(&self) -> Vec<String> {
-        let mut seen = HashSet::new();
-        self.foreign
-            .catalog_names()
-            .into_iter()
-            .chain(self.fallback.catalog_names())
-            .filter(|name| seen.insert(name.clone()))
-            .collect()
-    }
-
-    fn catalog(&self, name: &str) -> Option<Arc<dyn CatalogProvider>> {
-        self.foreign
-            .catalog(name)
-            .map(|catalog| Arc::new(DataFusionCatalog::new(catalog)) as _)
-            .or_else(|| self.fallback.catalog(name))
     }
 }

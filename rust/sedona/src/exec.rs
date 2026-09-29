@@ -15,14 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 use async_trait::async_trait;
-use datafusion::catalog::{
-    CatalogProvider, CatalogProviderList, SchemaProvider, Session, TableProvider,
-};
+use datafusion::catalog::{Session, TableProvider};
 use datafusion::prelude::DataFrame;
 use datafusion_common::exec_err;
 use datafusion_expr::{DdlStatement, LogicalPlan, TableType};
 use datafusion_physical_plan::ExecutionPlan;
-use sedona_catalog::{DataFusionCatalog, DataFusionSchema, OverlayCatalogList};
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -70,17 +67,19 @@ pub(crate) async fn execute_sedona_catalog_ddl(
 
     match ddl {
         DdlStatement::CreateCatalog(cmd) => {
-            let state = ctx.ctx.state();
-            let Some(catalogs) = state.catalog_list().downcast_ref::<OverlayCatalogList>() else {
+            let catalogs = ctx.catalog_registry();
+            if !catalogs.has_foreign_catalog_list() {
                 return Ok(None);
-            };
-            if catalogs.catalog(&cmd.catalog_name).is_some() {
+            }
+            if ctx.ctx.catalog(&cmd.catalog_name).is_some() {
                 if cmd.if_not_exists {
                     return Ok(Some(ctx.ctx.read_empty()?));
                 }
                 return exec_err!("Catalog '{}' already exists", cmd.catalog_name);
             }
-            catalogs.foreign().create(&cmd.catalog_name)?;
+            catalogs
+                .create_foreign_catalog(&cmd.catalog_name)
+                .expect("foreign catalog list checked above")?;
             Ok(Some(ctx.ctx.read_empty()?))
         }
         DdlStatement::CreateCatalogSchema(cmd) => {
@@ -96,10 +95,7 @@ pub(crate) async fn execute_sedona_catalog_ddl(
                 [catalog, schema] => ((*catalog).to_string(), (*schema).to_string()),
                 _ => return Ok(None),
             };
-            let Some(catalog) = ctx.ctx.catalog(&catalog_name) else {
-                return Ok(None);
-            };
-            let Some(catalog) = catalog.downcast_ref::<DataFusionCatalog>() else {
+            let Some(catalog) = ctx.catalog_registry().foreign_catalog(&catalog_name) else {
                 return Ok(None);
             };
             if catalog.schema(&schema_name).is_some() {
@@ -108,7 +104,7 @@ pub(crate) async fn execute_sedona_catalog_ddl(
                 }
                 return exec_err!("Schema '{schema_name}' already exists");
             }
-            catalog.inner().create(&schema_name)?;
+            catalog.create(&schema_name)?;
             Ok(Some(ctx.ctx.read_empty()?))
         }
         DdlStatement::CreateExternalTable(cmd) => {
@@ -121,13 +117,10 @@ pub(crate) async fn execute_sedona_catalog_ddl(
                 &catalog_options.default_catalog,
                 &catalog_options.default_schema,
             );
-            let Some(catalog) = state.catalog_list().catalog(&resolved.catalog) else {
+            let Some(catalog) = ctx.catalog_registry().foreign_catalog(&resolved.catalog) else {
                 return Ok(None);
             };
             let Some(schema) = catalog.schema(&resolved.schema) else {
-                return Ok(None);
-            };
-            let Some(schema) = schema.downcast_ref::<DataFusionSchema>() else {
                 return Ok(None);
             };
 
@@ -141,7 +134,7 @@ pub(crate) async fn execute_sedona_catalog_ddl(
                     return exec_err!("External table '{}' already exists", cmd.name)
                 }
                 (false, true, true) => {
-                    schema.inner().deregister(&resolved.table)?;
+                    schema.deregister(&resolved.table)?;
                 }
                 _ => {}
             }
@@ -158,7 +151,7 @@ pub(crate) async fn execute_sedona_catalog_ddl(
                 })?;
             let provider = factory.create(&state, cmd).await?;
             let input = provider.scan(&state, None, &[], None).await?;
-            let create = schema.inner().create(&resolved.table, input)?;
+            let create = schema.create(&resolved.table, input)?;
             Ok(Some(ctx.ctx.read_table(Arc::new(CatalogDdlProvider {
                 plan: create,
             }))?))

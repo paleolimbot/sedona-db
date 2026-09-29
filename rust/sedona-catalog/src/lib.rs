@@ -34,7 +34,7 @@ use datafusion_catalog::TableProvider;
 use datafusion_common::Result;
 use datafusion_physical_plan::ExecutionPlan;
 
-pub use adapter::{DataFusionCatalog, DataFusionCatalogList, DataFusionSchema, OverlayCatalogList};
+pub use adapter::{DataFusionCatalog, DataFusionCatalogList, DataFusionSchema};
 
 pub type SedonaCatalogListRef = Arc<dyn SedonaCatalogList>;
 pub type SedonaCatalogRef = Arc<dyn SedonaCatalog>;

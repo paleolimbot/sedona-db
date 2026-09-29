@@ -26,7 +26,6 @@ use datafusion_expr::ScalarUDFImpl;
 use pyo3::prelude::*;
 use sedona::context::SedonaContext;
 use sedona::context_builder::SedonaContextBuilder;
-use sedona_catalog::OverlayCatalogList;
 use sedona_common::SedonaOptions;
 use sedona_datasource::format::ExternalFormatFactory;
 use sedona_extension::runtime::RuntimeHandle;
@@ -434,10 +433,7 @@ impl InternalContext {
                 self.inner.ctx.task_ctx(),
                 self.runtime.clone(),
             ));
-            let current = self.inner.ctx.state().catalog_list().clone();
-            self.inner
-                .ctx
-                .register_catalog_list(Arc::new(OverlayCatalogList::new(foreign, current)));
+            self.inner.register_catalog_list(foreign);
             return Ok(());
         } else if component.hasattr("__sedonadb_scalar_udf__")? {
             // One function's overload kernels, each a natively-compiled kernel

@@ -95,6 +95,43 @@ def test_python_catalog_query_and_builtin_fallback():
     assert sd.sql("SELECT 42 AS answer").to_arrow_table()["answer"].to_pylist() == [42]
 
 
+def test_multiple_catalog_lists_compose_newest_first():
+    first = DictCatalogList(
+        {
+            "first": DictCatalog(
+                {"public": DictSchema({"items": pa.table({"value": [1]})})}
+            ),
+            "shared": DictCatalog(
+                {"public": DictSchema({"items": pa.table({"value": [10]})})}
+            ),
+        }
+    )
+    second = DictCatalogList(
+        {
+            "second": DictCatalog(
+                {"public": DictSchema({"items": pa.table({"value": [2]})})}
+            ),
+            "shared": DictCatalog(
+                {"public": DictSchema({"items": pa.table({"value": [20]})})}
+            ),
+        }
+    )
+
+    sd = sedonadb.connect()
+    sd.register(first)
+    sd.register(second)
+
+    assert sd.sql("SELECT value FROM first.public.items").to_arrow_table()[
+        "value"
+    ].to_pylist() == [1]
+    assert sd.sql("SELECT value FROM second.public.items").to_arrow_table()[
+        "value"
+    ].to_pylist() == [2]
+    assert sd.sql("SELECT value FROM shared.public.items").to_arrow_table()[
+        "value"
+    ].to_pylist() == [20]
+
+
 def test_python_catalog_create_hierarchy():
     catalogs = DictCatalogList({})
     catalog = catalogs.create("foreign")
@@ -111,12 +148,13 @@ def test_sql_create_uses_python_create_methods(tmp_path):
     sd.register(catalogs)
 
     sd.sql("CREATE SCHEMA foreign.public").execute()
+    sd.sql("SET datafusion.catalog.default_catalog = foreign").execute()
+    sd.sql("SET datafusion.catalog.default_schema = public").execute()
 
     source = tmp_path / "source.parquet"
     pq.write_table(pa.table({"value": [1, 2]}), source)
     result = sd.sql(
-        "CREATE EXTERNAL TABLE foreign.public.created "
-        f"STORED AS PARQUET LOCATION '{source}'"
+        f"CREATE EXTERNAL TABLE created STORED AS PARQUET LOCATION '{source}'"
     ).to_arrow_table()
 
     schema = catalogs.catalog("foreign").schema("public")
