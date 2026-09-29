@@ -88,7 +88,9 @@ def test_python_catalog_query_and_builtin_fallback():
     sd = sedonadb.connect()
     sd.register(catalogs)
 
-    result = sd.sql("SELECT name FROM foreign.public.items ORDER BY id").to_arrow_table()
+    result = sd.sql(
+        "SELECT name FROM foreign.public.items ORDER BY id"
+    ).to_arrow_table()
     assert result.column("name").to_pylist() == ["one", "two"]
 
     # Registering a foreign list overlays, rather than replaces, the built-ins.
