@@ -15,33 +15,33 @@
 // specific language governing permissions and limitations
 // under the License.
 
-//! Import and export [`crate`] catalog implementations through sedona-extension's C ABI.
+//! Import and export [`sedona_catalog`] implementations through the Sedona C ABI.
 
-use std::ffi::{CString, c_char, c_int};
+use std::ffi::{c_char, c_int, CString};
 use std::fmt::{Debug, Formatter};
 use std::ptr::null_mut;
 use std::sync::{Arc, Weak};
 
+use crate::execution_plan::{ExportedExecutionPlan, ImportedSedonaCExec};
+use crate::extension::{
+    SedonaCCatalogProvider, SedonaCCatalogProviderList, SedonaCError, SedonaCExecutionPlan,
+    SedonaCSchemaProvider, SedonaCTableProvider,
+};
+use crate::runtime::RuntimeHandle;
+use crate::table_provider::{ExportedTableProvider, ImportedTableProvider};
+use crate::utils::{
+    call_get_json_property_impl, cstr_from_ptr_or_empty, parse_json_c_args, write_json_property,
+    write_utf8_property_schema, ERRNO_OK,
+};
 use arrow_array::ffi::FFI_ArrowArray;
 use arrow_schema::ffi::FFI_ArrowSchema;
 use async_trait::async_trait;
 use datafusion_catalog::{Session, TableProvider};
-use datafusion_common::{DataFusionError, Result, not_impl_err};
+use datafusion_common::{not_impl_err, DataFusionError, Result};
 use datafusion_physical_plan::ExecutionPlan;
-use sedona_extension::execution_plan::{ExportedExecutionPlan, ImportedSedonaCExec};
-use sedona_extension::extension::{
-    SedonaCCatalogProvider, SedonaCCatalogProviderList, SedonaCError, SedonaCExecutionPlan,
-    SedonaCSchemaProvider, SedonaCTableProvider,
-};
-use sedona_extension::runtime::RuntimeHandle;
-use sedona_extension::table_provider::{ExportedTableProvider, ImportedTableProvider};
-use sedona_extension::utils::{
-    ERRNO_OK, call_get_json_property_impl, cstr_from_ptr_or_empty, parse_json_c_args,
-    write_json_property, write_utf8_property_schema,
-};
 use serde::{Deserialize, Serialize};
 
-use crate::{
+use sedona_catalog::{
     SedonaCatalog, SedonaCatalogList, SedonaCatalogListRef, SedonaCatalogRef, SedonaSchema,
     SedonaSchemaRef,
 };
@@ -111,9 +111,7 @@ unsafe extern "C" fn c_list_property(
             write_json_property(&exported.inner.catalog_names(), out, err)
         },
         property => {
-            unsafe {
-                sedona_extension::set_ffi_error!(err, "Unknown catalog list property: {}", property)
-            };
+            unsafe { crate::set_ffi_error!(err, "Unknown catalog list property: {}", property) };
             libc::EINVAL
         }
     }
@@ -321,9 +319,7 @@ unsafe extern "C" fn c_catalog_property(
     match unsafe { cstr_from_ptr_or_empty(property) }.as_ref() {
         "schema_names" => unsafe { write_json_property(&exported.inner.schema_names(), out, err) },
         property => {
-            unsafe {
-                sedona_extension::set_ffi_error!(err, "Unknown catalog property: {}", property)
-            };
+            unsafe { crate::set_ffi_error!(err, "Unknown catalog property: {}", property) };
             libc::EINVAL
         }
     }
@@ -589,9 +585,7 @@ unsafe extern "C" fn c_schema_property(
             Err(error) => ffi_error(err, error),
         },
         property => {
-            unsafe {
-                sedona_extension::set_ffi_error!(err, "Unknown schema property: {}", property)
-            };
+            unsafe { crate::set_ffi_error!(err, "Unknown schema property: {}", property) };
             libc::EINVAL
         }
     }
@@ -631,7 +625,7 @@ unsafe extern "C" fn c_schema_create(
     err: *mut SedonaCError,
 ) -> c_int {
     if plan.is_null() {
-        unsafe { sedona_extension::set_ffi_error!(err, "Input execution plan is null") };
+        unsafe { crate::set_ffi_error!(err, "Input execution plan is null") };
         return libc::EINVAL;
     }
     let exported = unsafe { &*((*self_).private_data as *const ExportedSchema) };
@@ -885,7 +879,7 @@ fn check_code(code: c_int, error: SedonaCError, operation: &str) -> Result<()> {
 }
 
 fn ffi_error(err: *mut SedonaCError, error: impl std::fmt::Display) -> c_int {
-    unsafe { sedona_extension::set_ffi_error!(err, "{}", error) };
+    unsafe { crate::set_ffi_error!(err, "{}", error) };
     libc::EINVAL
 }
 
@@ -1046,7 +1040,7 @@ mod tests {
             .unwrap()
             .insert("foreign".to_string(), catalog);
 
-        let adapter = crate::DataFusionCatalogList::new(catalogs);
+        let adapter = sedona_catalog::DataFusionCatalogList::new(catalogs);
         let table = adapter
             .catalog("foreign")
             .unwrap()

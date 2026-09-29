@@ -25,7 +25,6 @@
 //! [`SedonaCatalog::create`], or [`SedonaSchema::create`].
 
 mod adapter;
-pub mod ffi;
 
 use std::fmt::Debug;
 use std::sync::Arc;

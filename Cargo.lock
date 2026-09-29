@@ -5692,18 +5692,10 @@ dependencies = [
 name = "sedona-catalog"
 version = "0.5.0"
 dependencies = [
- "arrow-array",
- "arrow-schema",
  "async-trait",
- "datafusion",
  "datafusion-catalog",
  "datafusion-common",
  "datafusion-physical-plan",
- "libc",
- "sedona-common",
- "sedona-extension",
- "serde",
- "tokio",
 ]
 
 [[package]]
@@ -5804,6 +5796,7 @@ dependencies = [
  "futures",
  "libc",
  "prost",
+ "sedona-catalog",
  "sedona-common",
  "sedona-expr",
  "sedona-schema",
