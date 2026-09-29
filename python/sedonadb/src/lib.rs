@@ -16,6 +16,7 @@
 // under the License.
 
 use crate::{
+    catalog::py_catalog_list,
     error::PySedonaError,
     raster_loader::py_raster_loader,
     udf::{sedona_aggregate_udf, sedona_native_scalar_udf, sedona_scalar_udf},
@@ -27,6 +28,7 @@ use sedona_proj::register::{configure_global_proj_engine, ProjCrsEngineBuilder};
 use sedona_raster::geo_transform::geotransform_from_bbox_and_spatial_shape;
 use std::ffi::c_void;
 
+mod catalog;
 mod context;
 mod dataframe;
 mod datasource;
@@ -164,6 +166,7 @@ fn _lib(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(expr::expr_sort_expr, m)?)?;
     m.add_function(wrap_pyfunction!(gdal_version, m)?)?;
     m.add_function(wrap_pyfunction!(geotransform_from_bbox, m)?)?;
+    m.add_function(wrap_pyfunction!(py_catalog_list, m)?)?;
     m.add_function(wrap_pyfunction!(py_raster_loader, m)?)?;
     m.add_function(wrap_pyfunction!(schema::raster_type, m)?)?;
     m.add_function(wrap_pyfunction!(sedona_adbc_driver_init, m)?)?;
@@ -173,6 +176,8 @@ fn _lib(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(sedona_python_version, m)?)?;
     m.add_function(wrap_pyfunction!(sedona_scalar_udf, m)?)?;
 
+    m.add_class::<catalog::PyCatalogListWrapper>()?;
+    m.add_class::<catalog::PyExecutionPlan>()?;
     m.add_class::<context::InternalContext>()?;
     m.add_class::<dataframe::InternalDataFrame>()?;
     m.add_class::<datasource::PyExternalFormat>()?;

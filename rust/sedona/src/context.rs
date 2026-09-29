@@ -19,7 +19,7 @@ use std::{
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
-use crate::exec::create_plan_from_sql;
+use crate::exec::{create_plan_from_sql, execute_sedona_catalog_ddl};
 use crate::object_storage::ensure_object_store_registered_with_options;
 use crate::read::{read_provider, resolve_read_format};
 use crate::url_table::install_sedona_url_table;
@@ -655,7 +655,11 @@ impl SedonaContext {
         let mut results = Vec::with_capacity(statements.len());
         for statement in statements {
             let plan = create_plan_from_sql(self, statement.clone()).await?;
-            let df = self.ctx.execute_logical_plan(plan).await?;
+            let df = if let Some(df) = execute_sedona_catalog_ddl(self, &plan).await? {
+                df
+            } else {
+                self.ctx.execute_logical_plan(plan).await?
+            };
             results.push(df);
         }
 

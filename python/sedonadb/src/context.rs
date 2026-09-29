@@ -26,11 +26,13 @@ use datafusion_expr::ScalarUDFImpl;
 use pyo3::prelude::*;
 use sedona::context::SedonaContext;
 use sedona::context_builder::SedonaContextBuilder;
+use sedona_catalog::OverlayCatalogList;
 use sedona_common::SedonaOptions;
 use sedona_datasource::format::ExternalFormatFactory;
 use sedona_extension::runtime::RuntimeHandle;
 
 use crate::{
+    catalog::{PyCatalogListWrapper, PySedonaCatalogList},
     dataframe::InternalDataFrame,
     datasource::PyExternalFormat,
     error::PySedonaError,
@@ -420,6 +422,22 @@ impl InternalContext {
                 .call_method0("__sedonadb_raster_loader__")?
                 .extract::<PyRasterLoaderWrapper>()?;
             self.inner.register_raster_loader(wrapper.inner);
+            return Ok(());
+        } else if component.hasattr("__sedonadb_catalog_list__")? {
+            let wrapper = component.call_method0("__sedonadb_catalog_list__")?;
+            let wrapper = wrapper
+                .cast::<PyCatalogListWrapper>()
+                .map_err(|error| PySedonaError::SedonaPython(error.to_string()))?;
+            let object = wrapper.borrow().object.clone_ref(component.py());
+            let foreign = Arc::new(PySedonaCatalogList::new(
+                object,
+                self.inner.ctx.task_ctx(),
+                self.runtime.clone(),
+            ));
+            let current = self.inner.ctx.state().catalog_list().clone();
+            self.inner
+                .ctx
+                .register_catalog_list(Arc::new(OverlayCatalogList::new(foreign, current)));
             return Ok(());
         } else if component.hasattr("__sedonadb_scalar_udf__")? {
             // One function's overload kernels, each a natively-compiled kernel

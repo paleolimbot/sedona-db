@@ -14,7 +14,17 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-use datafusion_expr::{DdlStatement, LogicalPlan};
+use async_trait::async_trait;
+use datafusion::catalog::{
+    CatalogProvider, CatalogProviderList, SchemaProvider, Session, TableProvider,
+};
+use datafusion::prelude::DataFrame;
+use datafusion_common::exec_err;
+use datafusion_expr::{DdlStatement, LogicalPlan, TableType};
+use datafusion_physical_plan::ExecutionPlan;
+use sedona_catalog::{DataFusionCatalog, DataFusionSchema, OverlayCatalogList};
+use std::fmt::Debug;
+use std::sync::Arc;
 
 use crate::{context::SedonaContext, object_storage::register_object_store_and_config_extensions};
 
@@ -45,6 +55,151 @@ pub(crate) async fn create_plan_from_sql(
     }
 
     Ok(plan)
+}
+
+/// Execute DDL against the Sedona-owned catalog interfaces when the target is
+/// backed by a foreign catalog. Returning `None` delegates ordinary DDL to
+/// DataFusion unchanged.
+pub(crate) async fn execute_sedona_catalog_ddl(
+    ctx: &SedonaContext,
+    plan: &LogicalPlan,
+) -> Result<Option<DataFrame>, DataFusionError> {
+    let LogicalPlan::Ddl(ddl) = plan else {
+        return Ok(None);
+    };
+
+    match ddl {
+        DdlStatement::CreateCatalog(cmd) => {
+            let state = ctx.ctx.state();
+            let Some(catalogs) = state.catalog_list().downcast_ref::<OverlayCatalogList>() else {
+                return Ok(None);
+            };
+            if catalogs.catalog(&cmd.catalog_name).is_some() {
+                if cmd.if_not_exists {
+                    return Ok(Some(ctx.ctx.read_empty()?));
+                }
+                return exec_err!("Catalog '{}' already exists", cmd.catalog_name);
+            }
+            catalogs.foreign().create(&cmd.catalog_name)?;
+            Ok(Some(ctx.ctx.read_empty()?))
+        }
+        DdlStatement::CreateCatalogSchema(cmd) => {
+            let tokens: Vec<&str> = cmd.schema_name.split('.').collect();
+            let (catalog_name, schema_name) = match tokens.as_slice() {
+                [schema] => {
+                    let state = ctx.ctx.state();
+                    (
+                        state.config().options().catalog.default_catalog.clone(),
+                        (*schema).to_string(),
+                    )
+                }
+                [catalog, schema] => ((*catalog).to_string(), (*schema).to_string()),
+                _ => return Ok(None),
+            };
+            let Some(catalog) = ctx.ctx.catalog(&catalog_name) else {
+                return Ok(None);
+            };
+            let Some(catalog) = catalog.downcast_ref::<DataFusionCatalog>() else {
+                return Ok(None);
+            };
+            if catalog.schema(&schema_name).is_some() {
+                if cmd.if_not_exists {
+                    return Ok(Some(ctx.ctx.read_empty()?));
+                }
+                return exec_err!("Schema '{schema_name}' already exists");
+            }
+            catalog.inner().create(&schema_name)?;
+            Ok(Some(ctx.ctx.read_empty()?))
+        }
+        DdlStatement::CreateExternalTable(cmd) => {
+            if cmd.temporary {
+                return Ok(None);
+            }
+            let state = ctx.ctx.state();
+            let catalog_options = &state.config_options().catalog;
+            let resolved = cmd.name.clone().resolve(
+                &catalog_options.default_catalog,
+                &catalog_options.default_schema,
+            );
+            let Some(catalog) = state.catalog_list().catalog(&resolved.catalog) else {
+                return Ok(None);
+            };
+            let Some(schema) = catalog.schema(&resolved.schema) else {
+                return Ok(None);
+            };
+            let Some(schema) = schema.downcast_ref::<DataFusionSchema>() else {
+                return Ok(None);
+            };
+
+            let exists = schema.table_exist(&resolved.table);
+            match (cmd.if_not_exists, cmd.or_replace, exists) {
+                (true, false, true) => return Ok(Some(ctx.ctx.read_empty()?)),
+                (true, true, true) => {
+                    return exec_err!("'IF NOT EXISTS' cannot coexist with 'REPLACE'")
+                }
+                (false, false, true) => {
+                    return exec_err!("External table '{}' already exists", cmd.name)
+                }
+                (false, true, true) => {
+                    schema.inner().deregister(&resolved.table)?;
+                }
+                _ => {}
+            }
+
+            let file_type = cmd.file_type.to_uppercase();
+            let factory = state
+                .table_factories()
+                .get(file_type.as_str())
+                .ok_or_else(|| {
+                    datafusion::error::DataFusionError::Execution(format!(
+                        "Unable to find factory for {}",
+                        cmd.file_type
+                    ))
+                })?;
+            let provider = factory.create(&state, cmd).await?;
+            let input = provider.scan(&state, None, &[], None).await?;
+            let create = schema.inner().create(&resolved.table, input)?;
+            Ok(Some(ctx.ctx.read_table(Arc::new(CatalogDdlProvider {
+                plan: create,
+            }))?))
+        }
+        _ => Ok(None),
+    }
+}
+
+/// Presents a catalog DDL execution plan as a one-shot DataFrame so DDL keeps
+/// SedonaDB's lazy `.execute()`/`.collect()` behavior.
+struct CatalogDdlProvider {
+    plan: Arc<dyn ExecutionPlan>,
+}
+
+impl Debug for CatalogDdlProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CatalogDdlProvider")
+            .field("plan", &self.plan)
+            .finish()
+    }
+}
+
+#[async_trait]
+impl TableProvider for CatalogDdlProvider {
+    fn schema(&self) -> arrow_schema::SchemaRef {
+        self.plan.schema()
+    }
+
+    fn table_type(&self) -> TableType {
+        TableType::Temporary
+    }
+
+    async fn scan(
+        &self,
+        _state: &dyn Session,
+        _projection: Option<&Vec<usize>>,
+        _filters: &[datafusion_expr::Expr],
+        _limit: Option<usize>,
+    ) -> Result<Arc<dyn ExecutionPlan>> {
+        Ok(self.plan.clone())
+    }
 }
 
 #[cfg(test)]

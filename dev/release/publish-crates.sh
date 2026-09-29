@@ -132,6 +132,7 @@ CRATES=(
     "rust/sedona-functions"         # depends on: sedona-common, sedona-expr, sedona-geometry, sedona-raster, sedona-schema
     "rust/sedona-testing"           # depends on: sedona-common, sedona-expr, sedona-geometry, sedona-raster, sedona-schema (required by sedona main crate)
     "c/sedona-extension"            # depends on: sedona-common, sedona-expr, sedona-schema
+    "rust/sedona-catalog"           # depends on: sedona-extension
     "rust/sedona-datasource"        # depends on: sedona-common, sedona-expr, sedona-schema
     "rust/sedona-query-planner"     # depends on: sedona-common, sedona-expr, sedona-schema
     "rust/sedona-pointcloud"        # depends on: sedona-expr, sedona-geometry
