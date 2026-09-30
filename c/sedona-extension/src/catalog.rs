@@ -15,8 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#![deny(missing_docs)]
-
 //! Import and export [`sedona_catalog`] implementations through the Sedona C ABI.
 
 use std::ffi::{c_char, c_int, CString};
@@ -31,8 +29,8 @@ use datafusion_catalog::{Session, TableProvider};
 use datafusion_common::{not_impl_err, Result};
 use datafusion_physical_plan::ExecutionPlan;
 use sedona_catalog::{
-    CreateTableOptions, DropSchemaOptions, DropTableOptions, SedonaCatalog, SedonaCatalogList,
-    SedonaSchema,
+    CreateCatalogOptions, CreateSchemaOptions, CreateTableOptions, DropSchemaOptions,
+    DropTableOptions, SedonaCatalog, SedonaCatalogList, SedonaSchema,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -141,11 +139,23 @@ unsafe extern "C" fn c_catalog_list_catalog(
 unsafe extern "C" fn c_catalog_list_create(
     self_: *const SedonaCCatalogProviderList,
     name: *const c_char,
+    options: *const u8,
+    options_len: usize,
     out: *mut SedonaCCatalogProvider,
     err: *mut SedonaCError,
 ) -> c_int {
     let exported = &*((*self_).private_data as *const ExportedCatalogProviderList);
-    match exported.inner.create(&cstr_from_ptr_or_empty(name)) {
+    let options = match parse_json_options(options, options_len) {
+        Ok(options) => options,
+        Err(error) => {
+            set_ffi_error!(err, "Failed to parse create catalog options: {}", error);
+            return libc::EINVAL;
+        }
+    };
+    match exported
+        .inner
+        .create(&cstr_from_ptr_or_empty(name), &options)
+    {
         Ok(inner) => {
             std::ptr::write(
                 out,
@@ -217,14 +227,28 @@ impl ImportedCatalogProviderList {
     }
 
     /// Create a catalog, preserving any error returned by the FFI callback.
-    pub fn try_create_catalog(&self, name: String) -> Result<Arc<dyn SedonaCatalog>> {
+    pub fn try_create_catalog(
+        &self,
+        name: String,
+        options: &CreateCatalogOptions,
+    ) -> Result<Arc<dyn SedonaCatalog>> {
         let Some(callback) = self.inner.create_catalog else {
             return not_impl_err!("Creating catalogs is not supported by the foreign catalog list");
         };
         let name = c_string(name)?;
+        let options = serialize_json_options(options)?;
         let mut out = SedonaCCatalogProvider::default();
         let mut error = SedonaCError::default();
-        let code = unsafe { callback(&self.inner, name.as_ptr(), &mut out, &mut error) };
+        let code = unsafe {
+            callback(
+                &self.inner,
+                name.as_ptr(),
+                options.as_ptr(),
+                options.len(),
+                &mut out,
+                &mut error,
+            )
+        };
         if code != ERRNO_OK {
             return sedona_common::sedona_internal_err!("Failed to create catalog: {error}");
         }
@@ -274,8 +298,8 @@ impl SedonaCatalogList for ImportedCatalogProviderList {
         self.try_catalog(name).ok().flatten()
     }
 
-    fn create(&self, name: &str) -> Result<Arc<dyn SedonaCatalog>> {
-        self.try_create_catalog(name.to_owned())
+    fn create(&self, name: &str, options: &CreateCatalogOptions) -> Result<Arc<dyn SedonaCatalog>> {
+        self.try_create_catalog(name.to_owned(), options)
     }
 }
 
@@ -372,11 +396,23 @@ unsafe extern "C" fn c_catalog_schema(
 unsafe extern "C" fn c_catalog_create_schema(
     self_: *const SedonaCCatalogProvider,
     name: *const c_char,
+    options: *const u8,
+    options_len: usize,
     out: *mut SedonaCSchemaProvider,
     err: *mut SedonaCError,
 ) -> c_int {
     let exported = &*((*self_).private_data as *const ExportedCatalogProvider);
-    match exported.inner.create(&cstr_from_ptr_or_empty(name)) {
+    let options = match parse_json_options(options, options_len) {
+        Ok(options) => options,
+        Err(error) => {
+            set_ffi_error!(err, "Failed to parse create schema options: {}", error);
+            return libc::EINVAL;
+        }
+    };
+    match exported
+        .inner
+        .create(&cstr_from_ptr_or_empty(name), &options)
+    {
         Ok(inner) => {
             std::ptr::write(
                 out,
@@ -518,14 +554,28 @@ impl ImportedCatalogProvider {
     }
 
     /// Create a schema, preserving any error returned by the FFI callback.
-    pub fn try_create_schema(&self, name: &str) -> Result<Arc<dyn SedonaSchema>> {
+    pub fn try_create_schema(
+        &self,
+        name: &str,
+        options: &CreateSchemaOptions,
+    ) -> Result<Arc<dyn SedonaSchema>> {
         let Some(callback) = self.inner.create_schema else {
             return not_impl_err!("Creating schemas is not supported by the foreign catalog");
         };
         let name = c_string(name)?;
+        let options = serialize_json_options(options)?;
         let mut out = SedonaCSchemaProvider::default();
         let mut error = SedonaCError::default();
-        let code = unsafe { callback(&self.inner, name.as_ptr(), &mut out, &mut error) };
+        let code = unsafe {
+            callback(
+                &self.inner,
+                name.as_ptr(),
+                options.as_ptr(),
+                options.len(),
+                &mut out,
+                &mut error,
+            )
+        };
         if code != ERRNO_OK {
             return sedona_common::sedona_internal_err!("Failed to create schema: {error}");
         }
@@ -545,8 +595,8 @@ impl SedonaCatalog for ImportedCatalogProvider {
         self.try_schema(name).ok().flatten()
     }
 
-    fn create(&self, name: &str) -> Result<Arc<dyn SedonaSchema>> {
-        self.try_create_schema(name)
+    fn create(&self, name: &str, options: &CreateSchemaOptions) -> Result<Arc<dyn SedonaSchema>> {
+        self.try_create_schema(name, options)
     }
 
     fn drop_schema(
@@ -1089,7 +1139,7 @@ mod tests {
     use datafusion::datasource::empty::EmptyTable;
     use datafusion::prelude::SessionContext;
     use datafusion_physical_plan::placeholder_row::PlaceholderRowExec;
-    use sedona_catalog::{CatalogObjectType, DataFusionCatalog, DataFusionCatalogList};
+    use sedona_catalog::{CatalogObjectType, CreateMode, DataFusionCatalog, DataFusionCatalogList};
 
     #[derive(Debug, Default)]
     struct TestCatalogList {
@@ -1105,7 +1155,16 @@ mod tests {
             self.catalogs.read().unwrap().get(name).cloned()
         }
 
-        fn create(&self, name: &str) -> Result<Arc<dyn SedonaCatalog>> {
+        fn create(
+            &self,
+            name: &str,
+            options: &CreateCatalogOptions,
+        ) -> Result<Arc<dyn SedonaCatalog>> {
+            if options.mode != CreateMode::CreateOrIgnore {
+                return sedona_common::sedona_internal_err!(
+                    "test catalogs must use create_or_ignore mode"
+                );
+            }
             let catalog: Arc<dyn SedonaCatalog> = Arc::new(TestCatalog::default());
             self.catalogs
                 .write()
@@ -1129,7 +1188,16 @@ mod tests {
             self.schemas.read().unwrap().get(name).cloned()
         }
 
-        fn create(&self, name: &str) -> Result<Arc<dyn SedonaSchema>> {
+        fn create(
+            &self,
+            name: &str,
+            options: &CreateSchemaOptions,
+        ) -> Result<Arc<dyn SedonaSchema>> {
+            if options.mode != CreateMode::CreateOrIgnore {
+                return sedona_common::sedona_internal_err!(
+                    "test schemas must use create_or_ignore mode"
+                );
+            }
             let schema: Arc<dyn SedonaSchema> = Arc::new(TestSchema::default());
             self.schemas
                 .write()
@@ -1173,9 +1241,9 @@ mod tests {
             options: &CreateTableOptions,
             input: Arc<dyn ExecutionPlan>,
         ) -> Result<Arc<dyn ExecutionPlan>> {
-            if !options.temporary {
+            if !options.temporary || options.mode != CreateMode::CreateOrIgnore {
                 return sedona_common::sedona_internal_err!(
-                    "test tables must be created as temporary"
+                    "test tables must be temporary and use create_or_ignore mode"
                 );
             }
             Ok(input)
@@ -1207,6 +1275,8 @@ mod tests {
     unsafe extern "C" fn failing_create_catalog(
         _self_: *const SedonaCCatalogProviderList,
         _name: *const c_char,
+        _options: *const u8,
+        _options_len: usize,
         _out: *mut SedonaCCatalogProvider,
         error: *mut SedonaCError,
     ) -> c_int {
@@ -1258,6 +1328,10 @@ mod tests {
 
     #[test]
     fn empty_json_options_use_defaults() {
+        let create_catalog: CreateCatalogOptions =
+            unsafe { parse_json_options(std::ptr::null(), 0) }.unwrap();
+        let create_schema: CreateSchemaOptions =
+            unsafe { parse_json_options(std::ptr::null(), 0) }.unwrap();
         let create: CreateTableOptions =
             unsafe { parse_json_options(std::ptr::null(), 0) }.unwrap();
         let drop_schema: DropSchemaOptions =
@@ -1265,6 +1339,8 @@ mod tests {
         let drop_table: DropTableOptions =
             unsafe { parse_json_options(std::ptr::null(), 0) }.unwrap();
 
+        assert_eq!(create_catalog, CreateCatalogOptions::default());
+        assert_eq!(create_schema, CreateSchemaOptions::default());
         assert_eq!(create, CreateTableOptions::default());
         assert_eq!(drop_schema, DropSchemaOptions::default());
         assert_eq!(drop_table, DropTableOptions::default());
@@ -1343,7 +1419,10 @@ mod tests {
         let create = schema
             .create(
                 "temporary_table",
-                &CreateTableOptions { temporary: true },
+                &CreateTableOptions {
+                    mode: CreateMode::CreateOrIgnore,
+                    temporary: true,
+                },
                 input,
             )
             .unwrap();
@@ -1378,11 +1457,23 @@ mod tests {
         let (catalogs, consumer_session, runtime, _producer_runtime) = round_trip();
         let weak_consumer_session = Arc::downgrade(&consumer_session);
         let catalog = catalogs
-            .try_create_catalog("catalog_two".to_owned())
+            .try_create_catalog(
+                "catalog_two".to_owned(),
+                &CreateCatalogOptions {
+                    mode: CreateMode::CreateOrIgnore,
+                },
+            )
             .unwrap();
         assert!(catalogs.catalog("catalog_two").is_some());
 
-        catalog.create("schema_two").unwrap();
+        catalog
+            .create(
+                "schema_two",
+                &CreateSchemaOptions {
+                    mode: CreateMode::CreateOrIgnore,
+                },
+            )
+            .unwrap();
         assert!(catalog.schema("schema_two").is_some());
         let drop_options = DropSchemaOptions { cascade: true };
         assert!(catalog
@@ -1436,7 +1527,10 @@ mod tests {
         let create_plan = schema
             .try_create_table(
                 "created".to_owned(),
-                &CreateTableOptions { temporary: true },
+                &CreateTableOptions {
+                    mode: CreateMode::CreateOrIgnore,
+                    temporary: true,
+                },
                 input,
             )
             .unwrap();
@@ -1514,7 +1608,7 @@ mod tests {
             ImportedCatalogProviderList::try_new(raw, Arc::downgrade(&session), runtime).unwrap();
 
         let error = imported
-            .try_create_catalog("catalog".to_owned())
+            .try_create_catalog("catalog".to_owned(), &CreateCatalogOptions::default())
             .unwrap_err();
         assert!(error.to_string().contains("catalog creation failed"));
     }
@@ -1540,7 +1634,11 @@ mod tests {
         let mut input_plan: SedonaCExecutionPlan =
             ExportedExecutionPlan::new(plan, session.task_ctx(), consumer_runtime).into();
         let mut output_plan = SedonaCExecutionPlan::default();
-        let options = serde_json::to_vec(&CreateTableOptions { temporary: true }).unwrap();
+        let options = serde_json::to_vec(&CreateTableOptions {
+            mode: CreateMode::CreateOrIgnore,
+            temporary: true,
+        })
+        .unwrap();
         let code = unsafe {
             raw_schema.create_table.unwrap()(
                 &raw_schema,

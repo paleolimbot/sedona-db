@@ -37,10 +37,41 @@ use serde::{Deserialize, Serialize};
 
 pub use adapter::{DataFusionCatalog, DataFusionCatalogList, DataFusionSchema};
 
+/// The behavior to use when creating an object that already exists.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CreateMode {
+    /// Create the object and return an error if it already exists.
+    #[default]
+    Create,
+    /// Create the object unless it already exists.
+    CreateOrIgnore,
+    /// Create the object, replacing an existing object with the same name.
+    Replace,
+}
+
+/// Options for creating a catalog.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct CreateCatalogOptions {
+    /// The behavior to use when a catalog with the same name already exists.
+    pub mode: CreateMode,
+}
+
+/// Options for creating a schema.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct CreateSchemaOptions {
+    /// The behavior to use when a schema with the same name already exists.
+    pub mode: CreateMode,
+}
+
 /// Options for creating a table.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct CreateTableOptions {
+    /// The behavior to use when a table with the same name already exists.
+    pub mode: CreateMode,
     /// Whether the table is temporary.
     pub temporary: bool,
 }
@@ -85,7 +116,7 @@ pub trait SedonaCatalogList: Debug + Send + Sync {
     fn catalog(&self, name: &str) -> Option<Arc<dyn SedonaCatalog>>;
 
     /// Create a catalog in the backing catalog system.
-    fn create(&self, name: &str) -> Result<Arc<dyn SedonaCatalog>>;
+    fn create(&self, name: &str, options: &CreateCatalogOptions) -> Result<Arc<dyn SedonaCatalog>>;
 }
 
 /// A collection of schemas backed by a SedonaDB extension.
@@ -97,7 +128,7 @@ pub trait SedonaCatalog: Debug + Send + Sync {
     fn schema(&self, name: &str) -> Option<Arc<dyn SedonaSchema>>;
 
     /// Create a schema in the backing catalog system.
-    fn create(&self, name: &str) -> Result<Arc<dyn SedonaSchema>>;
+    fn create(&self, name: &str, options: &CreateSchemaOptions) -> Result<Arc<dyn SedonaSchema>>;
 
     /// Drop a schema from the backing catalog system.
     ///

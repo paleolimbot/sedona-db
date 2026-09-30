@@ -20,7 +20,10 @@ use datafusion::prelude::DataFrame;
 use datafusion_common::{exec_err, TableReference};
 use datafusion_expr::{DdlStatement, LogicalPlan, TableType};
 use datafusion_physical_plan::ExecutionPlan;
-use sedona_catalog::{CatalogObjectType, CreateTableOptions, DropTableOptions};
+use sedona_catalog::{
+    CatalogObjectType, CreateCatalogOptions, CreateMode, CreateSchemaOptions, CreateTableOptions,
+    DropTableOptions,
+};
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -79,7 +82,16 @@ pub(crate) async fn execute_sedona_catalog_ddl(
                 return exec_err!("Catalog '{}' already exists", cmd.catalog_name);
             }
             catalogs
-                .create_foreign_catalog(&cmd.catalog_name)
+                .create_foreign_catalog(
+                    &cmd.catalog_name,
+                    &CreateCatalogOptions {
+                        mode: if cmd.if_not_exists {
+                            CreateMode::CreateOrIgnore
+                        } else {
+                            CreateMode::Create
+                        },
+                    },
+                )
                 .expect("foreign catalog list checked above")?;
             Ok(Some(ctx.ctx.read_empty()?))
         }
@@ -105,7 +117,16 @@ pub(crate) async fn execute_sedona_catalog_ddl(
                 }
                 return exec_err!("Schema '{schema_name}' already exists");
             }
-            catalog.create(&schema_name)?;
+            catalog.create(
+                &schema_name,
+                &CreateSchemaOptions {
+                    mode: if cmd.if_not_exists {
+                        CreateMode::CreateOrIgnore
+                    } else {
+                        CreateMode::Create
+                    },
+                },
+            )?;
             Ok(Some(ctx.ctx.read_empty()?))
         }
         DdlStatement::CreateExternalTable(cmd) => {
@@ -122,23 +143,18 @@ pub(crate) async fn execute_sedona_catalog_ddl(
                 return Ok(None);
             };
 
-            let exists = schema.table_exist(&resolved.table);
-            match (cmd.if_not_exists, cmd.or_replace, exists) {
-                (true, false, true) => return Ok(Some(ctx.ctx.read_empty()?)),
-                (true, true, true) => {
-                    return exec_err!("'IF NOT EXISTS' cannot coexist with 'REPLACE'")
+            let mode = match (cmd.if_not_exists, cmd.or_replace) {
+                (true, true) => return exec_err!("'IF NOT EXISTS' cannot coexist with 'REPLACE'"),
+                (true, false) => CreateMode::CreateOrIgnore,
+                (false, true) => CreateMode::Replace,
+                (false, false) => CreateMode::Create,
+            };
+            match (mode, schema.table_exist(&resolved.table)) {
+                (CreateMode::CreateOrIgnore, true) => {
+                    return Ok(Some(ctx.ctx.read_empty()?));
                 }
-                (false, false, true) => {
+                (CreateMode::Create, true) => {
                     return exec_err!("External table '{}' already exists", cmd.name)
-                }
-                (false, true, true) => {
-                    schema.drop_table(
-                        &resolved.table,
-                        &DropTableOptions {
-                            object_type: Some(CatalogObjectType::Table),
-                            purge: false,
-                        },
-                    )?;
                 }
                 _ => {}
             }
@@ -158,6 +174,7 @@ pub(crate) async fn execute_sedona_catalog_ddl(
             let create = schema.create(
                 &resolved.table,
                 &CreateTableOptions {
+                    mode,
                     temporary: cmd.temporary,
                 },
                 input,
@@ -279,7 +296,11 @@ mod tests {
             (name == "foreign").then(|| self.catalog.clone())
         }
 
-        fn create(&self, _name: &str) -> Result<Arc<dyn SedonaCatalog>> {
+        fn create(
+            &self,
+            _name: &str,
+            _options: &CreateCatalogOptions,
+        ) -> Result<Arc<dyn SedonaCatalog>> {
             datafusion_common::not_impl_err!("not needed by drop tests")
         }
     }
@@ -298,7 +319,11 @@ mod tests {
             (name == "public").then(|| self.schema.clone())
         }
 
-        fn create(&self, _name: &str) -> Result<Arc<dyn SedonaSchema>> {
+        fn create(
+            &self,
+            _name: &str,
+            _options: &CreateSchemaOptions,
+        ) -> Result<Arc<dyn SedonaSchema>> {
             datafusion_common::not_impl_err!("not needed by drop tests")
         }
 

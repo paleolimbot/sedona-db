@@ -29,7 +29,7 @@ use datafusion::datasource::TableProvider;
 use datafusion::error::Result;
 use datafusion::execution::context::SessionState;
 use parking_lot::RwLock;
-use sedona_catalog::{DataFusionCatalog, SedonaCatalog, SedonaCatalogList};
+use sedona_catalog::{CreateCatalogOptions, DataFusionCatalog, SedonaCatalog, SedonaCatalogList};
 
 /// Owns the catalog composition for a Sedona session.
 ///
@@ -83,9 +83,13 @@ impl SedonaCatalogRegistry {
     ///
     /// `None` means that no foreign catalog list is installed and the caller
     /// should delegate the operation to DataFusion.
-    pub fn create_foreign_catalog(&self, name: &str) -> Option<Result<Arc<dyn SedonaCatalog>>> {
+    pub fn create_foreign_catalog(
+        &self,
+        name: &str,
+        options: &CreateCatalogOptions,
+    ) -> Option<Result<Arc<dyn SedonaCatalog>>> {
         let catalogs = self.foreign.read().last().cloned()?;
-        Some(catalogs.create(name))
+        Some(catalogs.create(name, options))
     }
 }
 

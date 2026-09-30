@@ -518,8 +518,9 @@ struct SedonaCSchemaProvider {
 
   /// \brief Create a table from `plan`, taking ownership of the input plan
   ///
-  /// `options` contains a JSON object with a `temporary` boolean and may be NULL
-  /// when `options_len` is zero.
+  /// `options` contains a JSON object with a `mode` string (`"create"`,
+  /// `"create_or_ignore"`, or `"replace"`) and a `temporary` boolean and may
+  /// be NULL when `options_len` is zero.
   /// The returned execution plan performs the create operation when executed.
   int (*create_table)(const struct SedonaCSchemaProvider* self, const char* name,
                       const uint8_t* options, size_t options_len,
@@ -565,7 +566,12 @@ struct SedonaCCatalogProvider {
                 struct SedonaCSchemaProvider* out, struct SedonaCError* err);
 
   /// \brief Create a schema and return it
+  ///
+  /// `options` contains a JSON object with a `mode` string (`"create"`,
+  /// `"create_or_ignore"`, or `"replace"`) and may be NULL when `options_len`
+  /// is zero.
   int (*create_schema)(const struct SedonaCCatalogProvider* self, const char* name,
+                       const uint8_t* options, size_t options_len,
                        struct SedonaCSchemaProvider* out, struct SedonaCError* err);
 
   /// \brief Drop a schema by name
@@ -606,7 +612,12 @@ struct SedonaCCatalogProviderList {
                  struct SedonaCCatalogProvider* out, struct SedonaCError* err);
 
   /// \brief Create a catalog and return it
+  ///
+  /// `options` contains a JSON object with a `mode` string (`"create"`,
+  /// `"create_or_ignore"`, or `"replace"`) and may be NULL when `options_len`
+  /// is zero.
   int (*create_catalog)(const struct SedonaCCatalogProviderList* self, const char* name,
+                        const uint8_t* options, size_t options_len,
                         struct SedonaCCatalogProvider* out, struct SedonaCError* err);
 
   /// \brief Reserved for future use. Must be NULL.

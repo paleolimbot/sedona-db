@@ -509,10 +509,13 @@ pub struct SedonaCCatalogProviderList {
         ) -> c_int,
     >,
     /// Create a catalog and return it.
+    /// `options` is a JSON-encoded [`sedona_catalog::CreateCatalogOptions`].
     pub create_catalog: Option<
         unsafe extern "C" fn(
             self_: *const SedonaCCatalogProviderList,
             name: *const c_char,
+            options: *const u8,
+            options_len: usize,
             out: *mut SedonaCCatalogProvider,
             err: *mut SedonaCError,
         ) -> c_int,
@@ -567,10 +570,13 @@ pub struct SedonaCCatalogProvider {
         ) -> c_int,
     >,
     /// Create a schema and return it.
+    /// `options` is a JSON-encoded [`sedona_catalog::CreateSchemaOptions`].
     pub create_schema: Option<
         unsafe extern "C" fn(
             self_: *const SedonaCCatalogProvider,
             name: *const c_char,
+            options: *const u8,
+            options_len: usize,
             out: *mut SedonaCSchemaProvider,
             err: *mut SedonaCError,
         ) -> c_int,
