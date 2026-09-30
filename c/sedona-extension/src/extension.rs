@@ -582,7 +582,8 @@ pub struct SedonaCCatalogProvider {
         ) -> c_int,
     >,
     /// Build a plan that drops a schema when executed.
-    /// `options` is a JSON-encoded [`sedona_catalog::DropSchemaOptions`].
+    /// `options` is a JSON-encoded [`sedona_catalog::DropSchemaOptions`],
+    /// including execution-time `if_exists` behavior.
     pub drop_schema: Option<
         unsafe extern "C" fn(
             self_: *const SedonaCCatalogProvider,
@@ -659,7 +660,8 @@ pub struct SedonaCSchemaProvider {
         ) -> c_int,
     >,
     /// Build a plan that drops a table when executed.
-    /// `options` is a JSON-encoded [`sedona_catalog::DropTableOptions`].
+    /// `options` is a JSON-encoded [`sedona_catalog::DropTableOptions`],
+    /// including execution-time `if_exists` behavior.
     pub drop_table: Option<
         unsafe extern "C" fn(
             self_: *const SedonaCSchemaProvider,

@@ -80,6 +80,8 @@ pub struct CreateTableOptions {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct DropSchemaOptions {
+    /// Whether a missing schema should be ignored when the drop plan executes.
+    pub if_exists: bool,
     /// Whether objects contained by the schema should also be dropped.
     pub cascade: bool,
 }
@@ -98,6 +100,8 @@ pub enum CatalogObjectType {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct DropTableOptions {
+    /// Whether a missing object should be ignored when the drop plan executes.
+    pub if_exists: bool,
     /// The expected kind of object, or `None` when the caller cannot distinguish it.
     ///
     /// Implementations should not drop an object whose kind does not match.
@@ -110,10 +114,10 @@ pub struct DropTableOptions {
 /// A collection of catalogs backed by a SedonaDB extension.
 pub trait SedonaCatalogList: Debug + Send + Sync {
     /// Return the names of the catalogs in this list.
-    fn catalog_names(&self) -> Vec<String>;
+    fn catalog_names(&self) -> Result<Vec<String>>;
 
     /// Return the catalog named `name`, or `None` when it does not exist.
-    fn catalog(&self, name: &str) -> Option<Arc<dyn SedonaCatalog>>;
+    fn catalog(&self, name: &str) -> Result<Option<Arc<dyn SedonaCatalog>>>;
 
     /// Create a catalog in the backing catalog system.
     fn create(&self, name: &str, options: &CreateCatalogOptions) -> Result<Arc<dyn SedonaCatalog>>;
@@ -122,10 +126,10 @@ pub trait SedonaCatalogList: Debug + Send + Sync {
 /// A collection of schemas backed by a SedonaDB extension.
 pub trait SedonaCatalog: Debug + Send + Sync {
     /// Return the names of the schemas in this catalog.
-    fn schema_names(&self) -> Vec<String>;
+    fn schema_names(&self) -> Result<Vec<String>>;
 
     /// Return the schema named `name`, or `None` when it does not exist.
-    fn schema(&self, name: &str) -> Option<Arc<dyn SedonaSchema>>;
+    fn schema(&self, name: &str) -> Result<Option<Arc<dyn SedonaSchema>>>;
 
     /// Create a schema in the backing catalog system.
     fn create(&self, name: &str, options: &CreateSchemaOptions) -> Result<Arc<dyn SedonaSchema>>;
@@ -133,7 +137,8 @@ pub trait SedonaCatalog: Debug + Send + Sync {
     /// Build a plan that drops a schema from the backing catalog system.
     ///
     /// Returns `None` when the schema does not exist. The returned plan performs
-    /// the drop operation when it is executed.
+    /// the drop operation when it is executed and must apply
+    /// [`DropSchemaOptions::if_exists`] at execution time.
     fn drop_schema(
         &self,
         name: &str,
@@ -145,12 +150,12 @@ pub trait SedonaCatalog: Debug + Send + Sync {
 #[async_trait]
 pub trait SedonaSchema: Debug + Send + Sync {
     /// Return the name of the schema owner, when one is available.
-    fn owner_name(&self) -> Option<&str> {
-        None
+    fn owner_name(&self) -> Result<Option<&str>> {
+        Ok(None)
     }
 
     /// Return the names of the tables in this schema.
-    fn table_names(&self) -> Vec<String>;
+    fn table_names(&self) -> Result<Vec<String>>;
 
     /// Return the table named `name`, or `None` when it does not exist.
     async fn table(&self, name: &str) -> Result<Option<Arc<dyn TableProvider>>>;
@@ -169,7 +174,8 @@ pub trait SedonaSchema: Debug + Send + Sync {
     /// Build a plan that drops a table from the backing catalog system.
     ///
     /// Returns `None` when the table does not exist. The returned plan performs
-    /// the drop operation when it is executed.
+    /// the drop operation when it is executed and must apply
+    /// [`DropTableOptions::if_exists`] at execution time.
     fn drop_table(
         &self,
         name: &str,
@@ -177,5 +183,5 @@ pub trait SedonaSchema: Debug + Send + Sync {
     ) -> Result<Option<Arc<dyn ExecutionPlan>>>;
 
     /// Return whether a table named `name` exists in this schema.
-    fn table_exist(&self, name: &str) -> bool;
+    fn table_exist(&self, name: &str) -> Result<bool>;
 }

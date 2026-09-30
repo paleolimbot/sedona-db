@@ -66,17 +66,24 @@ impl SedonaCatalogRegistry {
     }
 
     /// Find a catalog owned by a foreign catalog list.
-    pub fn foreign_catalog(&self, name: &str) -> Option<Arc<dyn SedonaCatalog>> {
-        self.foreign
-            .read()
-            .iter()
-            .rev()
-            .find_map(|catalogs| catalogs.catalog(name))
+    pub fn foreign_catalog(&self, name: &str) -> Result<Option<Arc<dyn SedonaCatalog>>> {
+        let foreign = self.foreign.read().clone();
+        for catalogs in foreign.iter().rev() {
+            if let Some(catalog) = catalogs.catalog(name)? {
+                return Ok(Some(catalog));
+            }
+        }
+        Ok(None)
     }
 
     /// Return whether at least one foreign catalog list is registered.
     pub fn has_foreign_catalog_list(&self) -> bool {
         !self.foreign.read().is_empty()
+    }
+
+    /// Return whether either a foreign or built-in catalog has this name.
+    pub fn catalog_exists(&self, name: &str) -> Result<bool> {
+        Ok(self.foreign_catalog(name)?.is_some() || self.fallback.catalog(name).is_some())
     }
 
     /// Create a catalog in the most recently registered foreign catalog list.
@@ -108,15 +115,19 @@ impl CatalogProviderList for SedonaCatalogRegistry {
             .read()
             .iter()
             .rev()
-            .flat_map(|catalogs| catalogs.catalog_names())
+            .flat_map(|catalogs| catalogs.catalog_names().unwrap_or_default())
             .chain(self.fallback.catalog_names())
             .filter(|name| seen.insert(name.clone()))
             .collect()
     }
 
     fn catalog(&self, name: &str) -> Option<Arc<dyn CatalogProvider>> {
-        if let Some(catalog) = self.foreign_catalog(name) {
-            return Some(Arc::new(DataFusionCatalog::new(catalog)));
+        match self.foreign_catalog(name) {
+            Ok(Some(catalog)) => return Some(Arc::new(DataFusionCatalog::new(catalog))),
+            Ok(None) => {}
+            Err(error) => {
+                return Some(Arc::new(DataFusionCatalog::new_error(error.to_string())));
+            }
         }
 
         let catalog = self.fallback.catalog(name)?;
@@ -231,6 +242,28 @@ mod tests {
     use super::*;
 
     use datafusion::{catalog::SchemaProvider, datasource::listing::ListingTableUrl};
+    use sedona_catalog::{CreateCatalogOptions, SedonaCatalogList};
+
+    #[derive(Debug)]
+    struct FailingCatalogList;
+
+    impl SedonaCatalogList for FailingCatalogList {
+        fn catalog_names(&self) -> Result<Vec<String>> {
+            Ok(vec!["datafusion".to_owned()])
+        }
+
+        fn catalog(&self, _name: &str) -> Result<Option<Arc<dyn SedonaCatalog>>> {
+            datafusion_common::exec_err!("foreign catalog lookup failed")
+        }
+
+        fn create(
+            &self,
+            _name: &str,
+            _options: &CreateCatalogOptions,
+        ) -> Result<Arc<dyn SedonaCatalog>> {
+            datafusion_common::not_impl_err!("not needed by lookup test")
+        }
+    }
 
     fn setup_context() -> (SedonaContext, Arc<dyn SchemaProvider>) {
         let ctx = SedonaContext::new();
@@ -279,6 +312,19 @@ mod tests {
         // The store must be configured for this domain
         let expected_domain = format!("Domain(\"{domain}\")");
         assert!(format!("{store:?}").contains(&expected_domain));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn foreign_lookup_error_does_not_fall_back_to_builtin_catalog() -> Result<()> {
+        let ctx = SedonaContext::new();
+        ctx.register_catalog_list(Arc::new(FailingCatalogList));
+
+        let catalog = ctx.ctx.catalog("datafusion").unwrap();
+        let schema = catalog.schema("public").unwrap();
+        let error = schema.table("any_table").await.unwrap_err();
+        assert!(error.to_string().contains("foreign catalog lookup failed"));
 
         Ok(())
     }

@@ -75,7 +75,7 @@ pub(crate) async fn execute_sedona_catalog_ddl(
             if !catalogs.has_foreign_catalog_list() {
                 return Ok(None);
             }
-            if ctx.ctx.catalog(&cmd.catalog_name).is_some() {
+            if catalogs.catalog_exists(&cmd.catalog_name)? {
                 if cmd.if_not_exists {
                     return Ok(Some(ctx.ctx.read_empty()?));
                 }
@@ -108,10 +108,10 @@ pub(crate) async fn execute_sedona_catalog_ddl(
                 [catalog, schema] => ((*catalog).to_string(), (*schema).to_string()),
                 _ => return Ok(None),
             };
-            let Some(catalog) = ctx.catalog_registry().foreign_catalog(&catalog_name) else {
+            let Some(catalog) = ctx.catalog_registry().foreign_catalog(&catalog_name)? else {
                 return Ok(None);
             };
-            if catalog.schema(&schema_name).is_some() {
+            if catalog.schema(&schema_name)?.is_some() {
                 if cmd.if_not_exists {
                     return Ok(Some(ctx.ctx.read_empty()?));
                 }
@@ -136,10 +136,10 @@ pub(crate) async fn execute_sedona_catalog_ddl(
                 &catalog_options.default_catalog,
                 &catalog_options.default_schema,
             );
-            let Some(catalog) = ctx.catalog_registry().foreign_catalog(&resolved.catalog) else {
+            let Some(catalog) = ctx.catalog_registry().foreign_catalog(&resolved.catalog)? else {
                 return Ok(None);
             };
-            let Some(schema) = catalog.schema(&resolved.schema) else {
+            let Some(schema) = catalog.schema(&resolved.schema)? else {
                 return Ok(None);
             };
 
@@ -149,7 +149,7 @@ pub(crate) async fn execute_sedona_catalog_ddl(
                 (false, true) => CreateMode::Replace,
                 (false, false) => CreateMode::Create,
             };
-            match (mode, schema.table_exist(&resolved.table)) {
+            match (mode, schema.table_exist(&resolved.table)?) {
                 (CreateMode::CreateOrIgnore, true) => {
                     return Ok(Some(ctx.ctx.read_empty()?));
                 }
@@ -185,7 +185,23 @@ pub(crate) async fn execute_sedona_catalog_ddl(
             }))?))
         }
         DdlStatement::CreateMemoryTable(cmd) => {
-            if targets_foreign_catalog(ctx, &cmd.name) {
+            let state = ctx.ctx.state();
+            let catalog_options = &state.config_options().catalog;
+            let resolved = cmd.name.clone().resolve(
+                &catalog_options.default_catalog,
+                &catalog_options.default_schema,
+            );
+            if let Some(catalog) = ctx.catalog_registry().foreign_catalog(&resolved.catalog)? {
+                if cmd.if_not_exists && cmd.or_replace {
+                    return exec_err!("'IF NOT EXISTS' cannot coexist with 'REPLACE'");
+                }
+                if cmd.if_not_exists {
+                    if let Some(schema) = catalog.schema(&resolved.schema)? {
+                        if schema.table_exist(&resolved.table)? {
+                            return Ok(Some(ctx.ctx.read_empty()?));
+                        }
+                    }
+                }
                 return exec_err!(
                     "CREATE TABLE AS is not supported for foreign table '{}'; use CREATE EXTERNAL TABLE instead",
                     cmd.name
@@ -194,7 +210,7 @@ pub(crate) async fn execute_sedona_catalog_ddl(
             Ok(None)
         }
         DdlStatement::CreateView(cmd) => {
-            if targets_foreign_catalog(ctx, &cmd.name) {
+            if targets_foreign_catalog(ctx, &cmd.name)? {
                 return exec_err!(
                     "Creating views is not supported for foreign view '{}'",
                     cmd.name
@@ -213,6 +229,7 @@ pub(crate) async fn execute_sedona_catalog_ddl(
             &cmd.name,
             cmd.if_exists,
             &DropSchemaOptions {
+                if_exists: cmd.if_exists,
                 cascade: cmd.cascade,
             },
         ),
@@ -220,16 +237,17 @@ pub(crate) async fn execute_sedona_catalog_ddl(
     }
 }
 
-fn targets_foreign_catalog(ctx: &SedonaContext, name: &TableReference) -> bool {
+fn targets_foreign_catalog(ctx: &SedonaContext, name: &TableReference) -> Result<bool> {
     let state = ctx.ctx.state();
     let catalog_options = &state.config_options().catalog;
     let resolved = name.clone().resolve(
         &catalog_options.default_catalog,
         &catalog_options.default_schema,
     );
-    ctx.catalog_registry()
-        .foreign_catalog(&resolved.catalog)
-        .is_some()
+    Ok(ctx
+        .catalog_registry()
+        .foreign_catalog(&resolved.catalog)?
+        .is_some())
 }
 
 fn drop_foreign_object(
@@ -244,13 +262,14 @@ fn drop_foreign_object(
         &catalog_options.default_catalog,
         &catalog_options.default_schema,
     );
-    let Some(catalog) = ctx.catalog_registry().foreign_catalog(&resolved.catalog) else {
+    let Some(catalog) = ctx.catalog_registry().foreign_catalog(&resolved.catalog)? else {
         return Ok(None);
     };
-    let drop_plan = match catalog.schema(&resolved.schema) {
+    let drop_plan = match catalog.schema(&resolved.schema)? {
         Some(schema) => schema.drop_table(
             &resolved.table,
             &DropTableOptions {
+                if_exists,
                 object_type: Some(object_type),
                 purge: false,
             },
@@ -303,7 +322,7 @@ fn drop_foreign_schema_in_catalog(
     if_exists: bool,
     options: &DropSchemaOptions,
 ) -> Result<Option<DataFrame>, DataFusionError> {
-    let Some(catalog) = ctx.catalog_registry().foreign_catalog(catalog_name) else {
+    let Some(catalog) = ctx.catalog_registry().foreign_catalog(catalog_name)? else {
         return Ok(None);
     };
     if let Some(plan) = catalog.drop_schema(name.schema_name(), options)? {
@@ -374,13 +393,15 @@ mod tests {
 
     use super::*;
 
+    type DropAction = Box<dyn FnOnce() -> Result<()> + Send>;
+
     struct DropTestExec {
         inner: Arc<dyn ExecutionPlan>,
-        drop_action: Mutex<Option<Box<dyn FnOnce() + Send>>>,
+        drop_action: Mutex<Option<DropAction>>,
     }
 
     impl DropTestExec {
-        fn new(drop_action: impl FnOnce() + Send + 'static) -> Self {
+        fn new(drop_action: impl FnOnce() -> Result<()> + Send + 'static) -> Self {
             Self {
                 inner: Arc::new(EmptyExec::new(Arc::new(Schema::empty()))),
                 drop_action: Mutex::new(Some(Box::new(drop_action))),
@@ -433,7 +454,7 @@ mod tests {
             context: Arc<TaskContext>,
         ) -> Result<SendableRecordBatchStream> {
             if let Some(drop_action) = self.drop_action.lock().unwrap().take() {
-                drop_action();
+                drop_action()?;
             }
             self.inner.execute(partition, context)
         }
@@ -445,12 +466,12 @@ mod tests {
     }
 
     impl SedonaCatalogList for DropTestCatalogList {
-        fn catalog_names(&self) -> Vec<String> {
-            vec!["foreign".to_owned()]
+        fn catalog_names(&self) -> Result<Vec<String>> {
+            Ok(vec!["foreign".to_owned()])
         }
 
-        fn catalog(&self, name: &str) -> Option<Arc<dyn SedonaCatalog>> {
-            (name == "foreign").then(|| self.catalog.clone())
+        fn catalog(&self, name: &str) -> Result<Option<Arc<dyn SedonaCatalog>>> {
+            Ok((name == "foreign").then(|| self.catalog.clone()))
         }
 
         fn create(
@@ -469,16 +490,19 @@ mod tests {
     }
 
     impl SedonaCatalog for DropTestCatalog {
-        fn schema_names(&self) -> Vec<String> {
-            self.schema_exists
-                .load(Ordering::SeqCst)
-                .then(|| vec!["public".to_owned()])
-                .unwrap_or_default()
+        fn schema_names(&self) -> Result<Vec<String>> {
+            if self.schema_exists.load(Ordering::SeqCst) {
+                Ok(vec!["public".to_owned()])
+            } else {
+                Ok(Vec::new())
+            }
         }
 
-        fn schema(&self, name: &str) -> Option<Arc<dyn SedonaSchema>> {
-            (name == "public" && self.schema_exists.load(Ordering::SeqCst))
-                .then(|| self.schema.clone())
+        fn schema(&self, name: &str) -> Result<Option<Arc<dyn SedonaSchema>>> {
+            Ok(
+                (name == "public" && self.schema_exists.load(Ordering::SeqCst))
+                    .then(|| self.schema.clone()),
+            )
         }
 
         fn create(
@@ -501,8 +525,13 @@ mod tests {
                 return datafusion_common::exec_err!("public must be dropped with cascade");
             }
             let schema_exists = self.schema_exists.clone();
+            let if_exists = options.if_exists;
             Ok(Some(Arc::new(DropTestExec::new(move || {
-                schema_exists.store(false, Ordering::SeqCst);
+                let existed = schema_exists.swap(false, Ordering::SeqCst);
+                if !existed && !if_exists {
+                    return datafusion_common::exec_err!("public no longer exists");
+                }
+                Ok(())
             }))))
         }
     }
@@ -515,8 +544,8 @@ mod tests {
 
     #[async_trait]
     impl SedonaSchema for DropTestSchema {
-        fn table_names(&self) -> Vec<String> {
-            self.objects.lock().unwrap().keys().cloned().collect()
+        fn table_names(&self) -> Result<Vec<String>> {
+            Ok(self.objects.lock().unwrap().keys().cloned().collect())
         }
 
         async fn table(&self, _name: &str) -> Result<Option<Arc<dyn TableProvider>>> {
@@ -549,13 +578,18 @@ mod tests {
             drop(objects);
             let objects = self.objects.clone();
             let name = name.to_owned();
+            let if_exists = options.if_exists;
             Ok(Some(Arc::new(DropTestExec::new(move || {
-                objects.lock().unwrap().remove(&name);
+                let removed = objects.lock().unwrap().remove(&name);
+                if removed.is_none() && !if_exists {
+                    return datafusion_common::exec_err!("{name} no longer exists");
+                }
+                Ok(())
             }))))
         }
 
-        fn table_exist(&self, name: &str) -> bool {
-            self.objects.lock().unwrap().contains_key(name)
+        fn table_exist(&self, name: &str) -> Result<bool> {
+            Ok(self.objects.lock().unwrap().contains_key(name))
         }
     }
 
@@ -576,33 +610,36 @@ mod tests {
         ctx.register_catalog_list(Arc::new(DropTestCatalogList { catalog }));
 
         let drop_table = ctx.sql("DROP TABLE foreign.public.table_one").await?;
-        assert!(schema.table_exist("table_one"));
+        assert!(schema.table_exist("table_one")?);
         drop_table.collect().await?;
-        assert!(!schema.table_exist("table_one"));
+        assert!(!schema.table_exist("table_one")?);
 
         let error = ctx
             .sql("DROP TABLE foreign.public.view_one")
             .await
             .unwrap_err();
         assert!(error.to_string().contains("doesn't exist"));
-        assert!(schema.table_exist("view_one"));
+        assert!(schema.table_exist("view_one")?);
 
         let drop_view = ctx.sql("DROP VIEW foreign.public.view_one").await?;
-        assert!(schema.table_exist("view_one"));
+        assert!(schema.table_exist("view_one")?);
         drop_view.collect().await?;
-        assert!(!schema.table_exist("view_one"));
+        assert!(!schema.table_exist("view_one")?);
         assert_eq!(
             *schema.received.lock().unwrap(),
             vec![
                 DropTableOptions {
+                    if_exists: false,
                     object_type: Some(CatalogObjectType::Table),
                     purge: false,
                 },
                 DropTableOptions {
+                    if_exists: false,
                     object_type: Some(CatalogObjectType::Table),
                     purge: false,
                 },
                 DropTableOptions {
+                    if_exists: false,
                     object_type: Some(CatalogObjectType::View),
                     purge: false,
                 },
@@ -628,9 +665,67 @@ mod tests {
         }));
 
         let drop_schema = ctx.sql("DROP SCHEMA foreign.public CASCADE").await?;
-        assert!(catalog.schema("public").is_some());
+        assert!(catalog.schema("public")?.is_some());
         drop_schema.collect().await?;
-        assert!(catalog.schema("public").is_none());
+        assert!(catalog.schema("public")?.is_none());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn foreign_drop_if_exists_is_preserved_until_execution() -> Result<()> {
+        let schema = Arc::new(DropTestSchema {
+            objects: Arc::new(Mutex::new(HashMap::from([(
+                "table_one".to_owned(),
+                CatalogObjectType::Table,
+            )]))),
+            received: Mutex::new(Vec::new()),
+        });
+        let catalog = Arc::new(DropTestCatalog {
+            schema: schema.clone(),
+            schema_exists: Arc::new(AtomicBool::new(true)),
+        });
+        let ctx = SedonaContext::new();
+        ctx.register_catalog_list(Arc::new(DropTestCatalogList {
+            catalog: catalog.clone(),
+        }));
+
+        let drop_table = ctx
+            .sql("DROP TABLE IF EXISTS foreign.public.table_one")
+            .await?;
+        schema.objects.lock().unwrap().remove("table_one");
+        drop_table.collect().await?;
+        assert!(schema.received.lock().unwrap()[0].if_exists);
+
+        let drop_schema = ctx
+            .sql("DROP SCHEMA IF EXISTS foreign.public CASCADE")
+            .await?;
+        catalog.schema_exists.store(false, Ordering::SeqCst);
+        drop_schema.collect().await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn foreign_drop_without_if_exists_errors_when_object_disappears() -> Result<()> {
+        let schema = Arc::new(DropTestSchema {
+            objects: Arc::new(Mutex::new(HashMap::from([(
+                "table_one".to_owned(),
+                CatalogObjectType::Table,
+            )]))),
+            received: Mutex::new(Vec::new()),
+        });
+        let catalog: Arc<dyn SedonaCatalog> = Arc::new(DropTestCatalog {
+            schema: schema.clone(),
+            schema_exists: Arc::new(AtomicBool::new(true)),
+        });
+        let ctx = SedonaContext::new();
+        ctx.register_catalog_list(Arc::new(DropTestCatalogList { catalog }));
+
+        let drop_table = ctx.sql("DROP TABLE foreign.public.table_one").await?;
+        schema.objects.lock().unwrap().remove("table_one");
+        let error = drop_table.collect().await.unwrap_err();
+        assert!(error.to_string().contains("no longer exists"));
 
         Ok(())
     }
@@ -651,6 +746,12 @@ mod tests {
         let ctx = SedonaContext::new();
         ctx.register_catalog_list(Arc::new(DropTestCatalogList { catalog }));
 
+        ctx.sql("CREATE TABLE IF NOT EXISTS foreign.public.table_one AS SELECT 1")
+            .await?
+            .collect()
+            .await?;
+        assert!(schema.table_exist("table_one")?);
+
         let table_error = ctx
             .sql("CREATE OR REPLACE TABLE foreign.public.table_one AS SELECT 1")
             .await
@@ -658,7 +759,7 @@ mod tests {
         assert!(table_error
             .to_string()
             .contains("use CREATE EXTERNAL TABLE instead"));
-        assert!(schema.table_exist("table_one"));
+        assert!(schema.table_exist("table_one")?);
 
         let view_error = ctx
             .sql("CREATE OR REPLACE VIEW foreign.public.view_one AS SELECT 1")
@@ -667,7 +768,7 @@ mod tests {
         assert!(view_error
             .to_string()
             .contains("Creating views is not supported"));
-        assert!(schema.table_exist("view_one"));
+        assert!(schema.table_exist("view_one")?);
         assert!(schema.received.lock().unwrap().is_empty());
 
         Ok(())

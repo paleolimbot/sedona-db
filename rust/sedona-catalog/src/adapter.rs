@@ -20,7 +20,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use datafusion_catalog::{CatalogProvider, CatalogProviderList, SchemaProvider, TableProvider};
-use datafusion_common::{Result, not_impl_err};
+use datafusion_common::{Result, exec_err, not_impl_err};
 
 use crate::{SedonaCatalog, SedonaCatalogList, SedonaSchema};
 
@@ -62,50 +62,81 @@ impl CatalogProviderList for DataFusionCatalogList {
     }
 
     fn catalog_names(&self) -> Vec<String> {
-        self.inner.catalog_names()
+        // DataFusion has no error channel for listing catalogs. Named catalog
+        // lookups preserve errors through an error-backed provider below.
+        self.inner.catalog_names().unwrap_or_default()
     }
 
     fn catalog(&self, name: &str) -> Option<Arc<dyn CatalogProvider>> {
-        self.inner
-            .catalog(name)
-            .map(|catalog| Arc::new(DataFusionCatalog::new(catalog)) as _)
+        match self.inner.catalog(name) {
+            Ok(Some(catalog)) => Some(Arc::new(DataFusionCatalog::new(catalog))),
+            Ok(None) => None,
+            Err(error) => Some(Arc::new(DataFusionCatalog::new_error(error.to_string()))),
+        }
     }
+}
+
+enum DataFusionCatalogInner {
+    Catalog(Arc<dyn SedonaCatalog>),
+    Error(String),
 }
 
 /// Exposes a [`crate::SedonaCatalog`] to DataFusion's read-side catalog API.
 pub struct DataFusionCatalog {
-    inner: Arc<dyn SedonaCatalog>,
+    inner: DataFusionCatalogInner,
 }
 
 impl DataFusionCatalog {
     /// Create an adapter over a Sedona catalog.
     pub fn new(inner: Arc<dyn SedonaCatalog>) -> Self {
-        Self { inner }
+        Self {
+            inner: DataFusionCatalogInner::Catalog(inner),
+        }
     }
 
-    /// Return the wrapped Sedona catalog.
-    pub fn inner(&self) -> &Arc<dyn SedonaCatalog> {
-        &self.inner
+    /// Return the wrapped Sedona catalog, or `None` for an error-backed adapter.
+    pub fn inner(&self) -> Option<&Arc<dyn SedonaCatalog>> {
+        match &self.inner {
+            DataFusionCatalogInner::Catalog(inner) => Some(inner),
+            DataFusionCatalogInner::Error(_) => None,
+        }
+    }
+
+    /// Create an adapter that surfaces a failed catalog lookup from table access.
+    pub fn new_error(error: impl Into<String>) -> Self {
+        Self {
+            inner: DataFusionCatalogInner::Error(error.into()),
+        }
     }
 }
 
 impl Debug for DataFusionCatalog {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DataFusionCatalog")
-            .field("inner", &self.inner)
+            .field("inner", &self.inner())
             .finish()
     }
 }
 
 impl CatalogProvider for DataFusionCatalog {
     fn schema_names(&self) -> Vec<String> {
-        self.inner.schema_names()
+        match &self.inner {
+            DataFusionCatalogInner::Catalog(inner) => inner.schema_names().unwrap_or_default(),
+            DataFusionCatalogInner::Error(_) => Vec::new(),
+        }
     }
 
     fn schema(&self, name: &str) -> Option<Arc<dyn SchemaProvider>> {
-        self.inner
-            .schema(name)
-            .map(|schema| Arc::new(DataFusionSchema::new(schema)) as _)
+        match &self.inner {
+            DataFusionCatalogInner::Catalog(inner) => match inner.schema(name) {
+                Ok(Some(schema)) => Some(Arc::new(DataFusionSchema::new(schema))),
+                Ok(None) => None,
+                Err(error) => Some(Arc::new(DataFusionSchema::new_error(error.to_string()))),
+            },
+            DataFusionCatalogInner::Error(error) => {
+                Some(Arc::new(DataFusionSchema::new_error(error.clone())))
+            }
+        }
     }
 
     fn register_schema(
@@ -129,27 +160,44 @@ impl CatalogProvider for DataFusionCatalog {
     }
 }
 
+enum DataFusionSchemaInner {
+    Schema(Arc<dyn SedonaSchema>),
+    Error(String),
+}
+
 /// Exposes a [`crate::SedonaSchema`] to DataFusion's read-side catalog API.
 pub struct DataFusionSchema {
-    inner: Arc<dyn SedonaSchema>,
+    inner: DataFusionSchemaInner,
 }
 
 impl DataFusionSchema {
     /// Create an adapter over a Sedona schema.
     pub fn new(inner: Arc<dyn SedonaSchema>) -> Self {
-        Self { inner }
+        Self {
+            inner: DataFusionSchemaInner::Schema(inner),
+        }
     }
 
-    /// Return the wrapped Sedona schema.
-    pub fn inner(&self) -> &Arc<dyn SedonaSchema> {
-        &self.inner
+    /// Return the wrapped Sedona schema, or `None` for an error-backed adapter.
+    pub fn inner(&self) -> Option<&Arc<dyn SedonaSchema>> {
+        match &self.inner {
+            DataFusionSchemaInner::Schema(inner) => Some(inner),
+            DataFusionSchemaInner::Error(_) => None,
+        }
+    }
+
+    /// Create an adapter that returns a failed schema lookup from table access.
+    pub fn new_error(error: impl Into<String>) -> Self {
+        Self {
+            inner: DataFusionSchemaInner::Error(error.into()),
+        }
     }
 }
 
 impl Debug for DataFusionSchema {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DataFusionSchema")
-            .field("inner", &self.inner)
+            .field("inner", &self.inner())
             .finish()
     }
 }
@@ -157,15 +205,26 @@ impl Debug for DataFusionSchema {
 #[async_trait]
 impl SchemaProvider for DataFusionSchema {
     fn owner_name(&self) -> Option<&str> {
-        self.inner.owner_name()
+        match &self.inner {
+            DataFusionSchemaInner::Schema(inner) => inner.owner_name().ok().flatten(),
+            DataFusionSchemaInner::Error(_) => None,
+        }
     }
 
     fn table_names(&self) -> Vec<String> {
-        self.inner.table_names()
+        match &self.inner {
+            DataFusionSchemaInner::Schema(inner) => inner.table_names().unwrap_or_default(),
+            DataFusionSchemaInner::Error(_) => Vec::new(),
+        }
     }
 
     async fn table(&self, name: &str) -> Result<Option<Arc<dyn TableProvider>>> {
-        self.inner.table(name).await
+        match &self.inner {
+            DataFusionSchemaInner::Schema(inner) => inner.table(name).await,
+            DataFusionSchemaInner::Error(error) => {
+                exec_err!("Foreign catalog lookup failed: {error}")
+            }
+        }
     }
 
     fn register_table(
@@ -183,6 +242,9 @@ impl SchemaProvider for DataFusionSchema {
     }
 
     fn table_exist(&self, name: &str) -> bool {
-        self.inner.table_exist(name)
+        match &self.inner {
+            DataFusionSchemaInner::Schema(inner) => inner.table_exist(name).unwrap_or(false),
+            DataFusionSchemaInner::Error(_) => false,
+        }
     }
 }

@@ -109,7 +109,7 @@ unsafe extern "C" fn c_catalog_list_property(
 ) -> c_int {
     let exported = &*((*self_).private_data as *const ExportedCatalogProviderList);
     match cstr_from_ptr_or_empty(property).as_ref() {
-        "catalog_names" => write_json_property(&exported.inner.catalog_names(), out, err),
+        "catalog_names" => write_json_result_property(exported.inner.catalog_names(), out, err),
         property => {
             set_ffi_error!(err, "Unknown catalog list property: {}", property);
             libc::EINVAL
@@ -121,18 +121,20 @@ unsafe extern "C" fn c_catalog_list_catalog(
     self_: *const SedonaCCatalogProviderList,
     name: *const c_char,
     out: *mut SedonaCCatalogProvider,
-    _err: *mut SedonaCError,
+    err: *mut SedonaCError,
 ) -> c_int {
     let exported = &*((*self_).private_data as *const ExportedCatalogProviderList);
-    let result = exported
-        .inner
-        .catalog(&cstr_from_ptr_or_empty(name))
-        .map(|inner| {
+    let result = match exported.inner.catalog(&cstr_from_ptr_or_empty(name)) {
+        Ok(result) => result.map(|inner| {
             ExportedCatalogProvider::new(inner, exported.session.clone(), exported.runtime.clone())
                 .into()
-        })
-        .unwrap_or_default();
-    std::ptr::write(out, result);
+        }),
+        Err(error) => {
+            set_ffi_error!(err, "{}", error);
+            return libc::EINVAL;
+        }
+    };
+    std::ptr::write(out, result.unwrap_or_default());
     ERRNO_OK
 }
 
@@ -281,12 +283,12 @@ impl ImportedCatalogProviderList {
 }
 
 impl SedonaCatalogList for ImportedCatalogProviderList {
-    fn catalog_names(&self) -> Vec<String> {
-        self.try_catalog_names().unwrap_or_default()
+    fn catalog_names(&self) -> Result<Vec<String>> {
+        self.try_catalog_names()
     }
 
-    fn catalog(&self, name: &str) -> Option<Arc<dyn SedonaCatalog>> {
-        self.try_catalog(name).ok().flatten()
+    fn catalog(&self, name: &str) -> Result<Option<Arc<dyn SedonaCatalog>>> {
+        self.try_catalog(name)
     }
 
     fn create(&self, name: &str, options: &CreateCatalogOptions) -> Result<Arc<dyn SedonaCatalog>> {
@@ -357,7 +359,7 @@ unsafe extern "C" fn c_catalog_property(
 ) -> c_int {
     let exported = &*((*self_).private_data as *const ExportedCatalogProvider);
     match cstr_from_ptr_or_empty(property).as_ref() {
-        "schema_names" => write_json_property(&exported.inner.schema_names(), out, err),
+        "schema_names" => write_json_result_property(exported.inner.schema_names(), out, err),
         property => {
             set_ffi_error!(err, "Unknown catalog property: {}", property);
             libc::EINVAL
@@ -369,18 +371,20 @@ unsafe extern "C" fn c_catalog_schema(
     self_: *const SedonaCCatalogProvider,
     name: *const c_char,
     out: *mut SedonaCSchemaProvider,
-    _err: *mut SedonaCError,
+    err: *mut SedonaCError,
 ) -> c_int {
     let exported = &*((*self_).private_data as *const ExportedCatalogProvider);
-    let result = exported
-        .inner
-        .schema(&cstr_from_ptr_or_empty(name))
-        .map(|inner| {
+    let result = match exported.inner.schema(&cstr_from_ptr_or_empty(name)) {
+        Ok(result) => result.map(|inner| {
             ExportedSchemaProvider::new(inner, exported.session.clone(), exported.runtime.clone())
                 .into()
-        })
-        .unwrap_or_default();
-    std::ptr::write(out, result);
+        }),
+        Err(error) => {
+            set_ffi_error!(err, "{}", error);
+            return libc::EINVAL;
+        }
+    };
+    std::ptr::write(out, result.unwrap_or_default());
     ERRNO_OK
 }
 
@@ -570,11 +574,11 @@ impl ImportedCatalogProvider {
 }
 
 impl SedonaCatalog for ImportedCatalogProvider {
-    fn schema_names(&self) -> Vec<String> {
-        self.try_schema_names().unwrap_or_default()
+    fn schema_names(&self) -> Result<Vec<String>> {
+        self.try_schema_names()
     }
-    fn schema(&self, name: &str) -> Option<Arc<dyn SedonaSchema>> {
-        self.try_schema(name).ok().flatten()
+    fn schema(&self, name: &str) -> Result<Option<Arc<dyn SedonaSchema>>> {
+        self.try_schema(name)
     }
 
     fn create(&self, name: &str, options: &CreateSchemaOptions) -> Result<Arc<dyn SedonaSchema>> {
@@ -690,10 +694,12 @@ unsafe extern "C" fn c_schema_property(
 ) -> c_int {
     let exported = &*((*self_).private_data as *const ExportedSchemaProvider);
     match cstr_from_ptr_or_empty(property).as_ref() {
-        "owner_name" => write_json_property(&exported.inner.owner_name(), out, err),
-        "table_names" => write_json_property(&exported.inner.table_names(), out, err),
+        "owner_name" => write_json_result_property(exported.inner.owner_name(), out, err),
+        "table_names" => write_json_result_property(exported.inner.table_names(), out, err),
         "table_exist" => match parse_json_c_args::<TableExistArgs>(args) {
-            Ok(args) => write_json_property(&exported.inner.table_exist(&args.name), out, err),
+            Ok(args) => {
+                write_json_result_property(exported.inner.table_exist(&args.name), out, err)
+            }
             Err(error) => {
                 set_ffi_error!(err, "Failed to parse table_exist arguments: {}", error);
                 libc::EINVAL
@@ -968,11 +974,11 @@ impl ImportedSchemaProvider {
 
 #[async_trait]
 impl SedonaSchema for ImportedSchemaProvider {
-    fn owner_name(&self) -> Option<&str> {
-        self.owner_name.as_deref()
+    fn owner_name(&self) -> Result<Option<&str>> {
+        Ok(self.owner_name.as_deref())
     }
-    fn table_names(&self) -> Vec<String> {
-        self.try_table_names().unwrap_or_default()
+    fn table_names(&self) -> Result<Vec<String>> {
+        self.try_table_names()
     }
     async fn table(&self, name: &str) -> Result<Option<Arc<dyn TableProvider>>> {
         let callback = self.inner.table.expect("validated in try_new");
@@ -1022,8 +1028,22 @@ impl SedonaSchema for ImportedSchemaProvider {
         }
         optional_execution_plan(out)
     }
-    fn table_exist(&self, name: &str) -> bool {
-        self.try_table_exist(name).unwrap_or(false)
+    fn table_exist(&self, name: &str) -> Result<bool> {
+        self.try_table_exist(name)
+    }
+}
+
+unsafe fn write_json_result_property<T: Serialize>(
+    value: Result<T>,
+    out: *mut FFI_ArrowArray,
+    err: *mut SedonaCError,
+) -> c_int {
+    match value {
+        Ok(value) => write_json_property(&value, out, err),
+        Err(error) => {
+            set_ffi_error!(err, "{}", error);
+            libc::EINVAL
+        }
     }
 }
 
@@ -1190,12 +1210,12 @@ mod tests {
     }
 
     impl SedonaCatalogList for TestCatalogList {
-        fn catalog_names(&self) -> Vec<String> {
-            self.catalogs.read().unwrap().keys().cloned().collect()
+        fn catalog_names(&self) -> Result<Vec<String>> {
+            Ok(self.catalogs.read().unwrap().keys().cloned().collect())
         }
 
-        fn catalog(&self, name: &str) -> Option<Arc<dyn SedonaCatalog>> {
-            self.catalogs.read().unwrap().get(name).cloned()
+        fn catalog(&self, name: &str) -> Result<Option<Arc<dyn SedonaCatalog>>> {
+            Ok(self.catalogs.read().unwrap().get(name).cloned())
         }
 
         fn create(
@@ -1223,12 +1243,12 @@ mod tests {
     }
 
     impl SedonaCatalog for TestCatalog {
-        fn schema_names(&self) -> Vec<String> {
-            self.schemas.read().unwrap().keys().cloned().collect()
+        fn schema_names(&self) -> Result<Vec<String>> {
+            Ok(self.schemas.read().unwrap().keys().cloned().collect())
         }
 
-        fn schema(&self, name: &str) -> Option<Arc<dyn SedonaSchema>> {
-            self.schemas.read().unwrap().get(name).cloned()
+        fn schema(&self, name: &str) -> Result<Option<Arc<dyn SedonaSchema>>> {
+            Ok(self.schemas.read().unwrap().get(name).cloned())
         }
 
         fn create(
@@ -1277,8 +1297,8 @@ mod tests {
 
     #[async_trait]
     impl SedonaSchema for TestSchema {
-        fn table_names(&self) -> Vec<String> {
-            self.tables.read().unwrap().keys().cloned().collect()
+        fn table_names(&self) -> Result<Vec<String>> {
+            Ok(self.tables.read().unwrap().keys().cloned().collect())
         }
 
         async fn table(&self, name: &str) -> Result<Option<Arc<dyn TableProvider>>> {
@@ -1325,8 +1345,8 @@ mod tests {
             }))))
         }
 
-        fn table_exist(&self, name: &str) -> bool {
-            self.tables.read().unwrap().contains_key(name)
+        fn table_exist(&self, name: &str) -> Result<bool> {
+            Ok(self.tables.read().unwrap().contains_key(name))
         }
     }
 
@@ -1339,6 +1359,16 @@ mod tests {
         error: *mut SedonaCError,
     ) -> c_int {
         crate::extension::write_ffi_error(error, "catalog creation failed");
+        libc::EIO
+    }
+
+    unsafe extern "C" fn failing_catalog_lookup(
+        _self_: *const SedonaCCatalogProviderList,
+        _name: *const c_char,
+        _out: *mut SedonaCCatalogProvider,
+        error: *mut SedonaCError,
+    ) -> c_int {
+        crate::extension::write_ffi_error(error, "catalog lookup failed");
         libc::EIO
     }
 
@@ -1450,15 +1480,15 @@ mod tests {
     #[test]
     fn round_trips_the_catalog_hierarchy() {
         let (catalogs, consumer_session, runtime, _producer_runtime) = round_trip();
-        assert_eq!(catalogs.catalog_names(), vec!["catalog_one"]);
+        assert_eq!(catalogs.catalog_names().unwrap(), vec!["catalog_one"]);
 
-        let catalog = catalogs.catalog("catalog_one").unwrap();
-        assert_eq!(catalog.schema_names(), vec!["schema_one"]);
+        let catalog = catalogs.catalog("catalog_one").unwrap().unwrap();
+        assert_eq!(catalog.schema_names().unwrap(), vec!["schema_one"]);
 
-        let schema = catalog.schema("schema_one").unwrap();
-        assert_eq!(schema.table_names(), vec!["table_one"]);
-        assert!(schema.table_exist("table_one"));
-        assert!(!schema.table_exist("missing"));
+        let schema = catalog.schema("schema_one").unwrap().unwrap();
+        assert_eq!(schema.table_names().unwrap(), vec!["table_one"]);
+        assert!(schema.table_exist("table_one").unwrap());
+        assert!(!schema.table_exist("missing").unwrap());
 
         let table = runtime
             .block_on(schema.table("table_one"))
@@ -1483,6 +1513,7 @@ mod tests {
         assert!(create.name().contains("PlaceholderRowExec"));
 
         let drop_options = DropTableOptions {
+            if_exists: false,
             object_type: Some(CatalogObjectType::Table),
             purge: true,
         };
@@ -1490,20 +1521,21 @@ mod tests {
             .drop_table("table_one", &drop_options)
             .unwrap()
             .unwrap();
-        assert!(schema.table_exist("table_one"));
+        assert!(schema.table_exist("table_one").unwrap());
         runtime
             .block_on(datafusion_physical_plan::collect(
                 drop_plan,
                 consumer_session.task_ctx(),
             ))
             .unwrap();
-        assert!(!schema.table_exist("table_one"));
+        assert!(!schema.table_exist("table_one").unwrap());
         assert!(schema
             .drop_table("table_one", &drop_options)
             .unwrap()
             .is_none());
 
         let view_drop_options = DropTableOptions {
+            if_exists: false,
             object_type: Some(CatalogObjectType::View),
             purge: false,
         };
@@ -1525,7 +1557,7 @@ mod tests {
                 },
             )
             .unwrap();
-        assert!(catalogs.catalog("catalog_two").is_some());
+        assert!(catalogs.catalog("catalog_two").unwrap().is_some());
 
         catalog
             .create(
@@ -1535,20 +1567,23 @@ mod tests {
                 },
             )
             .unwrap();
-        assert!(catalog.schema("schema_two").is_some());
-        let drop_options = DropSchemaOptions { cascade: true };
+        assert!(catalog.schema("schema_two").unwrap().is_some());
+        let drop_options = DropSchemaOptions {
+            if_exists: false,
+            cascade: true,
+        };
         let drop_plan = catalog
             .drop_schema("schema_two", &drop_options)
             .unwrap()
             .unwrap();
-        assert!(catalog.schema("schema_two").is_some());
+        assert!(catalog.schema("schema_two").unwrap().is_some());
         runtime
             .block_on(datafusion_physical_plan::collect(
                 drop_plan,
                 consumer_session.task_ctx(),
             ))
             .unwrap();
-        assert!(catalog.schema("schema_two").is_none());
+        assert!(catalog.schema("schema_two").unwrap().is_none());
         assert!(catalog
             .drop_schema("schema_two", &drop_options)
             .unwrap()
@@ -1600,7 +1635,7 @@ mod tests {
             .unwrap();
 
         assert!(create_plan.name().contains("PlaceholderRowExec"));
-        assert!(!schema.table_exist("created"));
+        assert!(!schema.table_exist("created").unwrap());
     }
 
     #[test]
@@ -1658,7 +1693,11 @@ mod tests {
         )
         .into();
         raw.create_catalog = Some(failing_create_catalog);
+        raw.catalog = Some(failing_catalog_lookup);
         let imported = ImportedCatalogProviderList::try_new(raw, runtime).unwrap();
+
+        let error = imported.catalog("catalog").unwrap_err();
+        assert!(error.to_string().contains("catalog lookup failed"));
 
         let error = imported
             .try_create_catalog("catalog".to_owned(), &CreateCatalogOptions::default())

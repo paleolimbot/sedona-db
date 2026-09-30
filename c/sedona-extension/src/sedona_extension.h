@@ -529,9 +529,10 @@ struct SedonaCSchemaProvider {
 
   /// \brief Build an execution plan that drops a table by name
   ///
-  /// `options` contains a JSON object with an optional `object_type` string
-  /// (`"table"` or `"view"`) and a `purge` boolean. It may be NULL when
-  /// `options_len` is zero. The returned execution plan performs the drop.
+  /// `options` contains a JSON object with an `if_exists` boolean, an optional
+  /// `object_type` string (`"table"` or `"view"`), and a `purge` boolean. It
+  /// may be NULL when `options_len` is zero. The returned execution plan
+  /// performs the drop.
   int (*drop_table)(const struct SedonaCSchemaProvider* self, const char* name,
                     const uint8_t* options, size_t options_len,
                     struct SedonaCExecutionPlan* out, struct SedonaCError* err);
@@ -576,8 +577,9 @@ struct SedonaCCatalogProvider {
 
   /// \brief Build an execution plan that drops a schema by name
   ///
-  /// `options` contains a JSON object with a `cascade` boolean and may be NULL
-  /// when `options_len` is zero. The returned execution plan performs the drop.
+  /// `options` contains a JSON object with `if_exists` and `cascade` booleans
+  /// and may be NULL when `options_len` is zero. The returned execution plan
+  /// performs the drop.
   int (*drop_schema)(const struct SedonaCCatalogProvider* self, const char* name,
                      const uint8_t* options, size_t options_len,
                      struct SedonaCExecutionPlan* out, struct SedonaCError* err);
