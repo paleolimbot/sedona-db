@@ -442,7 +442,8 @@ class SedonaContext:
 
         - Python UDFs annotated with arrow_aggregate_udf or arrow_udf
         - An ExternalFormatSpec implementing a custom datasource type
-        - A CatalogList implementing a custom catalog hierarchy
+        - A native catalog list whose __sedonadb_catalog_list__ method returns
+          a sedonadb_catalog_list PyCapsule
         - An object implementing __sedonadb_extension__(ctx, **kwargs), which
           is called with this context and any keyword arguments passed.
         - A single function object implementing __sedonadb_scalar_udf__(self),

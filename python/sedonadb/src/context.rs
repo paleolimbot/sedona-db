@@ -20,7 +20,7 @@ use std::{
 };
 
 use arrow_schema::DataType;
-use datafusion::{dataframe::DataFrame, datasource::provider_as_source};
+use datafusion::{catalog::Session, dataframe::DataFrame, datasource::provider_as_source};
 use datafusion_expr::LogicalPlanBuilder;
 use datafusion_expr::ScalarUDFImpl;
 use pyo3::prelude::*;
@@ -31,11 +31,10 @@ use sedona_datasource::format::ExternalFormatFactory;
 use sedona_extension::runtime::RuntimeHandle;
 
 use crate::{
-    catalog::{PyCatalogListWrapper, PySedonaCatalogList},
     dataframe::InternalDataFrame,
     datasource::PyExternalFormat,
     error::PySedonaError,
-    import_from::import_table_provider_from_any,
+    import_from::{import_sedona_ffi_catalog_list, import_table_provider_from_any},
     raster_loader::PyRasterLoaderWrapper,
     runtime::wait_for_future,
     udf::{PyAggregateUdf, PyScalarUdf, PySedonaAggregateUdf, PySedonaScalarUdf},
@@ -423,16 +422,12 @@ impl InternalContext {
             self.inner.register_raster_loader(wrapper.inner);
             return Ok(());
         } else if component.hasattr("__sedonadb_catalog_list__")? {
-            let wrapper = component.call_method0("__sedonadb_catalog_list__")?;
-            let wrapper = wrapper
-                .cast::<PyCatalogListWrapper>()
-                .map_err(|error| PySedonaError::SedonaPython(error.to_string()))?;
-            let object = wrapper.borrow().object.clone_ref(component.py());
-            let foreign = Arc::new(PySedonaCatalogList::new(
-                object,
-                self.inner.ctx.task_ctx(),
+            let session: Arc<dyn Session> = Arc::new(self.inner.ctx.state());
+            let foreign = Arc::new(import_sedona_ffi_catalog_list(
+                &component,
+                session,
                 self.runtime.clone(),
-            ));
+            )?);
             self.inner.register_catalog_list(foreign);
             return Ok(());
         } else if component.hasattr("__sedonadb_scalar_udf__")? {
