@@ -575,11 +575,13 @@ pub struct SedonaCCatalogProvider {
             err: *mut SedonaCError,
         ) -> c_int,
     >,
-    pub deregister_schema: Option<
+    /// Drop a schema. `options` is a JSON-encoded [`sedona_catalog::DropSchemaOptions`].
+    pub drop_schema: Option<
         unsafe extern "C" fn(
             self_: *const SedonaCCatalogProvider,
             name: *const c_char,
-            cascade: bool,
+            options: *const u8,
+            options_len: usize,
             out: *mut SedonaCSchemaProvider,
             err: *mut SedonaCError,
         ) -> c_int,
@@ -636,20 +638,26 @@ pub struct SedonaCSchemaProvider {
         ) -> c_int,
     >,
     /// Create a table from `plan`, transferring ownership of the input plan to the callback.
+    /// `options` is a JSON-encoded [`sedona_catalog::CreateTableOptions`].
     /// Returns an execution plan that performs the create operation.
     pub create_table: Option<
         unsafe extern "C" fn(
             self_: *const SedonaCSchemaProvider,
             name: *const c_char,
+            options: *const u8,
+            options_len: usize,
             plan: *mut SedonaCExecutionPlan,
             out: *mut SedonaCExecutionPlan,
             err: *mut SedonaCError,
         ) -> c_int,
     >,
-    pub deregister_table: Option<
+    /// Drop a table. `options` is a JSON-encoded [`sedona_catalog::DropTableOptions`].
+    pub drop_table: Option<
         unsafe extern "C" fn(
             self_: *const SedonaCSchemaProvider,
             name: *const c_char,
+            options: *const u8,
+            options_len: usize,
             out: *mut SedonaCTableProvider,
             err: *mut SedonaCError,
         ) -> c_int,

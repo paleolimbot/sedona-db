@@ -518,14 +518,21 @@ struct SedonaCSchemaProvider {
 
   /// \brief Create a table from `plan`, taking ownership of the input plan
   ///
+  /// `options` contains a JSON object with a `temporary` boolean and may be NULL
+  /// when `options_len` is zero.
   /// The returned execution plan performs the create operation when executed.
   int (*create_table)(const struct SedonaCSchemaProvider* self, const char* name,
+                      const uint8_t* options, size_t options_len,
                       struct SedonaCExecutionPlan* plan, struct SedonaCExecutionPlan* out,
                       struct SedonaCError* err);
 
-  /// \brief Deregister a table by name
-  int (*deregister_table)(const struct SedonaCSchemaProvider* self, const char* name,
-                          struct SedonaCTableProvider* out, struct SedonaCError* err);
+  /// \brief Drop a table by name
+  ///
+  /// `options` contains a JSON object with a `purge` boolean and may be NULL when
+  /// `options_len` is zero.
+  int (*drop_table)(const struct SedonaCSchemaProvider* self, const char* name,
+                    const uint8_t* options, size_t options_len,
+                    struct SedonaCTableProvider* out, struct SedonaCError* err);
 
   /// \brief Reserved for future use. Must be NULL.
   void* reserved;
@@ -560,10 +567,13 @@ struct SedonaCCatalogProvider {
   int (*create_schema)(const struct SedonaCCatalogProvider* self, const char* name,
                        struct SedonaCSchemaProvider* out, struct SedonaCError* err);
 
-  /// \brief Deregister a schema by name
-  int (*deregister_schema)(const struct SedonaCCatalogProvider* self, const char* name,
-                           bool cascade, struct SedonaCSchemaProvider* out,
-                           struct SedonaCError* err);
+  /// \brief Drop a schema by name
+  ///
+  /// `options` contains a JSON object with a `cascade` boolean and may be NULL
+  /// when `options_len` is zero.
+  int (*drop_schema)(const struct SedonaCCatalogProvider* self, const char* name,
+                     const uint8_t* options, size_t options_len,
+                     struct SedonaCSchemaProvider* out, struct SedonaCError* err);
 
   /// \brief Reserved for future use. Must be NULL.
   void* reserved;

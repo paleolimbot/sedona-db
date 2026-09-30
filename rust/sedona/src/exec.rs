@@ -20,6 +20,7 @@ use datafusion::prelude::DataFrame;
 use datafusion_common::exec_err;
 use datafusion_expr::{DdlStatement, LogicalPlan, TableType};
 use datafusion_physical_plan::ExecutionPlan;
+use sedona_catalog::{CreateTableOptions, DropTableOptions};
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -108,9 +109,6 @@ pub(crate) async fn execute_sedona_catalog_ddl(
             Ok(Some(ctx.ctx.read_empty()?))
         }
         DdlStatement::CreateExternalTable(cmd) => {
-            if cmd.temporary {
-                return Ok(None);
-            }
             let state = ctx.ctx.state();
             let catalog_options = &state.config_options().catalog;
             let resolved = cmd.name.clone().resolve(
@@ -134,7 +132,7 @@ pub(crate) async fn execute_sedona_catalog_ddl(
                     return exec_err!("External table '{}' already exists", cmd.name)
                 }
                 (false, true, true) => {
-                    schema.deregister(&resolved.table)?;
+                    schema.drop_table(&resolved.table, &DropTableOptions::default())?;
                 }
                 _ => {}
             }
@@ -151,7 +149,13 @@ pub(crate) async fn execute_sedona_catalog_ddl(
                 })?;
             let provider = factory.create(&state, cmd).await?;
             let input = provider.scan(&state, None, &[], None).await?;
-            let create = schema.create(&resolved.table, input)?;
+            let create = schema.create(
+                &resolved.table,
+                &CreateTableOptions {
+                    temporary: cmd.temporary,
+                },
+                input,
+            )?;
             Ok(Some(ctx.ctx.read_table(Arc::new(CatalogDdlProvider {
                 plan: create,
             }))?))

@@ -33,12 +33,37 @@ use async_trait::async_trait;
 use datafusion_catalog::TableProvider;
 use datafusion_common::Result;
 use datafusion_physical_plan::ExecutionPlan;
+use serde::{Deserialize, Serialize};
 
 pub use adapter::{DataFusionCatalog, DataFusionCatalogList, DataFusionSchema};
 
 pub type SedonaCatalogListRef = Arc<dyn SedonaCatalogList>;
 pub type SedonaCatalogRef = Arc<dyn SedonaCatalog>;
 pub type SedonaSchemaRef = Arc<dyn SedonaSchema>;
+
+/// Options for creating a table.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct CreateTableOptions {
+    /// Whether the table is temporary.
+    pub temporary: bool,
+}
+
+/// Options for dropping a schema.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct DropSchemaOptions {
+    /// Whether objects contained by the schema should also be dropped.
+    pub cascade: bool,
+}
+
+/// Options for dropping a table.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct DropTableOptions {
+    /// Whether data and metadata referenced by the table should also be deleted.
+    pub purge: bool,
+}
 
 /// A collection of catalogs backed by a SedonaDB extension.
 pub trait SedonaCatalogList: Debug + Send + Sync {
@@ -59,7 +84,14 @@ pub trait SedonaCatalog: Debug + Send + Sync {
     /// Create a schema in the backing catalog system.
     fn create(&self, name: &str) -> Result<SedonaSchemaRef>;
 
-    fn deregister(&self, name: &str, cascade: bool) -> Result<Option<SedonaSchemaRef>>;
+    /// Drop a schema from the backing catalog system.
+    ///
+    /// Returns the dropped schema when it existed, or `None` otherwise.
+    fn drop_schema(
+        &self,
+        name: &str,
+        options: &DropSchemaOptions,
+    ) -> Result<Option<SedonaSchemaRef>>;
 }
 
 /// A collection of tables backed by a SedonaDB extension.
@@ -76,9 +108,21 @@ pub trait SedonaSchema: Debug + Send + Sync {
     /// Create a table from a physical input plan.
     ///
     /// The returned plan performs the create operation when it is executed.
-    fn create(&self, name: &str, input: Arc<dyn ExecutionPlan>) -> Result<Arc<dyn ExecutionPlan>>;
+    fn create(
+        &self,
+        name: &str,
+        options: &CreateTableOptions,
+        input: Arc<dyn ExecutionPlan>,
+    ) -> Result<Arc<dyn ExecutionPlan>>;
 
-    fn deregister(&self, name: &str) -> Result<Option<Arc<dyn TableProvider>>>;
+    /// Drop a table from the backing catalog system.
+    ///
+    /// Returns the dropped table when it existed, or `None` otherwise.
+    fn drop_table(
+        &self,
+        name: &str,
+        options: &DropTableOptions,
+    ) -> Result<Option<Arc<dyn TableProvider>>>;
 
     fn table_exist(&self, name: &str) -> bool;
 }

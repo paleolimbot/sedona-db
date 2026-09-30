@@ -32,3 +32,4 @@ async-trait = { workspace = true }
 datafusion-catalog = { workspace = true }
 datafusion-common = { workspace = true }
 datafusion-physical-plan = { workspace = true }
+serde = { workspace = true }

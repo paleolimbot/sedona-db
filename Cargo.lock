@@ -5696,6 +5696,7 @@ dependencies = [
  "datafusion-catalog",
  "datafusion-common",
  "datafusion-physical-plan",
+ "serde",
 ]
 
 [[package]]

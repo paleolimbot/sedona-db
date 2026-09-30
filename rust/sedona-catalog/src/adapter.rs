@@ -22,7 +22,9 @@ use async_trait::async_trait;
 use datafusion_catalog::{CatalogProvider, CatalogProviderList, SchemaProvider, TableProvider};
 use datafusion_common::{Result, not_impl_err};
 
-use crate::{SedonaCatalogListRef, SedonaCatalogRef, SedonaSchemaRef};
+use crate::{
+    DropSchemaOptions, DropTableOptions, SedonaCatalogListRef, SedonaCatalogRef, SedonaSchemaRef,
+};
 
 /// Exposes a [`crate::SedonaCatalogList`] to DataFusion's read-side catalog API.
 pub struct DataFusionCatalogList {
@@ -121,7 +123,7 @@ impl CatalogProvider for DataFusionCatalog {
     ) -> Result<Option<Arc<dyn SchemaProvider>>> {
         Ok(self
             .inner
-            .deregister(name, cascade)?
+            .drop_schema(name, &DropSchemaOptions { cascade })?
             .map(|schema| Arc::new(DataFusionSchema::new(schema)) as _))
     }
 }
@@ -172,7 +174,7 @@ impl SchemaProvider for DataFusionSchema {
     }
 
     fn deregister_table(&self, name: &str) -> Result<Option<Arc<dyn TableProvider>>> {
-        self.inner.deregister(name)
+        self.inner.drop_table(name, &DropTableOptions::default())
     }
 
     fn table_exist(&self, name: &str) -> bool {

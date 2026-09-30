@@ -29,8 +29,8 @@ use datafusion_catalog::{Session, TableProvider};
 use datafusion_common::{not_impl_err, Result};
 use datafusion_physical_plan::ExecutionPlan;
 use sedona_catalog::{
-    SedonaCatalog, SedonaCatalogList, SedonaCatalogListRef, SedonaCatalogRef, SedonaSchema,
-    SedonaSchemaRef,
+    CreateTableOptions, DropSchemaOptions, DropTableOptions, SedonaCatalog, SedonaCatalogList,
+    SedonaCatalogListRef, SedonaCatalogRef, SedonaSchema, SedonaSchemaRef,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -311,7 +311,7 @@ impl From<ExportedCatalogProvider> for SedonaCCatalogProvider {
             get_property: Some(c_catalog_property),
             schema: Some(c_catalog_schema),
             create_schema: Some(c_catalog_create_schema),
-            deregister_schema: Some(c_catalog_deregister_schema),
+            drop_schema: Some(c_catalog_drop_schema),
             reserved: null_mut(),
             release: Some(c_catalog_release),
             private_data: Box::into_raw(Box::new(value)).cast(),
@@ -391,17 +391,25 @@ unsafe extern "C" fn c_catalog_create_schema(
     }
 }
 
-unsafe extern "C" fn c_catalog_deregister_schema(
+unsafe extern "C" fn c_catalog_drop_schema(
     self_: *const SedonaCCatalogProvider,
     name: *const c_char,
-    cascade: bool,
+    options: *const u8,
+    options_len: usize,
     out: *mut SedonaCSchemaProvider,
     err: *mut SedonaCError,
 ) -> c_int {
     let exported = &*((*self_).private_data as *const ExportedCatalogProvider);
+    let options = match parse_json_options(options, options_len) {
+        Ok(options) => options,
+        Err(error) => {
+            set_ffi_error!(err, "Failed to parse drop schema options: {}", error);
+            return libc::EINVAL;
+        }
+    };
     match exported
         .inner
-        .deregister(&cstr_from_ptr_or_empty(name), cascade)
+        .drop_schema(&cstr_from_ptr_or_empty(name), &options)
     {
         Ok(result) => {
             let result = result
@@ -535,16 +543,30 @@ impl SedonaCatalog for ImportedCatalogProvider {
         self.try_create_schema(name)
     }
 
-    fn deregister(&self, name: &str, cascade: bool) -> Result<Option<SedonaSchemaRef>> {
-        let Some(callback) = self.inner.deregister_schema else {
-            return not_impl_err!("Deregistering schemas is not supported by the foreign catalog");
+    fn drop_schema(
+        &self,
+        name: &str,
+        options: &DropSchemaOptions,
+    ) -> Result<Option<SedonaSchemaRef>> {
+        let Some(callback) = self.inner.drop_schema else {
+            return not_impl_err!("Dropping schemas is not supported by the foreign catalog");
         };
         let name = c_string(name)?;
+        let options = serialize_json_options(options)?;
         let mut out = SedonaCSchemaProvider::default();
         let mut error = SedonaCError::default();
-        let code = unsafe { callback(&self.inner, name.as_ptr(), cascade, &mut out, &mut error) };
+        let code = unsafe {
+            callback(
+                &self.inner,
+                name.as_ptr(),
+                options.as_ptr(),
+                options.len(),
+                &mut out,
+                &mut error,
+            )
+        };
         if code != ERRNO_OK {
-            return sedona_common::sedona_internal_err!("Failed to deregister schema: {error}");
+            return sedona_common::sedona_internal_err!("Failed to drop schema: {error}");
         }
         optional_schema(out, self.session.clone(), self.runtime.clone())
     }
@@ -603,7 +625,7 @@ impl From<ExportedSchemaProvider> for SedonaCSchemaProvider {
             get_property: Some(c_schema_property),
             table: Some(c_schema_table),
             create_table: Some(c_schema_create_table),
-            deregister_table: Some(c_schema_deregister_table),
+            drop_table: Some(c_schema_drop_table),
             reserved: null_mut(),
             release: Some(c_schema_release),
             private_data: Box::into_raw(Box::new(value)).cast(),
@@ -677,6 +699,8 @@ unsafe extern "C" fn c_schema_table(
 unsafe extern "C" fn c_schema_create_table(
     self_: *const SedonaCSchemaProvider,
     name: *const c_char,
+    options: *const u8,
+    options_len: usize,
     plan: *mut SedonaCExecutionPlan,
     out: *mut SedonaCExecutionPlan,
     err: *mut SedonaCError,
@@ -686,6 +710,13 @@ unsafe extern "C" fn c_schema_create_table(
         return libc::EINVAL;
     }
     let exported = &*((*self_).private_data as *const ExportedSchemaProvider);
+    let options = match parse_json_options(options, options_len) {
+        Ok(options) => options,
+        Err(error) => {
+            set_ffi_error!(err, "Failed to parse create table options: {}", error);
+            return libc::EINVAL;
+        }
+    };
     let input = std::ptr::replace(plan, SedonaCExecutionPlan::default());
     let input = match ImportedSedonaCExec::try_new(input) {
         Ok(input) => Arc::new(input) as Arc<dyn ExecutionPlan>,
@@ -694,7 +725,10 @@ unsafe extern "C" fn c_schema_create_table(
             return libc::EINVAL;
         }
     };
-    match exported.inner.create(&cstr_from_ptr_or_empty(name), input) {
+    match exported
+        .inner
+        .create(&cstr_from_ptr_or_empty(name), &options, input)
+    {
         Ok(plan) => {
             std::ptr::write(
                 out,
@@ -714,14 +748,26 @@ unsafe extern "C" fn c_schema_create_table(
     }
 }
 
-unsafe extern "C" fn c_schema_deregister_table(
+unsafe extern "C" fn c_schema_drop_table(
     self_: *const SedonaCSchemaProvider,
     name: *const c_char,
+    options: *const u8,
+    options_len: usize,
     out: *mut SedonaCTableProvider,
     err: *mut SedonaCError,
 ) -> c_int {
     let exported = &*((*self_).private_data as *const ExportedSchemaProvider);
-    match exported.inner.deregister(&cstr_from_ptr_or_empty(name)) {
+    let options = match parse_json_options(options, options_len) {
+        Ok(options) => options,
+        Err(error) => {
+            set_ffi_error!(err, "Failed to parse drop table options: {}", error);
+            return libc::EINVAL;
+        }
+    };
+    match exported
+        .inner
+        .drop_table(&cstr_from_ptr_or_empty(name), &options)
+    {
         Ok(result) => {
             let result = result
                 .map(|inner| {
@@ -848,19 +894,30 @@ impl ImportedSchemaProvider {
     pub fn try_create_table(
         &self,
         name: String,
+        options: &CreateTableOptions,
         plan: Arc<dyn ExecutionPlan>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
         let Some(callback) = self.inner.create_table else {
             return not_impl_err!("Creating tables is not supported by the foreign schema");
         };
         let name = c_string(name)?;
+        let options = serialize_json_options(options)?;
         let session = upgrade_session(&self.session)?;
         let mut input =
             ExportedExecutionPlan::new(plan, session.task_ctx(), self.runtime.clone()).into();
         let mut out = SedonaCExecutionPlan::default();
         let mut error = SedonaCError::default();
-        let code =
-            unsafe { callback(&self.inner, name.as_ptr(), &mut input, &mut out, &mut error) };
+        let code = unsafe {
+            callback(
+                &self.inner,
+                name.as_ptr(),
+                options.as_ptr(),
+                options.len(),
+                &mut input,
+                &mut out,
+                &mut error,
+            )
+        };
         if code != ERRNO_OK {
             return sedona_common::sedona_internal_err!("Failed to create table: {error}");
         }
@@ -892,26 +949,73 @@ impl SedonaSchema for ImportedSchemaProvider {
         }
         optional_table(out)
     }
-    fn create(&self, name: &str, plan: Arc<dyn ExecutionPlan>) -> Result<Arc<dyn ExecutionPlan>> {
-        self.try_create_table(name.to_owned(), plan)
+    fn create(
+        &self,
+        name: &str,
+        options: &CreateTableOptions,
+        plan: Arc<dyn ExecutionPlan>,
+    ) -> Result<Arc<dyn ExecutionPlan>> {
+        self.try_create_table(name.to_owned(), options, plan)
     }
 
-    fn deregister(&self, name: &str) -> Result<Option<Arc<dyn TableProvider>>> {
-        let Some(callback) = self.inner.deregister_table else {
-            return not_impl_err!("Deregistering tables is not supported by the foreign schema");
+    fn drop_table(
+        &self,
+        name: &str,
+        options: &DropTableOptions,
+    ) -> Result<Option<Arc<dyn TableProvider>>> {
+        let Some(callback) = self.inner.drop_table else {
+            return not_impl_err!("Dropping tables is not supported by the foreign schema");
         };
         let name = c_string(name)?;
+        let options = serialize_json_options(options)?;
         let mut out = SedonaCTableProvider::default();
         let mut error = SedonaCError::default();
-        let code = unsafe { callback(&self.inner, name.as_ptr(), &mut out, &mut error) };
+        let code = unsafe {
+            callback(
+                &self.inner,
+                name.as_ptr(),
+                options.as_ptr(),
+                options.len(),
+                &mut out,
+                &mut error,
+            )
+        };
         if code != ERRNO_OK {
-            return sedona_common::sedona_internal_err!("Failed to deregister table: {error}");
+            return sedona_common::sedona_internal_err!("Failed to drop table: {error}");
         }
         optional_table(out)
     }
     fn table_exist(&self, name: &str) -> bool {
         self.try_table_exist(name).unwrap_or(false)
     }
+}
+
+fn serialize_json_options<T: Serialize>(options: &T) -> Result<Vec<u8>> {
+    serde_json::to_vec(options).map_err(|error| {
+        datafusion_common::DataFusionError::External(
+            format!("Failed to serialize catalog options: {error}").into(),
+        )
+    })
+}
+
+unsafe fn parse_json_options<T: DeserializeOwned + Default>(
+    options: *const u8,
+    options_len: usize,
+) -> Result<T> {
+    if options_len == 0 {
+        return Ok(T::default());
+    }
+    if options.is_null() {
+        return sedona_common::sedona_internal_err!(
+            "Catalog options pointer is null but options_len is non-zero"
+        );
+    }
+    let options = unsafe { std::slice::from_raw_parts(options, options_len) };
+    serde_json::from_slice(options).map_err(|error| {
+        datafusion_common::DataFusionError::External(
+            format!("Failed to parse catalog options: {error}").into(),
+        )
+    })
 }
 
 fn c_string(value: impl Into<Vec<u8>>) -> Result<CString> {
@@ -1026,7 +1130,16 @@ mod tests {
             Ok(schema)
         }
 
-        fn deregister(&self, name: &str, _cascade: bool) -> Result<Option<SedonaSchemaRef>> {
+        fn drop_schema(
+            &self,
+            name: &str,
+            options: &DropSchemaOptions,
+        ) -> Result<Option<SedonaSchemaRef>> {
+            if name == "schema_two" && !options.cascade {
+                return sedona_common::sedona_internal_err!(
+                    "schema_two must be dropped with cascade"
+                );
+            }
             Ok(self.schemas.write().unwrap().remove(name))
         }
     }
@@ -1049,12 +1162,25 @@ mod tests {
         fn create(
             &self,
             _name: &str,
+            options: &CreateTableOptions,
             input: Arc<dyn ExecutionPlan>,
         ) -> Result<Arc<dyn ExecutionPlan>> {
+            if !options.temporary {
+                return sedona_common::sedona_internal_err!(
+                    "test tables must be created as temporary"
+                );
+            }
             Ok(input)
         }
 
-        fn deregister(&self, name: &str) -> Result<Option<Arc<dyn TableProvider>>> {
+        fn drop_table(
+            &self,
+            name: &str,
+            options: &DropTableOptions,
+        ) -> Result<Option<Arc<dyn TableProvider>>> {
+            if name == "table_one" && !options.purge {
+                return sedona_common::sedona_internal_err!("table_one must be purged");
+            }
             Ok(self.tables.write().unwrap().remove(name))
         }
 
@@ -1076,12 +1202,25 @@ mod tests {
     unsafe extern "C" fn passthrough_create_table(
         _self_: *const SedonaCSchemaProvider,
         _name: *const c_char,
+        options: *const u8,
+        options_len: usize,
         plan: *mut SedonaCExecutionPlan,
         out: *mut SedonaCExecutionPlan,
         error: *mut SedonaCError,
     ) -> c_int {
         if plan.is_null() {
             crate::extension::write_ffi_error(error, "execution plan is null");
+            return libc::EINVAL;
+        }
+        let options: CreateTableOptions = match parse_json_options(options, options_len) {
+            Ok(options) => options,
+            Err(error_value) => {
+                crate::extension::write_ffi_error(error, &error_value.to_string());
+                return libc::EINVAL;
+            }
+        };
+        if !options.temporary {
+            crate::extension::write_ffi_error(error, "temporary option is false");
             return libc::EINVAL;
         }
         let plan = std::ptr::replace(plan, SedonaCExecutionPlan::default());
@@ -1100,6 +1239,20 @@ mod tests {
 
     fn empty_table() -> Arc<dyn TableProvider> {
         Arc::new(EmptyTable::new(Arc::new(Schema::empty())))
+    }
+
+    #[test]
+    fn empty_json_options_use_defaults() {
+        let create: CreateTableOptions =
+            unsafe { parse_json_options(std::ptr::null(), 0) }.unwrap();
+        let drop_schema: DropSchemaOptions =
+            unsafe { parse_json_options(std::ptr::null(), 0) }.unwrap();
+        let drop_table: DropTableOptions =
+            unsafe { parse_json_options(std::ptr::null(), 0) }.unwrap();
+
+        assert_eq!(create, CreateTableOptions::default());
+        assert_eq!(drop_schema, DropSchemaOptions::default());
+        assert_eq!(drop_table, DropTableOptions::default());
     }
 
     fn round_trip() -> (
@@ -1169,6 +1322,28 @@ mod tests {
             .unwrap();
         assert_eq!(table.schema().fields().len(), 0);
         assert!(runtime.block_on(schema.table("missing")).unwrap().is_none());
+
+        let input: Arc<dyn ExecutionPlan> =
+            Arc::new(PlaceholderRowExec::new(Arc::new(Schema::empty())));
+        let create = schema
+            .create(
+                "temporary_table",
+                &CreateTableOptions { temporary: true },
+                input,
+            )
+            .unwrap();
+        assert!(create.name().contains("PlaceholderRowExec"));
+
+        let drop_options = DropTableOptions { purge: true };
+        assert!(schema
+            .drop_table("table_one", &drop_options)
+            .unwrap()
+            .is_some());
+        assert!(!schema.table_exist("table_one"));
+        assert!(schema
+            .drop_table("table_one", &drop_options)
+            .unwrap()
+            .is_none());
     }
 
     #[test]
@@ -1182,7 +1357,16 @@ mod tests {
 
         catalog.create("schema_two").unwrap();
         assert!(catalog.schema("schema_two").is_some());
-        assert!(catalog.deregister("schema_two", false).unwrap().is_some());
+        let drop_options = DropSchemaOptions { cascade: true };
+        assert!(catalog
+            .drop_schema("schema_two", &drop_options)
+            .unwrap()
+            .is_some());
+        assert!(catalog.schema("schema_two").is_none());
+        assert!(catalog
+            .drop_schema("schema_two", &drop_options)
+            .unwrap()
+            .is_none());
         drop(consumer_session);
         assert!(weak_consumer_session.upgrade().is_none());
         drop(runtime);
@@ -1223,7 +1407,11 @@ mod tests {
         let input: Arc<dyn ExecutionPlan> =
             Arc::new(PlaceholderRowExec::new(Arc::new(Schema::empty())));
         let create_plan = schema
-            .try_create_table("created".to_owned(), input)
+            .try_create_table(
+                "created".to_owned(),
+                &CreateTableOptions { temporary: true },
+                input,
+            )
             .unwrap();
 
         assert!(create_plan.name().contains("PlaceholderRowExec"));
@@ -1325,10 +1513,13 @@ mod tests {
         let mut input_plan: SedonaCExecutionPlan =
             ExportedExecutionPlan::new(plan, session.task_ctx(), consumer_runtime).into();
         let mut output_plan = SedonaCExecutionPlan::default();
+        let options = serde_json::to_vec(&CreateTableOptions { temporary: true }).unwrap();
         let code = unsafe {
             raw_schema.create_table.unwrap()(
                 &raw_schema,
                 name.as_ptr(),
+                options.as_ptr(),
+                options.len(),
                 &mut input_plan,
                 &mut output_plan,
                 &mut error,
