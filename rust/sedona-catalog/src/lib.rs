@@ -30,7 +30,7 @@ use std::fmt::Debug;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use datafusion_catalog::TableProvider;
+use datafusion_catalog::{Session, TableProvider};
 use datafusion_common::Result;
 use datafusion_physical_plan::ExecutionPlan;
 use serde::{Deserialize, Serialize};
@@ -154,11 +154,12 @@ pub trait SedonaSchema: Debug + Send + Sync {
     /// Return the table named `name`, or `None` when it does not exist.
     async fn table(&self, name: &str) -> Result<Option<Arc<dyn TableProvider>>>;
 
-    /// Create a table from a physical input plan.
+    /// Create a table from a physical input plan using the calling session.
     ///
     /// The returned plan performs the create operation when it is executed.
     fn create(
         &self,
+        session: &dyn Session,
         name: &str,
         options: &CreateTableOptions,
         input: Arc<dyn ExecutionPlan>,

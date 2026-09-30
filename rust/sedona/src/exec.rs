@@ -172,6 +172,7 @@ pub(crate) async fn execute_sedona_catalog_ddl(
             let provider = factory.create(&state, cmd).await?;
             let input = provider.scan(&state, None, &[], None).await?;
             let create = schema.create(
+                &state,
                 &resolved.table,
                 &CreateTableOptions {
                     mode,
@@ -384,6 +385,7 @@ mod tests {
 
         fn create(
             &self,
+            _session: &dyn Session,
             _name: &str,
             _options: &CreateTableOptions,
             _input: Arc<dyn ExecutionPlan>,

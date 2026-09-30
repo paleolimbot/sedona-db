@@ -20,7 +20,7 @@ use std::{
 };
 
 use arrow_schema::DataType;
-use datafusion::{catalog::Session, dataframe::DataFrame, datasource::provider_as_source};
+use datafusion::{dataframe::DataFrame, datasource::provider_as_source};
 use datafusion_expr::LogicalPlanBuilder;
 use datafusion_expr::ScalarUDFImpl;
 use pyo3::prelude::*;
@@ -422,10 +422,8 @@ impl InternalContext {
             self.inner.register_raster_loader(wrapper.inner);
             return Ok(());
         } else if component.hasattr("__sedonadb_catalog_list__")? {
-            let session: Arc<dyn Session> = Arc::new(self.inner.ctx.state());
             let foreign = Arc::new(import_sedona_ffi_catalog_list(
                 &component,
-                session,
                 self.runtime.clone(),
             )?);
             self.inner.register_catalog_list(foreign);

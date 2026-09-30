@@ -26,7 +26,7 @@ use arrow_array::{
     make_array, ArrayRef, RecordBatchReader,
 };
 use arrow_schema::{Field, Schema};
-use datafusion::catalog::{Session, TableProvider};
+use datafusion::catalog::TableProvider;
 use datafusion_common::{metadata::ScalarAndMetadata, ScalarValue, TableReference};
 use datafusion_expr::expr::FieldMetadata;
 use pyo3::{
@@ -51,7 +51,6 @@ use crate::error::PySedonaError;
 
 pub fn import_sedona_ffi_catalog_list(
     obj: &Bound<PyAny>,
-    session: Arc<dyn Session>,
     runtime: Arc<RuntimeHandle>,
 ) -> Result<ImportedCatalogProviderList, PySedonaError> {
     let capsule = obj.getattr("__sedonadb_catalog_list__")?.call0()?;
@@ -66,11 +65,7 @@ pub fn import_sedona_ffi_catalog_list(
         catalog_list
     };
 
-    Ok(ImportedCatalogProviderList::try_new(
-        catalog_list,
-        Arc::downgrade(&session),
-        runtime,
-    )?)
+    Ok(ImportedCatalogProviderList::try_new(catalog_list, runtime)?)
 }
 
 pub fn import_table_provider_from_any<'py>(
@@ -353,15 +348,13 @@ mod tests {
                     Some(&locals),
                 )
                 .unwrap();
-            let session: Arc<dyn Session> =
-                Arc::new(datafusion::prelude::SessionContext::new().state());
             let runtime = Arc::new(RuntimeHandle::new(
                 tokio::runtime::Builder::new_current_thread()
                     .build()
                     .unwrap(),
             ));
 
-            import_sedona_ffi_catalog_list(&exporter, session, runtime).unwrap();
+            import_sedona_ffi_catalog_list(&exporter, runtime).unwrap();
         });
     }
 
