@@ -130,14 +130,15 @@ pub trait SedonaCatalog: Debug + Send + Sync {
     /// Create a schema in the backing catalog system.
     fn create(&self, name: &str, options: &CreateSchemaOptions) -> Result<Arc<dyn SedonaSchema>>;
 
-    /// Drop a schema from the backing catalog system.
+    /// Build a plan that drops a schema from the backing catalog system.
     ///
-    /// Returns the dropped schema when it existed, or `None` otherwise.
+    /// Returns `None` when the schema does not exist. The returned plan performs
+    /// the drop operation when it is executed.
     fn drop_schema(
         &self,
         name: &str,
         options: &DropSchemaOptions,
-    ) -> Result<Option<Arc<dyn SedonaSchema>>>;
+    ) -> Result<Option<Arc<dyn ExecutionPlan>>>;
 }
 
 /// A collection of tables backed by a SedonaDB extension.
@@ -165,14 +166,15 @@ pub trait SedonaSchema: Debug + Send + Sync {
         input: Arc<dyn ExecutionPlan>,
     ) -> Result<Arc<dyn ExecutionPlan>>;
 
-    /// Drop a table from the backing catalog system.
+    /// Build a plan that drops a table from the backing catalog system.
     ///
-    /// Returns the dropped table when it existed, or `None` otherwise.
+    /// Returns `None` when the table does not exist. The returned plan performs
+    /// the drop operation when it is executed.
     fn drop_table(
         &self,
         name: &str,
         options: &DropTableOptions,
-    ) -> Result<Option<Arc<dyn TableProvider>>>;
+    ) -> Result<Option<Arc<dyn ExecutionPlan>>>;
 
     /// Return whether a table named `name` exists in this schema.
     fn table_exist(&self, name: &str) -> bool;

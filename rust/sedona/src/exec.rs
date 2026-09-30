@@ -17,12 +17,12 @@
 use async_trait::async_trait;
 use datafusion::catalog::{Session, TableProvider};
 use datafusion::prelude::DataFrame;
-use datafusion_common::{exec_err, TableReference};
+use datafusion_common::{exec_err, SchemaReference, TableReference};
 use datafusion_expr::{DdlStatement, LogicalPlan, TableType};
 use datafusion_physical_plan::ExecutionPlan;
 use sedona_catalog::{
     CatalogObjectType, CreateCatalogOptions, CreateMode, CreateSchemaOptions, CreateTableOptions,
-    DropTableOptions,
+    DropSchemaOptions, DropTableOptions,
 };
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -208,6 +208,14 @@ pub(crate) async fn execute_sedona_catalog_ddl(
         DdlStatement::DropView(cmd) => {
             drop_foreign_object(ctx, &cmd.name, cmd.if_exists, CatalogObjectType::View)
         }
+        DdlStatement::DropCatalogSchema(cmd) => drop_foreign_schema(
+            ctx,
+            &cmd.name,
+            cmd.if_exists,
+            &DropSchemaOptions {
+                cascade: cmd.cascade,
+            },
+        ),
         _ => Ok(None),
     }
 }
@@ -239,7 +247,7 @@ fn drop_foreign_object(
     let Some(catalog) = ctx.catalog_registry().foreign_catalog(&resolved.catalog) else {
         return Ok(None);
     };
-    let dropped = match catalog.schema(&resolved.schema) {
+    let drop_plan = match catalog.schema(&resolved.schema) {
         Some(schema) => schema.drop_table(
             &resolved.table,
             &DropTableOptions {
@@ -250,7 +258,12 @@ fn drop_foreign_object(
         None => None,
     };
 
-    if dropped.is_some() || if_exists {
+    if let Some(plan) = drop_plan {
+        return Ok(Some(
+            ctx.ctx.read_table(Arc::new(CatalogDdlProvider { plan }))?,
+        ));
+    }
+    if if_exists {
         return Ok(Some(ctx.ctx.read_empty()?));
     }
 
@@ -259,6 +272,49 @@ fn drop_foreign_object(
         CatalogObjectType::View => "View",
     };
     exec_err!("{kind} '{name}' doesn't exist.")
+}
+
+fn drop_foreign_schema(
+    ctx: &SedonaContext,
+    name: &SchemaReference,
+    if_exists: bool,
+    options: &DropSchemaOptions,
+) -> Result<Option<DataFrame>, DataFusionError> {
+    let catalog_name = match name {
+        SchemaReference::Full { catalog, .. } => catalog.as_ref(),
+        SchemaReference::Bare { .. } => {
+            let state = ctx.ctx.state();
+            return drop_foreign_schema_in_catalog(
+                ctx,
+                &state.config_options().catalog.default_catalog,
+                name,
+                if_exists,
+                options,
+            );
+        }
+    };
+    drop_foreign_schema_in_catalog(ctx, catalog_name, name, if_exists, options)
+}
+
+fn drop_foreign_schema_in_catalog(
+    ctx: &SedonaContext,
+    catalog_name: &str,
+    name: &SchemaReference,
+    if_exists: bool,
+    options: &DropSchemaOptions,
+) -> Result<Option<DataFrame>, DataFusionError> {
+    let Some(catalog) = ctx.catalog_registry().foreign_catalog(catalog_name) else {
+        return Ok(None);
+    };
+    if let Some(plan) = catalog.drop_schema(name.schema_name(), options)? {
+        return Ok(Some(
+            ctx.ctx.read_table(Arc::new(CatalogDdlProvider { plan }))?,
+        ));
+    }
+    if if_exists {
+        return Ok(Some(ctx.ctx.read_empty()?));
+    }
+    exec_err!("Schema '{name}' doesn't exist.")
 }
 
 /// Presents a catalog DDL execution plan as a one-shot DataFrame so DDL keeps
@@ -299,19 +355,89 @@ impl TableProvider for CatalogDdlProvider {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Mutex;
 
     use arrow_schema::Schema;
     use datafusion::common::plan_datafusion_err;
     use datafusion::common::plan_err;
-    use datafusion::datasource::empty::EmptyTable;
     use datafusion::datasource::listing::ListingTableUrl;
     use datafusion::sql::parser::DFParser;
+    use datafusion_execution::TaskContext;
     use datafusion_expr::sqlparser::dialect::dialect_from_str;
+    use datafusion_physical_plan::empty::EmptyExec;
+    use datafusion_physical_plan::{
+        DisplayAs, DisplayFormatType, PlanProperties, SendableRecordBatchStream,
+    };
     use sedona_catalog::{DropSchemaOptions, SedonaCatalog, SedonaCatalogList, SedonaSchema};
     use url::Url;
 
     use super::*;
+
+    struct DropTestExec {
+        inner: Arc<dyn ExecutionPlan>,
+        drop_action: Mutex<Option<Box<dyn FnOnce() + Send>>>,
+    }
+
+    impl DropTestExec {
+        fn new(drop_action: impl FnOnce() + Send + 'static) -> Self {
+            Self {
+                inner: Arc::new(EmptyExec::new(Arc::new(Schema::empty()))),
+                drop_action: Mutex::new(Some(Box::new(drop_action))),
+            }
+        }
+    }
+
+    impl Debug for DropTestExec {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("DropTestExec").finish()
+        }
+    }
+
+    impl DisplayAs for DropTestExec {
+        fn fmt_as(
+            &self,
+            _t: DisplayFormatType,
+            f: &mut std::fmt::Formatter<'_>,
+        ) -> std::fmt::Result {
+            write!(f, "DropTestExec")
+        }
+    }
+
+    impl ExecutionPlan for DropTestExec {
+        fn name(&self) -> &str {
+            "DropTestExec"
+        }
+
+        fn properties(&self) -> &Arc<PlanProperties> {
+            self.inner.properties()
+        }
+
+        fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+            vec![]
+        }
+
+        fn with_new_children(
+            self: Arc<Self>,
+            children: Vec<Arc<dyn ExecutionPlan>>,
+        ) -> Result<Arc<dyn ExecutionPlan>> {
+            if !children.is_empty() {
+                return datafusion_common::internal_err!("DropTestExec does not have children");
+            }
+            Ok(self)
+        }
+
+        fn execute(
+            &self,
+            partition: usize,
+            context: Arc<TaskContext>,
+        ) -> Result<SendableRecordBatchStream> {
+            if let Some(drop_action) = self.drop_action.lock().unwrap().take() {
+                drop_action();
+            }
+            self.inner.execute(partition, context)
+        }
+    }
 
     #[derive(Debug)]
     struct DropTestCatalogList {
@@ -339,15 +465,20 @@ mod tests {
     #[derive(Debug)]
     struct DropTestCatalog {
         schema: Arc<dyn SedonaSchema>,
+        schema_exists: Arc<AtomicBool>,
     }
 
     impl SedonaCatalog for DropTestCatalog {
         fn schema_names(&self) -> Vec<String> {
-            vec!["public".to_owned()]
+            self.schema_exists
+                .load(Ordering::SeqCst)
+                .then(|| vec!["public".to_owned()])
+                .unwrap_or_default()
         }
 
         fn schema(&self, name: &str) -> Option<Arc<dyn SedonaSchema>> {
-            (name == "public").then(|| self.schema.clone())
+            (name == "public" && self.schema_exists.load(Ordering::SeqCst))
+                .then(|| self.schema.clone())
         }
 
         fn create(
@@ -360,16 +491,25 @@ mod tests {
 
         fn drop_schema(
             &self,
-            _name: &str,
-            _options: &DropSchemaOptions,
-        ) -> Result<Option<Arc<dyn SedonaSchema>>> {
-            datafusion_common::not_impl_err!("not needed by drop tests")
+            name: &str,
+            options: &DropSchemaOptions,
+        ) -> Result<Option<Arc<dyn ExecutionPlan>>> {
+            if name != "public" || !self.schema_exists.load(Ordering::SeqCst) {
+                return Ok(None);
+            }
+            if !options.cascade {
+                return datafusion_common::exec_err!("public must be dropped with cascade");
+            }
+            let schema_exists = self.schema_exists.clone();
+            Ok(Some(Arc::new(DropTestExec::new(move || {
+                schema_exists.store(false, Ordering::SeqCst);
+            }))))
         }
     }
 
     #[derive(Debug)]
     struct DropTestSchema {
-        objects: Mutex<HashMap<String, CatalogObjectType>>,
+        objects: Arc<Mutex<HashMap<String, CatalogObjectType>>>,
         received: Mutex<Vec<DropTableOptions>>,
     }
 
@@ -397,17 +537,21 @@ mod tests {
             &self,
             name: &str,
             options: &DropTableOptions,
-        ) -> Result<Option<Arc<dyn TableProvider>>> {
+        ) -> Result<Option<Arc<dyn ExecutionPlan>>> {
             self.received.lock().unwrap().push(*options);
-            let mut objects = self.objects.lock().unwrap();
+            let objects = self.objects.lock().unwrap();
             let Some(actual_type) = objects.get(name).copied() else {
                 return Ok(None);
             };
             if options.object_type.is_some() && options.object_type != Some(actual_type) {
                 return Ok(None);
             }
-            objects.remove(name);
-            Ok(Some(Arc::new(EmptyTable::new(Arc::new(Schema::empty())))))
+            drop(objects);
+            let objects = self.objects.clone();
+            let name = name.to_owned();
+            Ok(Some(Arc::new(DropTestExec::new(move || {
+                objects.lock().unwrap().remove(&name);
+            }))))
         }
 
         fn table_exist(&self, name: &str) -> bool {
@@ -418,19 +562,22 @@ mod tests {
     #[tokio::test]
     async fn foreign_drop_distinguishes_tables_and_views() -> Result<()> {
         let schema = Arc::new(DropTestSchema {
-            objects: Mutex::new(HashMap::from([
+            objects: Arc::new(Mutex::new(HashMap::from([
                 ("table_one".to_owned(), CatalogObjectType::Table),
                 ("view_one".to_owned(), CatalogObjectType::View),
-            ])),
+            ]))),
             received: Mutex::new(Vec::new()),
         });
         let catalog: Arc<dyn SedonaCatalog> = Arc::new(DropTestCatalog {
             schema: schema.clone(),
+            schema_exists: Arc::new(AtomicBool::new(true)),
         });
         let ctx = SedonaContext::new();
         ctx.register_catalog_list(Arc::new(DropTestCatalogList { catalog }));
 
-        ctx.sql("DROP TABLE foreign.public.table_one").await?;
+        let drop_table = ctx.sql("DROP TABLE foreign.public.table_one").await?;
+        assert!(schema.table_exist("table_one"));
+        drop_table.collect().await?;
         assert!(!schema.table_exist("table_one"));
 
         let error = ctx
@@ -440,7 +587,9 @@ mod tests {
         assert!(error.to_string().contains("doesn't exist"));
         assert!(schema.table_exist("view_one"));
 
-        ctx.sql("DROP VIEW foreign.public.view_one").await?;
+        let drop_view = ctx.sql("DROP VIEW foreign.public.view_one").await?;
+        assert!(schema.table_exist("view_one"));
+        drop_view.collect().await?;
         assert!(!schema.table_exist("view_one"));
         assert_eq!(
             *schema.received.lock().unwrap(),
@@ -464,16 +613,40 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn foreign_drop_schema_is_lazy() -> Result<()> {
+        let schema: Arc<dyn SedonaSchema> = Arc::new(DropTestSchema {
+            objects: Arc::new(Mutex::new(HashMap::new())),
+            received: Mutex::new(Vec::new()),
+        });
+        let catalog = Arc::new(DropTestCatalog {
+            schema,
+            schema_exists: Arc::new(AtomicBool::new(true)),
+        });
+        let ctx = SedonaContext::new();
+        ctx.register_catalog_list(Arc::new(DropTestCatalogList {
+            catalog: catalog.clone(),
+        }));
+
+        let drop_schema = ctx.sql("DROP SCHEMA foreign.public CASCADE").await?;
+        assert!(catalog.schema("public").is_some());
+        drop_schema.collect().await?;
+        assert!(catalog.schema("public").is_none());
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn unsupported_foreign_create_does_not_drop_existing_objects() -> Result<()> {
         let schema = Arc::new(DropTestSchema {
-            objects: Mutex::new(HashMap::from([
+            objects: Arc::new(Mutex::new(HashMap::from([
                 ("table_one".to_owned(), CatalogObjectType::Table),
                 ("view_one".to_owned(), CatalogObjectType::View),
-            ])),
+            ]))),
             received: Mutex::new(Vec::new()),
         });
         let catalog: Arc<dyn SedonaCatalog> = Arc::new(DropTestCatalog {
             schema: schema.clone(),
+            schema_exists: Arc::new(AtomicBool::new(true)),
         });
         let ctx = SedonaContext::new();
         ctx.register_catalog_list(Arc::new(DropTestCatalogList { catalog }));

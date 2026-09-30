@@ -22,7 +22,7 @@ use async_trait::async_trait;
 use datafusion_catalog::{CatalogProvider, CatalogProviderList, SchemaProvider, TableProvider};
 use datafusion_common::{Result, not_impl_err};
 
-use crate::{DropSchemaOptions, DropTableOptions, SedonaCatalog, SedonaCatalogList, SedonaSchema};
+use crate::{SedonaCatalog, SedonaCatalogList, SedonaSchema};
 
 /// Exposes a [`crate::SedonaCatalogList`] to DataFusion's read-side catalog API.
 pub struct DataFusionCatalogList {
@@ -120,13 +120,12 @@ impl CatalogProvider for DataFusionCatalog {
 
     fn deregister_schema(
         &self,
-        name: &str,
-        cascade: bool,
+        _name: &str,
+        _cascade: bool,
     ) -> Result<Option<Arc<dyn SchemaProvider>>> {
-        Ok(self
-            .inner
-            .drop_schema(name, &DropSchemaOptions { cascade })?
-            .map(|schema| Arc::new(DataFusionSchema::new(schema)) as _))
+        not_impl_err!(
+            "Deregistering schemas is not supported by a Sedona catalog; use drop_schema instead"
+        )
     }
 }
 
@@ -177,8 +176,10 @@ impl SchemaProvider for DataFusionSchema {
         not_impl_err!("Registering tables is not supported by a Sedona schema; use create instead")
     }
 
-    fn deregister_table(&self, name: &str) -> Result<Option<Arc<dyn TableProvider>>> {
-        self.inner.drop_table(name, &DropTableOptions::default())
+    fn deregister_table(&self, _name: &str) -> Result<Option<Arc<dyn TableProvider>>> {
+        not_impl_err!(
+            "Deregistering tables is not supported by a Sedona schema; use drop_table instead"
+        )
     }
 
     fn table_exist(&self, name: &str) -> bool {

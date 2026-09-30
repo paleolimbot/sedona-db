@@ -428,7 +428,7 @@ unsafe extern "C" fn c_catalog_drop_schema(
     name: *const c_char,
     options: *const u8,
     options_len: usize,
-    out: *mut SedonaCSchemaProvider,
+    out: *mut SedonaCExecutionPlan,
     err: *mut SedonaCError,
 ) -> c_int {
     let exported = &*((*self_).private_data as *const ExportedCatalogProvider);
@@ -445,10 +445,10 @@ unsafe extern "C" fn c_catalog_drop_schema(
     {
         Ok(result) => {
             let result = result
-                .map(|inner| {
-                    ExportedSchemaProvider::new(
-                        inner,
-                        exported.session.clone(),
+                .map(|plan| {
+                    ExportedExecutionPlan::new(
+                        plan,
+                        exported.session.task_ctx(),
                         exported.runtime.clone(),
                     )
                     .into()
@@ -585,13 +585,13 @@ impl SedonaCatalog for ImportedCatalogProvider {
         &self,
         name: &str,
         options: &DropSchemaOptions,
-    ) -> Result<Option<Arc<dyn SedonaSchema>>> {
+    ) -> Result<Option<Arc<dyn ExecutionPlan>>> {
         let Some(callback) = self.inner.drop_schema else {
             return not_impl_err!("Dropping schemas is not supported by the foreign catalog");
         };
         let name = c_string(name)?;
         let options = serialize_json_options(options)?;
-        let mut out = SedonaCSchemaProvider::default();
+        let mut out = SedonaCExecutionPlan::default();
         let mut error = SedonaCError::default();
         let code = unsafe {
             callback(
@@ -606,7 +606,7 @@ impl SedonaCatalog for ImportedCatalogProvider {
         if code != ERRNO_OK {
             return sedona_common::sedona_internal_err!("Failed to drop schema: {error}");
         }
-        optional_schema(out, self.runtime.clone())
+        optional_execution_plan(out)
     }
 }
 
@@ -794,7 +794,7 @@ unsafe extern "C" fn c_schema_drop_table(
     name: *const c_char,
     options: *const u8,
     options_len: usize,
-    out: *mut SedonaCTableProvider,
+    out: *mut SedonaCExecutionPlan,
     err: *mut SedonaCError,
 ) -> c_int {
     let exported = &*((*self_).private_data as *const ExportedSchemaProvider);
@@ -811,10 +811,10 @@ unsafe extern "C" fn c_schema_drop_table(
     {
         Ok(result) => {
             let result = result
-                .map(|inner| {
-                    ExportedTableProvider::new(
-                        inner,
-                        exported.session.clone(),
+                .map(|plan| {
+                    ExportedExecutionPlan::new(
+                        plan,
+                        exported.session.task_ctx(),
                         exported.runtime.clone(),
                     )
                     .into()
@@ -999,13 +999,13 @@ impl SedonaSchema for ImportedSchemaProvider {
         &self,
         name: &str,
         options: &DropTableOptions,
-    ) -> Result<Option<Arc<dyn TableProvider>>> {
+    ) -> Result<Option<Arc<dyn ExecutionPlan>>> {
         let Some(callback) = self.inner.drop_table else {
             return not_impl_err!("Dropping tables is not supported by the foreign schema");
         };
         let name = c_string(name)?;
         let options = serialize_json_options(options)?;
-        let mut out = SedonaCTableProvider::default();
+        let mut out = SedonaCExecutionPlan::default();
         let mut error = SedonaCError::default();
         let code = unsafe {
             callback(
@@ -1020,7 +1020,7 @@ impl SedonaSchema for ImportedSchemaProvider {
         if code != ERRNO_OK {
             return sedona_common::sedona_internal_err!("Failed to drop table: {error}");
         }
-        optional_table(out)
+        optional_execution_plan(out)
     }
     fn table_exist(&self, name: &str) -> bool {
         self.try_table_exist(name).unwrap_or(false)
@@ -1097,18 +1097,92 @@ fn optional_table(raw: SedonaCTableProvider) -> Result<Option<Arc<dyn TableProvi
     }
 }
 
+fn optional_execution_plan(raw: SedonaCExecutionPlan) -> Result<Option<Arc<dyn ExecutionPlan>>> {
+    if raw.release.is_none() {
+        Ok(None)
+    } else {
+        Ok(Some(Arc::new(ImportedSedonaCExec::try_new(raw)?)))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
-    use std::sync::RwLock;
+    use std::sync::{Mutex, RwLock};
 
     use super::*;
     use arrow_schema::Schema;
     use datafusion::catalog::CatalogProviderList;
     use datafusion::datasource::empty::EmptyTable;
     use datafusion::prelude::SessionContext;
+    use datafusion_execution::TaskContext;
+    use datafusion_physical_plan::empty::EmptyExec;
     use datafusion_physical_plan::placeholder_row::PlaceholderRowExec;
+    use datafusion_physical_plan::{
+        DisplayAs, DisplayFormatType, PlanProperties, SendableRecordBatchStream,
+    };
     use sedona_catalog::{CatalogObjectType, CreateMode, DataFusionCatalog, DataFusionCatalogList};
+
+    struct TestMutationExec {
+        inner: Arc<dyn ExecutionPlan>,
+        mutation: Mutex<Option<Box<dyn FnOnce() + Send>>>,
+    }
+
+    impl TestMutationExec {
+        fn new(mutation: impl FnOnce() + Send + 'static) -> Self {
+            Self {
+                inner: Arc::new(EmptyExec::new(Arc::new(Schema::empty()))),
+                mutation: Mutex::new(Some(Box::new(mutation))),
+            }
+        }
+    }
+
+    impl Debug for TestMutationExec {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("TestMutationExec").finish()
+        }
+    }
+
+    impl DisplayAs for TestMutationExec {
+        fn fmt_as(&self, _t: DisplayFormatType, f: &mut Formatter<'_>) -> std::fmt::Result {
+            write!(f, "TestMutationExec")
+        }
+    }
+
+    impl ExecutionPlan for TestMutationExec {
+        fn name(&self) -> &str {
+            "TestMutationExec"
+        }
+
+        fn properties(&self) -> &Arc<PlanProperties> {
+            self.inner.properties()
+        }
+
+        fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+            vec![]
+        }
+
+        fn with_new_children(
+            self: Arc<Self>,
+            children: Vec<Arc<dyn ExecutionPlan>>,
+        ) -> Result<Arc<dyn ExecutionPlan>> {
+            if !children.is_empty() {
+                return datafusion_common::internal_err!("TestMutationExec does not have children");
+            }
+            Ok(self)
+        }
+
+        fn execute(
+            &self,
+            partition: usize,
+            context: Arc<TaskContext>,
+        ) -> Result<SendableRecordBatchStream> {
+            if let Some(mutation) = self.mutation.lock().unwrap().take() {
+                mutation();
+            }
+            self.inner.execute(partition, context)
+        }
+    }
 
     #[derive(Debug, Default)]
     struct TestCatalogList {
@@ -1145,7 +1219,7 @@ mod tests {
 
     #[derive(Debug, Default)]
     struct TestCatalog {
-        schemas: RwLock<HashMap<String, Arc<dyn SedonaSchema>>>,
+        schemas: Arc<RwLock<HashMap<String, Arc<dyn SedonaSchema>>>>,
     }
 
     impl SedonaCatalog for TestCatalog {
@@ -1179,19 +1253,26 @@ mod tests {
             &self,
             name: &str,
             options: &DropSchemaOptions,
-        ) -> Result<Option<Arc<dyn SedonaSchema>>> {
+        ) -> Result<Option<Arc<dyn ExecutionPlan>>> {
             if name == "schema_two" && !options.cascade {
                 return sedona_common::sedona_internal_err!(
                     "schema_two must be dropped with cascade"
                 );
             }
-            Ok(self.schemas.write().unwrap().remove(name))
+            if !self.schemas.read().unwrap().contains_key(name) {
+                return Ok(None);
+            }
+            let schemas = self.schemas.clone();
+            let name = name.to_owned();
+            Ok(Some(Arc::new(TestMutationExec::new(move || {
+                schemas.write().unwrap().remove(&name);
+            }))))
         }
     }
 
     #[derive(Debug, Default)]
     struct TestSchema {
-        tables: RwLock<HashMap<String, Arc<dyn TableProvider>>>,
+        tables: Arc<RwLock<HashMap<String, Arc<dyn TableProvider>>>>,
     }
 
     #[async_trait]
@@ -1223,7 +1304,7 @@ mod tests {
             &self,
             name: &str,
             options: &DropTableOptions,
-        ) -> Result<Option<Arc<dyn TableProvider>>> {
+        ) -> Result<Option<Arc<dyn ExecutionPlan>>> {
             if name == "table_one"
                 && (!options.purge || options.object_type != Some(CatalogObjectType::Table))
             {
@@ -1234,7 +1315,14 @@ mod tests {
             if name == "view_one" && options.object_type != Some(CatalogObjectType::View) {
                 return sedona_common::sedona_internal_err!("view_one must be dropped as a view");
             }
-            Ok(self.tables.write().unwrap().remove(name))
+            if !self.tables.read().unwrap().contains_key(name) {
+                return Ok(None);
+            }
+            let tables = self.tables.clone();
+            let name = name.to_owned();
+            Ok(Some(Arc::new(TestMutationExec::new(move || {
+                tables.write().unwrap().remove(&name);
+            }))))
         }
 
         fn table_exist(&self, name: &str) -> bool {
@@ -1398,10 +1486,17 @@ mod tests {
             object_type: Some(CatalogObjectType::Table),
             purge: true,
         };
-        assert!(schema
+        let drop_plan = schema
             .drop_table("table_one", &drop_options)
             .unwrap()
-            .is_some());
+            .unwrap();
+        assert!(schema.table_exist("table_one"));
+        runtime
+            .block_on(datafusion_physical_plan::collect(
+                drop_plan,
+                consumer_session.task_ctx(),
+            ))
+            .unwrap();
         assert!(!schema.table_exist("table_one"));
         assert!(schema
             .drop_table("table_one", &drop_options)
@@ -1442,10 +1537,17 @@ mod tests {
             .unwrap();
         assert!(catalog.schema("schema_two").is_some());
         let drop_options = DropSchemaOptions { cascade: true };
-        assert!(catalog
+        let drop_plan = catalog
             .drop_schema("schema_two", &drop_options)
             .unwrap()
-            .is_some());
+            .unwrap();
+        assert!(catalog.schema("schema_two").is_some());
+        runtime
+            .block_on(datafusion_physical_plan::collect(
+                drop_plan,
+                consumer_session.task_ctx(),
+            ))
+            .unwrap();
         assert!(catalog.schema("schema_two").is_none());
         assert!(catalog
             .drop_schema("schema_two", &drop_options)
