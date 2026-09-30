@@ -22,7 +22,7 @@ use datafusion_expr::{DdlStatement, LogicalPlan, TableType};
 use datafusion_physical_plan::ExecutionPlan;
 use sedona_catalog::{
     CatalogObjectType, CreateCatalogOptions, CreateMode, CreateSchemaOptions, CreateTableOptions,
-    DropSchemaOptions, DropTableOptions,
+    DropSchemaOptions, DropTableOptions, SedonaSchema,
 };
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -43,10 +43,10 @@ pub(crate) async fn create_plan_from_sql(
 ) -> Result<LogicalPlan, DataFusionError> {
     let mut plan = ctx.ctx.state().statement_to_plan(statement).await?;
 
-    // Note that cmd is a mutable reference so that create_external_table function can remove all
-    // datafusion-cli specific options before passing through to datafusion. Otherwise, datafusion
-    // will raise Configuration errors.
     if let LogicalPlan::Ddl(DdlStatement::CreateExternalTable(cmd)) = &plan {
+        if targets_foreign_catalog(ctx, &cmd.name)? {
+            reject_unsupported_external_table_metadata(cmd)?;
+        }
         register_object_store_and_config_extensions(ctx, &cmd.location, &cmd.options).await?;
     }
 
@@ -131,33 +131,24 @@ pub(crate) async fn execute_sedona_catalog_ddl(
         }
         DdlStatement::CreateExternalTable(cmd) => {
             let state = ctx.ctx.state();
-            let catalog_options = &state.config_options().catalog;
-            let resolved = cmd.name.clone().resolve(
-                &catalog_options.default_catalog,
-                &catalog_options.default_schema,
-            );
-            let Some(catalog) = ctx.catalog_registry().foreign_catalog(&resolved.catalog)? else {
-                return Ok(None);
-            };
-            let Some(schema) = catalog.schema(&resolved.schema)? else {
-                return Ok(None);
-            };
-
-            let mode = match (cmd.if_not_exists, cmd.or_replace) {
-                (true, true) => return exec_err!("'IF NOT EXISTS' cannot coexist with 'REPLACE'"),
-                (true, false) => CreateMode::CreateOrIgnore,
-                (false, true) => CreateMode::Replace,
-                (false, false) => CreateMode::Create,
-            };
-            match (mode, schema.table_exist(&resolved.table)?) {
-                (CreateMode::CreateOrIgnore, true) => {
+            let action = prepare_foreign_table_create(
+                ctx,
+                &cmd.name,
+                cmd.if_not_exists,
+                cmd.or_replace,
+                cmd.temporary,
+                true,
+            )?;
+            if !matches!(&action, ForeignTableCreateAction::NotForeign) {
+                reject_unsupported_external_table_metadata(cmd)?;
+            }
+            let target = match action {
+                ForeignTableCreateAction::NotForeign => return Ok(None),
+                ForeignTableCreateAction::Ignore => {
                     return Ok(Some(ctx.ctx.read_empty()?));
                 }
-                (CreateMode::Create, true) => {
-                    return exec_err!("External table '{}' already exists", cmd.name)
-                }
-                _ => {}
-            }
+                ForeignTableCreateAction::Create(target) => target,
+            };
 
             let file_type = cmd.file_type.to_uppercase();
             let factory = state
@@ -171,43 +162,27 @@ pub(crate) async fn execute_sedona_catalog_ddl(
                 })?;
             let provider = factory.create(&state, cmd).await?;
             let input = provider.scan(&state, None, &[], None).await?;
-            let create = schema.create(
-                &state,
-                &resolved.table,
-                &CreateTableOptions {
-                    mode,
-                    temporary: cmd.temporary,
-                },
-                input,
-            )?;
-            Ok(Some(ctx.ctx.read_table(Arc::new(CatalogDdlProvider {
-                plan: create,
-            }))?))
+            Ok(Some(finish_foreign_table_create(ctx, target, input)?))
         }
         DdlStatement::CreateMemoryTable(cmd) => {
             let state = ctx.ctx.state();
-            let catalog_options = &state.config_options().catalog;
-            let resolved = cmd.name.clone().resolve(
-                &catalog_options.default_catalog,
-                &catalog_options.default_schema,
-            );
-            if let Some(catalog) = ctx.catalog_registry().foreign_catalog(&resolved.catalog)? {
-                if cmd.if_not_exists && cmd.or_replace {
-                    return exec_err!("'IF NOT EXISTS' cannot coexist with 'REPLACE'");
+            let target = match prepare_foreign_table_create(
+                ctx,
+                &cmd.name,
+                cmd.if_not_exists,
+                cmd.or_replace,
+                cmd.temporary,
+                false,
+            )? {
+                ForeignTableCreateAction::NotForeign => return Ok(None),
+                ForeignTableCreateAction::Ignore => {
+                    return Ok(Some(ctx.ctx.read_empty()?));
                 }
-                if cmd.if_not_exists {
-                    if let Some(schema) = catalog.schema(&resolved.schema)? {
-                        if schema.table_exist(&resolved.table)? {
-                            return Ok(Some(ctx.ctx.read_empty()?));
-                        }
-                    }
-                }
-                return exec_err!(
-                    "CREATE TABLE AS is not supported for foreign table '{}'; use CREATE EXTERNAL TABLE instead",
-                    cmd.name
-                );
-            }
-            Ok(None)
+                ForeignTableCreateAction::Create(target) => target,
+            };
+
+            let input = state.create_physical_plan(cmd.input.as_ref()).await?;
+            Ok(Some(finish_foreign_table_create(ctx, target, input)?))
         }
         DdlStatement::CreateView(cmd) => {
             if targets_foreign_catalog(ctx, &cmd.name)? {
@@ -234,6 +209,113 @@ pub(crate) async fn execute_sedona_catalog_ddl(
             },
         ),
         _ => Ok(None),
+    }
+}
+
+struct ForeignTableCreate {
+    schema: Arc<dyn SedonaSchema>,
+    table_name: String,
+    options: CreateTableOptions,
+}
+
+enum ForeignTableCreateAction {
+    NotForeign,
+    Ignore,
+    Create(ForeignTableCreate),
+}
+
+/// Resolve and validate a foreign table create.
+fn prepare_foreign_table_create(
+    ctx: &SedonaContext,
+    name: &TableReference,
+    if_not_exists: bool,
+    or_replace: bool,
+    temporary: bool,
+    external: bool,
+) -> Result<ForeignTableCreateAction, DataFusionError> {
+    let state = ctx.ctx.state();
+    let catalog_options = &state.config_options().catalog;
+    let resolved = name.clone().resolve(
+        &catalog_options.default_catalog,
+        &catalog_options.default_schema,
+    );
+    let Some(catalog) = ctx.catalog_registry().foreign_catalog(&resolved.catalog)? else {
+        return Ok(ForeignTableCreateAction::NotForeign);
+    };
+    let Some(schema) = catalog.schema(&resolved.schema)? else {
+        return exec_err!(
+            "Schema '{}.{}' doesn't exist",
+            resolved.catalog,
+            resolved.schema
+        );
+    };
+
+    let mode = match (if_not_exists, or_replace) {
+        (true, true) => return exec_err!("'IF NOT EXISTS' cannot coexist with 'REPLACE'"),
+        (true, false) => CreateMode::CreateOrIgnore,
+        (false, true) => CreateMode::Replace,
+        (false, false) => CreateMode::Create,
+    };
+    match (mode, schema.table_exist(&resolved.table)?) {
+        (CreateMode::CreateOrIgnore, true) => return Ok(ForeignTableCreateAction::Ignore),
+        (CreateMode::Create, true) => return exec_err!("Table '{name}' already exists"),
+        _ => {}
+    }
+
+    Ok(ForeignTableCreateAction::Create(ForeignTableCreate {
+        schema,
+        table_name: resolved.table.to_string(),
+        options: CreateTableOptions {
+            mode,
+            temporary,
+            external,
+        },
+    }))
+}
+
+fn finish_foreign_table_create(
+    ctx: &SedonaContext,
+    target: ForeignTableCreate,
+    input: Arc<dyn ExecutionPlan>,
+) -> Result<DataFrame, DataFusionError> {
+    let state = ctx.ctx.state();
+    let create = target
+        .schema
+        .create(&state, &target.table_name, &target.options, input)?;
+    ctx.ctx
+        .read_table(Arc::new(CatalogDdlProvider { plan: create }))
+}
+
+fn reject_unsupported_external_table_metadata(
+    cmd: &datafusion_expr::CreateExternalTable,
+) -> Result<(), DataFusionError> {
+    let mut unsupported = Vec::new();
+    if !cmd.table_partition_cols.is_empty() {
+        unsupported.push("PARTITIONED BY");
+    }
+    if !cmd.order_exprs.is_empty() {
+        unsupported.push("WITH ORDER");
+    }
+    if cmd.unbounded {
+        unsupported.push("UNBOUNDED");
+    }
+    if !cmd.options.is_empty() {
+        unsupported.push("OPTIONS");
+    }
+    if !cmd.constraints.is_empty() {
+        unsupported.push("table constraints");
+    }
+    if !cmd.column_defaults.is_empty() {
+        unsupported.push("column defaults");
+    }
+
+    if unsupported.is_empty() {
+        Ok(())
+    } else {
+        exec_err!(
+            "CREATE EXTERNAL TABLE for a foreign catalog cannot preserve: {}",
+            unsupported.join(", ")
+        )
     }
 }
 
@@ -593,6 +675,48 @@ mod tests {
         }
     }
 
+    #[derive(Debug, Default)]
+    struct CreateTestSchema {
+        received: Mutex<Vec<(String, CreateTableOptions)>>,
+    }
+
+    #[async_trait]
+    impl SedonaSchema for CreateTestSchema {
+        fn table_names(&self) -> Result<Vec<String>> {
+            Ok(Vec::new())
+        }
+
+        async fn table(&self, _name: &str) -> Result<Option<Arc<dyn TableProvider>>> {
+            Ok(None)
+        }
+
+        fn create(
+            &self,
+            _session: &dyn Session,
+            name: &str,
+            options: &CreateTableOptions,
+            input: Arc<dyn ExecutionPlan>,
+        ) -> Result<Arc<dyn ExecutionPlan>> {
+            self.received
+                .lock()
+                .unwrap()
+                .push((name.to_owned(), *options));
+            Ok(input)
+        }
+
+        fn drop_table(
+            &self,
+            _name: &str,
+            _options: &DropTableOptions,
+        ) -> Result<Option<Arc<dyn ExecutionPlan>>> {
+            datafusion_common::not_impl_err!("not needed by create tests")
+        }
+
+        fn table_exist(&self, _name: &str) -> Result<bool> {
+            Ok(false)
+        }
+    }
+
     #[tokio::test]
     async fn foreign_drop_distinguishes_tables_and_views() -> Result<()> {
         let schema = Arc::new(DropTestSchema {
@@ -731,7 +855,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn unsupported_foreign_create_does_not_drop_existing_objects() -> Result<()> {
+    async fn foreign_create_does_not_drop_existing_objects_eagerly() -> Result<()> {
         let schema = Arc::new(DropTestSchema {
             objects: Arc::new(Mutex::new(HashMap::from([
                 ("table_one".to_owned(), CatalogObjectType::Table),
@@ -756,9 +880,7 @@ mod tests {
             .sql("CREATE OR REPLACE TABLE foreign.public.table_one AS SELECT 1")
             .await
             .unwrap_err();
-        assert!(table_error
-            .to_string()
-            .contains("use CREATE EXTERNAL TABLE instead"));
+        assert!(table_error.to_string().contains("not needed by drop tests"));
         assert!(schema.table_exist("table_one")?);
 
         let view_error = ctx
@@ -771,6 +893,135 @@ mod tests {
         assert!(schema.table_exist("view_one")?);
         assert!(schema.received.lock().unwrap().is_empty());
 
+        Ok(())
+    }
+
+    fn create_test_context(schema: Arc<dyn SedonaSchema>) -> SedonaContext {
+        let catalog: Arc<dyn SedonaCatalog> = Arc::new(DropTestCatalog {
+            schema,
+            schema_exists: Arc::new(AtomicBool::new(true)),
+        });
+        let ctx = SedonaContext::new();
+        ctx.register_catalog_list(Arc::new(DropTestCatalogList { catalog }));
+        ctx
+    }
+
+    #[tokio::test]
+    async fn foreign_ctas_uses_managed_create() -> Result<()> {
+        let schema = Arc::new(CreateTestSchema::default());
+        let ctx = create_test_context(schema.clone());
+
+        ctx.sql("CREATE TABLE foreign.public.created AS SELECT 1 AS value")
+            .await?;
+
+        assert_eq!(
+            *schema.received.lock().unwrap(),
+            vec![(
+                "created".to_owned(),
+                CreateTableOptions {
+                    mode: CreateMode::Create,
+                    temporary: false,
+                    external: false,
+                }
+            )]
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn foreign_external_table_sets_external_create_option() -> Result<()> {
+        let schema = Arc::new(CreateTestSchema::default());
+        let ctx = create_test_context(schema.clone());
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("values.csv");
+        std::fs::write(&path, "1\n")?;
+
+        ctx.sql(&format!(
+            "CREATE EXTERNAL TABLE foreign.public.created (value BIGINT) \
+             STORED AS CSV LOCATION '{}'",
+            path.display()
+        ))
+        .await?;
+
+        assert_eq!(
+            *schema.received.lock().unwrap(),
+            vec![(
+                "created".to_owned(),
+                CreateTableOptions {
+                    mode: CreateMode::Create,
+                    temporary: false,
+                    external: true,
+                }
+            )]
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn foreign_external_table_rejects_unpreserved_metadata() -> Result<()> {
+        let schema = Arc::new(CreateTestSchema::default());
+        let ctx = create_test_context(schema.clone());
+        let error = ctx
+            .sql(
+                "CREATE EXTERNAL TABLE foreign.public.created (value BIGINT) \
+                 STORED AS CSV LOCATION 'values.csv' \
+                 OPTIONS ('format.has_header' 'true')",
+            )
+            .await
+            .unwrap_err();
+
+        assert!(error.to_string().contains("cannot preserve: OPTIONS"));
+        assert!(schema.received.lock().unwrap().is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn external_table_metadata_validation_covers_optional_clauses() -> Result<()> {
+        let ctx = SedonaContext::new();
+        let cases = [
+            (
+                "CREATE EXTERNAL TABLE t (value BIGINT) STORED AS CSV \
+                 PARTITIONED BY (part BIGINT) LOCATION 'values.csv'",
+                "PARTITIONED BY",
+            ),
+            (
+                "CREATE EXTERNAL TABLE t (value BIGINT) STORED AS CSV \
+                 WITH ORDER (value) LOCATION 'values.csv'",
+                "WITH ORDER",
+            ),
+            (
+                "CREATE UNBOUNDED EXTERNAL TABLE t (value BIGINT) \
+                 STORED AS CSV LOCATION 'values.csv'",
+                "UNBOUNDED",
+            ),
+            (
+                "CREATE EXTERNAL TABLE t (value BIGINT) STORED AS CSV \
+                 LOCATION 'values.csv' OPTIONS ('format.has_header' 'true')",
+                "OPTIONS",
+            ),
+            (
+                "CREATE EXTERNAL TABLE t (value BIGINT, PRIMARY KEY (value)) \
+                 STORED AS CSV LOCATION 'values.csv'",
+                "table constraints",
+            ),
+            (
+                "CREATE EXTERNAL TABLE t (value BIGINT DEFAULT 1) \
+                 STORED AS CSV LOCATION 'values.csv'",
+                "column defaults",
+            ),
+        ];
+
+        for (sql, expected) in cases {
+            let plan = ctx.ctx.state().create_logical_plan(sql).await?;
+            let LogicalPlan::Ddl(DdlStatement::CreateExternalTable(cmd)) = plan else {
+                panic!("expected CreateExternalTable plan for {sql}");
+            };
+            let error = reject_unsupported_external_table_metadata(&cmd).unwrap_err();
+            assert!(
+                error.to_string().contains(expected),
+                "expected {expected:?} in {error}"
+            );
+        }
         Ok(())
     }
 

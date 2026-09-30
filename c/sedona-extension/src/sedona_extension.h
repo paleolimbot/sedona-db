@@ -519,8 +519,8 @@ struct SedonaCSchemaProvider {
   /// \brief Create a table from `plan`, taking ownership of the input plan
   ///
   /// `options` contains a JSON object with a `mode` string (`"create"`,
-  /// `"create_or_ignore"`, or `"replace"`) and a `temporary` boolean and may
-  /// be NULL when `options_len` is zero.
+  /// `"create_or_ignore"`, or `"replace"`), a `temporary` boolean, and an
+  /// `external` boolean and may be NULL when `options_len` is zero.
   /// The returned execution plan performs the create operation when executed.
   int (*create_table)(const struct SedonaCSchemaProvider* self, const char* name,
                       const uint8_t* options, size_t options_len,

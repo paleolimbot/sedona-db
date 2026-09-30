@@ -1506,6 +1506,7 @@ mod tests {
                 &CreateTableOptions {
                     mode: CreateMode::CreateOrIgnore,
                     temporary: true,
+                    external: false,
                 },
                 input,
             )
@@ -1629,6 +1630,7 @@ mod tests {
                 &CreateTableOptions {
                     mode: CreateMode::CreateOrIgnore,
                     temporary: true,
+                    external: false,
                 },
                 input,
             )
@@ -1729,6 +1731,7 @@ mod tests {
         let options = serde_json::to_vec(&CreateTableOptions {
             mode: CreateMode::CreateOrIgnore,
             temporary: true,
+            external: false,
         })
         .unwrap();
         let code = unsafe {

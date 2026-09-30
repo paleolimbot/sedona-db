@@ -74,6 +74,8 @@ pub struct CreateTableOptions {
     pub mode: CreateMode,
     /// Whether the table is temporary.
     pub temporary: bool,
+    /// Whether the table is backed by an external data source.
+    pub external: bool,
 }
 
 /// Options for dropping a schema.
