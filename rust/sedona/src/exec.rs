@@ -166,14 +166,18 @@ pub(crate) async fn execute_sedona_catalog_ddl(
         }
         DdlStatement::CreateMemoryTable(cmd) => {
             let state = ctx.ctx.state();
-            let target = match prepare_foreign_table_create(
+            let action = prepare_foreign_table_create(
                 ctx,
                 &cmd.name,
                 cmd.if_not_exists,
                 cmd.or_replace,
                 cmd.temporary,
                 false,
-            )? {
+            )?;
+            if !matches!(&action, ForeignTableCreateAction::NotForeign) {
+                reject_unsupported_memory_table_metadata(cmd)?;
+            }
+            let target = match action {
                 ForeignTableCreateAction::NotForeign => return Ok(None),
                 ForeignTableCreateAction::Ignore => {
                     return Ok(Some(ctx.ctx.read_empty()?));
@@ -284,6 +288,27 @@ fn finish_foreign_table_create(
         .create(&state, &target.table_name, &target.options, input)?;
     ctx.ctx
         .read_table(Arc::new(CatalogDdlProvider { plan: create }))
+}
+
+fn reject_unsupported_memory_table_metadata(
+    cmd: &datafusion_expr::CreateMemoryTable,
+) -> Result<(), DataFusionError> {
+    let mut unsupported = Vec::new();
+    if !cmd.constraints.is_empty() {
+        unsupported.push("table constraints");
+    }
+    if !cmd.column_defaults.is_empty() {
+        unsupported.push("column defaults");
+    }
+
+    if unsupported.is_empty() {
+        Ok(())
+    } else {
+        exec_err!(
+            "CREATE TABLE for a foreign catalog cannot preserve: {}",
+            unsupported.join(", ")
+        )
+    }
 }
 
 fn reject_unsupported_external_table_metadata(
@@ -906,25 +931,108 @@ mod tests {
         ctx
     }
 
+    #[rstest::rstest]
+    #[case("CREATE TABLE", CreateMode::Create)]
+    #[case("CREATE TABLE IF NOT EXISTS", CreateMode::CreateOrIgnore)]
+    #[case("CREATE OR REPLACE TABLE", CreateMode::Replace)]
     #[tokio::test]
-    async fn foreign_ctas_uses_managed_create() -> Result<()> {
+    async fn foreign_ctas_uses_managed_create(
+        #[case] create: &str,
+        #[case] mode: CreateMode,
+    ) -> Result<()> {
         let schema = Arc::new(CreateTestSchema::default());
         let ctx = create_test_context(schema.clone());
 
-        ctx.sql("CREATE TABLE foreign.public.created AS SELECT 1 AS value")
-            .await?;
+        ctx.sql(&format!(
+            "{create} foreign.public.created AS SELECT 1 AS value"
+        ))
+        .await?;
 
         assert_eq!(
             *schema.received.lock().unwrap(),
             vec![(
                 "created".to_owned(),
                 CreateTableOptions {
-                    mode: CreateMode::Create,
+                    mode,
                     temporary: false,
                     external: false,
                 }
             )]
         );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn foreign_memory_table_rejects_unpreserved_metadata() -> Result<()> {
+        let schema = Arc::new(CreateTestSchema::default());
+        let ctx = create_test_context(schema.clone());
+        let cases = [
+            ("value BIGINT DEFAULT 42", "column defaults"),
+            ("value BIGINT, PRIMARY KEY (value)", "table constraints"),
+            ("value BIGINT UNIQUE", "table constraints"),
+            (
+                "value BIGINT DEFAULT 42, PRIMARY KEY (value)",
+                "table constraints, column defaults",
+            ),
+        ];
+
+        for (columns, expected) in cases {
+            let error = ctx
+                .sql(&format!("CREATE TABLE foreign.public.created ({columns})"))
+                .await
+                .unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains(&format!("cannot preserve: {expected}")),
+                "expected {expected:?} in {error}"
+            );
+        }
+        assert!(schema.received.lock().unwrap().is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn foreign_memory_table_metadata_is_rejected_for_existing_tables() -> Result<()> {
+        let schema = Arc::new(DropTestSchema {
+            objects: Arc::new(Mutex::new(HashMap::from([(
+                "table_one".to_owned(),
+                CatalogObjectType::Table,
+            )]))),
+            received: Mutex::new(Vec::new()),
+        });
+        let ctx = create_test_context(schema.clone());
+
+        for create in ["CREATE TABLE IF NOT EXISTS", "CREATE OR REPLACE TABLE"] {
+            let error = ctx
+                .sql(&format!(
+                    "{create} foreign.public.table_one \
+                     (value BIGINT DEFAULT 42, PRIMARY KEY (value))"
+                ))
+                .await
+                .unwrap_err();
+            assert!(error
+                .to_string()
+                .contains("cannot preserve: table constraints, column defaults"));
+            assert!(schema.table_exist("table_one")?);
+        }
+        assert!(schema.received.lock().unwrap().is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn builtin_memory_table_preserves_metadata_with_foreign_catalog() -> Result<()> {
+        let schema = Arc::new(CreateTestSchema::default());
+        let ctx = create_test_context(schema.clone());
+        ctx.sql("CREATE TABLE created (value BIGINT DEFAULT 42, PRIMARY KEY (value))")
+            .await?
+            .collect()
+            .await?;
+
+        let table = ctx.ctx.table_provider("created").await?;
+        assert!(!table.constraints().unwrap().is_empty());
+        assert!(table.get_column_default("value").is_some());
+        assert!(schema.received.lock().unwrap().is_empty());
         Ok(())
     }
 
