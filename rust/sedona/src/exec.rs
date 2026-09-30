@@ -19,52 +19,31 @@ use datafusion_expr::{DdlStatement, LogicalPlan};
 use crate::{context::SedonaContext, object_storage::register_object_store_and_config_extensions};
 
 use datafusion::{
-    config::ConfigFileType,
     error::{DataFusionError, Result},
     sql::parser::Statement,
 };
 
 /// A Sedona-specific hook for creating a logical plan from a SQL Statement
 ///
-/// Currently this provides support for CREATE EXTERNAL TABLE and
+/// Registers object stores and their option extensions for CREATE EXTERNAL TABLE and COPY.
 pub(crate) async fn create_plan_from_sql(
     ctx: &SedonaContext,
     statement: Statement,
 ) -> Result<LogicalPlan, DataFusionError> {
-    let mut plan = ctx.ctx.state().statement_to_plan(statement).await?;
+    let plan = ctx.ctx.state().statement_to_plan(statement).await?;
 
-    // Note that cmd is a mutable reference so that create_external_table function can remove all
-    // datafusion-cli specific options before passing through to datafusion. Otherwise, datafusion
-    // will raise Configuration errors.
+    // Configure storage for every location, leaving format options for the file format factory.
     if let LogicalPlan::Ddl(DdlStatement::CreateExternalTable(cmd)) = &plan {
-        // To support custom formats, treat error as None
-        let format = config_file_type_from_str(&cmd.file_type);
         let locations = cmd.locations.iter().map(|s| s.as_ref()).collect::<Vec<_>>();
-        register_object_store_and_config_extensions(ctx, &locations, &cmd.options, format).await?;
+        register_object_store_and_config_extensions(ctx, &locations, &cmd.options).await?;
     }
 
-    if let LogicalPlan::Copy(copy_to) = &mut plan {
-        let format = config_file_type_from_str(&copy_to.file_type.get_ext());
-
-        register_object_store_and_config_extensions(
-            ctx,
-            &[&copy_to.output_url],
-            &copy_to.options,
-            format,
-        )
-        .await?;
+    if let LogicalPlan::Copy(copy_to) = &plan {
+        register_object_store_and_config_extensions(ctx, &[&copy_to.output_url], &copy_to.options)
+            .await?;
     }
 
     Ok(plan)
-}
-
-pub(crate) fn config_file_type_from_str(ext: &str) -> Option<ConfigFileType> {
-    match ext.to_lowercase().as_str() {
-        "csv" => Some(ConfigFileType::CSV),
-        "json" => Some(ConfigFileType::JSON),
-        "parquet" => Some(ConfigFileType::PARQUET),
-        _ => None,
-    }
 }
 
 #[cfg(test)]
@@ -84,10 +63,8 @@ mod tests {
         let plan = ctx.ctx.state().create_logical_plan(sql).await?;
 
         if let LogicalPlan::Ddl(DdlStatement::CreateExternalTable(cmd)) = &plan {
-            let format = config_file_type_from_str(&cmd.file_type);
             let locations = cmd.locations.iter().map(|s| s.as_ref()).collect::<Vec<_>>();
-            register_object_store_and_config_extensions(&ctx, &locations, &cmd.options, format)
-                .await?;
+            register_object_store_and_config_extensions(&ctx, &locations, &cmd.options).await?;
         } else {
             return plan_err!("LogicalPlan is not a CreateExternalTable");
         }
@@ -107,14 +84,8 @@ mod tests {
         let plan = ctx.ctx.state().create_logical_plan(sql).await?;
 
         if let LogicalPlan::Copy(cmd) = &plan {
-            let format = config_file_type_from_str(&cmd.file_type.get_ext());
-            register_object_store_and_config_extensions(
-                &ctx,
-                &[&cmd.output_url],
-                &cmd.options,
-                format,
-            )
-            .await?;
+            register_object_store_and_config_extensions(&ctx, &[&cmd.output_url], &cmd.options)
+                .await?;
         } else {
             return plan_err!("LogicalPlan is not a CreateExternalTable");
         }
@@ -136,6 +107,40 @@ mod tests {
 
         Ok(())
     }
+
+    #[cfg(feature = "aws")]
+    #[tokio::test]
+    async fn create_external_table_multiple_locations_with_format_options() -> Result<()> {
+        let ctx = SedonaContext::new();
+        let locations = [
+            "s3://first-bucket/file.parquet",
+            "s3://second-bucket/file.parquet",
+        ];
+        let sql = format!(
+            "CREATE EXTERNAL TABLE test STORED AS PARQUET
+             LOCATION ('{}', '{}')
+             OPTIONS ('aws.skip_signature' 'true', 'aws.region' 'us-east-1',
+                      'format.validate' 'false')",
+            locations[0], locations[1]
+        );
+        let statement = DFParser::parse_sql(&sql)?.pop_front().unwrap();
+        let plan = create_plan_from_sql(&ctx, statement).await?;
+
+        let LogicalPlan::Ddl(DdlStatement::CreateExternalTable(cmd)) = plan else {
+            return plan_err!("LogicalPlan is not a CreateExternalTable");
+        };
+        assert_eq!(cmd.locations, locations);
+        // GeoParquet options must survive storage setup for the selected factory.
+        assert_eq!(cmd.options.get("format.validate").unwrap(), "false");
+        for location in locations {
+            ctx.ctx
+                .runtime_env()
+                .object_store(ListingTableUrl::parse(location)?)?;
+        }
+
+        Ok(())
+    }
+
     #[tokio::test]
     async fn copy_to_external_object_store_test() -> Result<()> {
         let locations = vec![
