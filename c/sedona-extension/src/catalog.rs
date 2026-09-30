@@ -15,6 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#![deny(missing_docs)]
+
 //! Import and export [`sedona_catalog`] implementations through the Sedona C ABI.
 
 use std::ffi::{c_char, c_int, CString};
@@ -30,7 +32,7 @@ use datafusion_common::{not_impl_err, Result};
 use datafusion_physical_plan::ExecutionPlan;
 use sedona_catalog::{
     CreateTableOptions, DropSchemaOptions, DropTableOptions, SedonaCatalog, SedonaCatalogList,
-    SedonaCatalogListRef, SedonaCatalogRef, SedonaSchema, SedonaSchemaRef,
+    SedonaSchema,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -49,7 +51,7 @@ use crate::utils::{
 
 /// Exports a [`SedonaCatalogList`] through [`SedonaCCatalogProviderList`].
 pub struct ExportedCatalogProviderList {
-    inner: SedonaCatalogListRef,
+    inner: Arc<dyn SedonaCatalogList>,
     session: Arc<dyn Session>,
     runtime: Arc<RuntimeHandle>,
 }
@@ -63,8 +65,9 @@ impl Debug for ExportedCatalogProviderList {
 }
 
 impl ExportedCatalogProviderList {
+    /// Create an exported catalog list using `session` and `runtime` for its providers.
     pub fn new(
-        inner: SedonaCatalogListRef,
+        inner: Arc<dyn SedonaCatalogList>,
         session: Arc<dyn Session>,
         runtime: Arc<RuntimeHandle>,
     ) -> Self {
@@ -187,6 +190,7 @@ impl Debug for ImportedCatalogProviderList {
 }
 
 impl ImportedCatalogProviderList {
+    /// Import a catalog list after validating its required C callbacks.
     pub fn try_new(
         inner: SedonaCCatalogProviderList,
         session: Weak<dyn Session>,
@@ -213,7 +217,7 @@ impl ImportedCatalogProviderList {
     }
 
     /// Create a catalog, preserving any error returned by the FFI callback.
-    pub fn try_create_catalog(&self, name: String) -> Result<SedonaCatalogRef> {
+    pub fn try_create_catalog(&self, name: String) -> Result<Arc<dyn SedonaCatalog>> {
         let Some(callback) = self.inner.create_catalog else {
             return not_impl_err!("Creating catalogs is not supported by the foreign catalog list");
         };
@@ -248,7 +252,7 @@ impl ImportedCatalogProviderList {
     }
 
     /// Look up a catalog, preserving any error returned by the FFI callback.
-    pub fn try_catalog(&self, name: &str) -> Result<Option<SedonaCatalogRef>> {
+    pub fn try_catalog(&self, name: &str) -> Result<Option<Arc<dyn SedonaCatalog>>> {
         let callback = self.inner.catalog.expect("validated in try_new");
         let name = c_string(name)?;
         let mut out = SedonaCCatalogProvider::default();
@@ -266,18 +270,18 @@ impl SedonaCatalogList for ImportedCatalogProviderList {
         self.try_catalog_names().unwrap_or_default()
     }
 
-    fn catalog(&self, name: &str) -> Option<SedonaCatalogRef> {
+    fn catalog(&self, name: &str) -> Option<Arc<dyn SedonaCatalog>> {
         self.try_catalog(name).ok().flatten()
     }
 
-    fn create(&self, name: &str) -> Result<SedonaCatalogRef> {
+    fn create(&self, name: &str) -> Result<Arc<dyn SedonaCatalog>> {
         self.try_create_catalog(name.to_owned())
     }
 }
 
 /// Exports a [`SedonaCatalog`] through [`SedonaCCatalogProvider`].
 pub struct ExportedCatalogProvider {
-    inner: SedonaCatalogRef,
+    inner: Arc<dyn SedonaCatalog>,
     session: Arc<dyn Session>,
     runtime: Arc<RuntimeHandle>,
 }
@@ -291,8 +295,9 @@ impl Debug for ExportedCatalogProvider {
 }
 
 impl ExportedCatalogProvider {
+    /// Create an exported catalog using `session` and `runtime` for its providers.
     pub fn new(
-        inner: SedonaCatalogRef,
+        inner: Arc<dyn SedonaCatalog>,
         session: Arc<dyn Session>,
         runtime: Arc<RuntimeHandle>,
     ) -> Self {
@@ -457,6 +462,7 @@ impl Debug for ImportedCatalogProvider {
 }
 
 impl ImportedCatalogProvider {
+    /// Import a catalog after validating its required C callbacks.
     pub fn try_new(
         inner: SedonaCCatalogProvider,
         session: Weak<dyn Session>,
@@ -499,7 +505,7 @@ impl ImportedCatalogProvider {
     }
 
     /// Look up a schema, preserving any error returned by the FFI callback.
-    pub fn try_schema(&self, name: &str) -> Result<Option<SedonaSchemaRef>> {
+    pub fn try_schema(&self, name: &str) -> Result<Option<Arc<dyn SedonaSchema>>> {
         let callback = self.inner.schema.expect("validated in try_new");
         let name = c_string(name)?;
         let mut out = SedonaCSchemaProvider::default();
@@ -512,7 +518,7 @@ impl ImportedCatalogProvider {
     }
 
     /// Create a schema, preserving any error returned by the FFI callback.
-    pub fn try_create_schema(&self, name: &str) -> Result<SedonaSchemaRef> {
+    pub fn try_create_schema(&self, name: &str) -> Result<Arc<dyn SedonaSchema>> {
         let Some(callback) = self.inner.create_schema else {
             return not_impl_err!("Creating schemas is not supported by the foreign catalog");
         };
@@ -535,11 +541,11 @@ impl SedonaCatalog for ImportedCatalogProvider {
     fn schema_names(&self) -> Vec<String> {
         self.try_schema_names().unwrap_or_default()
     }
-    fn schema(&self, name: &str) -> Option<SedonaSchemaRef> {
+    fn schema(&self, name: &str) -> Option<Arc<dyn SedonaSchema>> {
         self.try_schema(name).ok().flatten()
     }
 
-    fn create(&self, name: &str) -> Result<SedonaSchemaRef> {
+    fn create(&self, name: &str) -> Result<Arc<dyn SedonaSchema>> {
         self.try_create_schema(name)
     }
 
@@ -547,7 +553,7 @@ impl SedonaCatalog for ImportedCatalogProvider {
         &self,
         name: &str,
         options: &DropSchemaOptions,
-    ) -> Result<Option<SedonaSchemaRef>> {
+    ) -> Result<Option<Arc<dyn SedonaSchema>>> {
         let Some(callback) = self.inner.drop_schema else {
             return not_impl_err!("Dropping schemas is not supported by the foreign catalog");
         };
@@ -579,7 +585,7 @@ struct TableExistArgs {
 
 /// Exports a [`SedonaSchema`] through [`SedonaCSchemaProvider`].
 pub struct ExportedSchemaProvider {
-    inner: SedonaSchemaRef,
+    inner: Arc<dyn SedonaSchema>,
     session: Arc<dyn Session>,
     runtime: Arc<RuntimeHandle>,
 }
@@ -593,8 +599,9 @@ impl Debug for ExportedSchemaProvider {
 }
 
 impl ExportedSchemaProvider {
+    /// Create an exported schema using `session` and `runtime` for its providers.
     pub fn new(
-        inner: SedonaSchemaRef,
+        inner: Arc<dyn SedonaSchema>,
         session: Arc<dyn Session>,
         runtime: Arc<RuntimeHandle>,
     ) -> Self {
@@ -815,6 +822,7 @@ impl Debug for ImportedSchemaProvider {
 }
 
 impl ImportedSchemaProvider {
+    /// Import a schema after validating its required C callbacks and properties.
     pub fn try_new(
         inner: SedonaCSchemaProvider,
         session: Weak<dyn Session>,
@@ -1030,7 +1038,7 @@ fn optional_catalog(
     raw: SedonaCCatalogProvider,
     session: Weak<dyn Session>,
     runtime: Arc<RuntimeHandle>,
-) -> Result<Option<SedonaCatalogRef>> {
+) -> Result<Option<Arc<dyn SedonaCatalog>>> {
     if raw.release.is_none() {
         Ok(None)
     } else {
@@ -1044,7 +1052,7 @@ fn optional_schema(
     raw: SedonaCSchemaProvider,
     session: Weak<dyn Session>,
     runtime: Arc<RuntimeHandle>,
-) -> Result<Option<SedonaSchemaRef>> {
+) -> Result<Option<Arc<dyn SedonaSchema>>> {
     if raw.release.is_none() {
         Ok(None)
     } else {
@@ -1085,7 +1093,7 @@ mod tests {
 
     #[derive(Debug, Default)]
     struct TestCatalogList {
-        catalogs: RwLock<HashMap<String, SedonaCatalogRef>>,
+        catalogs: RwLock<HashMap<String, Arc<dyn SedonaCatalog>>>,
     }
 
     impl SedonaCatalogList for TestCatalogList {
@@ -1093,12 +1101,12 @@ mod tests {
             self.catalogs.read().unwrap().keys().cloned().collect()
         }
 
-        fn catalog(&self, name: &str) -> Option<SedonaCatalogRef> {
+        fn catalog(&self, name: &str) -> Option<Arc<dyn SedonaCatalog>> {
             self.catalogs.read().unwrap().get(name).cloned()
         }
 
-        fn create(&self, name: &str) -> Result<SedonaCatalogRef> {
-            let catalog: SedonaCatalogRef = Arc::new(TestCatalog::default());
+        fn create(&self, name: &str) -> Result<Arc<dyn SedonaCatalog>> {
+            let catalog: Arc<dyn SedonaCatalog> = Arc::new(TestCatalog::default());
             self.catalogs
                 .write()
                 .unwrap()
@@ -1109,7 +1117,7 @@ mod tests {
 
     #[derive(Debug, Default)]
     struct TestCatalog {
-        schemas: RwLock<HashMap<String, SedonaSchemaRef>>,
+        schemas: RwLock<HashMap<String, Arc<dyn SedonaSchema>>>,
     }
 
     impl SedonaCatalog for TestCatalog {
@@ -1117,12 +1125,12 @@ mod tests {
             self.schemas.read().unwrap().keys().cloned().collect()
         }
 
-        fn schema(&self, name: &str) -> Option<SedonaSchemaRef> {
+        fn schema(&self, name: &str) -> Option<Arc<dyn SedonaSchema>> {
             self.schemas.read().unwrap().get(name).cloned()
         }
 
-        fn create(&self, name: &str) -> Result<SedonaSchemaRef> {
-            let schema: SedonaSchemaRef = Arc::new(TestSchema::default());
+        fn create(&self, name: &str) -> Result<Arc<dyn SedonaSchema>> {
+            let schema: Arc<dyn SedonaSchema> = Arc::new(TestSchema::default());
             self.schemas
                 .write()
                 .unwrap()
@@ -1134,7 +1142,7 @@ mod tests {
             &self,
             name: &str,
             options: &DropSchemaOptions,
-        ) -> Result<Option<SedonaSchemaRef>> {
+        ) -> Result<Option<Arc<dyn SedonaSchema>>> {
             if name == "schema_two" && !options.cascade {
                 return sedona_common::sedona_internal_err!(
                     "schema_two must be dropped with cascade"

@@ -260,17 +260,14 @@ mod tests {
     use datafusion::datasource::listing::ListingTableUrl;
     use datafusion::sql::parser::DFParser;
     use datafusion_expr::sqlparser::dialect::dialect_from_str;
-    use sedona_catalog::{
-        DropSchemaOptions, SedonaCatalog, SedonaCatalogList, SedonaCatalogRef, SedonaSchema,
-        SedonaSchemaRef,
-    };
+    use sedona_catalog::{DropSchemaOptions, SedonaCatalog, SedonaCatalogList, SedonaSchema};
     use url::Url;
 
     use super::*;
 
     #[derive(Debug)]
     struct DropTestCatalogList {
-        catalog: SedonaCatalogRef,
+        catalog: Arc<dyn SedonaCatalog>,
     }
 
     impl SedonaCatalogList for DropTestCatalogList {
@@ -278,18 +275,18 @@ mod tests {
             vec!["foreign".to_owned()]
         }
 
-        fn catalog(&self, name: &str) -> Option<SedonaCatalogRef> {
+        fn catalog(&self, name: &str) -> Option<Arc<dyn SedonaCatalog>> {
             (name == "foreign").then(|| self.catalog.clone())
         }
 
-        fn create(&self, _name: &str) -> Result<SedonaCatalogRef> {
+        fn create(&self, _name: &str) -> Result<Arc<dyn SedonaCatalog>> {
             datafusion_common::not_impl_err!("not needed by drop tests")
         }
     }
 
     #[derive(Debug)]
     struct DropTestCatalog {
-        schema: SedonaSchemaRef,
+        schema: Arc<dyn SedonaSchema>,
     }
 
     impl SedonaCatalog for DropTestCatalog {
@@ -297,11 +294,11 @@ mod tests {
             vec!["public".to_owned()]
         }
 
-        fn schema(&self, name: &str) -> Option<SedonaSchemaRef> {
+        fn schema(&self, name: &str) -> Option<Arc<dyn SedonaSchema>> {
             (name == "public").then(|| self.schema.clone())
         }
 
-        fn create(&self, _name: &str) -> Result<SedonaSchemaRef> {
+        fn create(&self, _name: &str) -> Result<Arc<dyn SedonaSchema>> {
             datafusion_common::not_impl_err!("not needed by drop tests")
         }
 
@@ -309,7 +306,7 @@ mod tests {
             &self,
             _name: &str,
             _options: &DropSchemaOptions,
-        ) -> Result<Option<SedonaSchemaRef>> {
+        ) -> Result<Option<Arc<dyn SedonaSchema>>> {
             datafusion_common::not_impl_err!("not needed by drop tests")
         }
     }
@@ -370,7 +367,7 @@ mod tests {
             ])),
             received: Mutex::new(Vec::new()),
         });
-        let catalog: SedonaCatalogRef = Arc::new(DropTestCatalog {
+        let catalog: Arc<dyn SedonaCatalog> = Arc::new(DropTestCatalog {
             schema: schema.clone(),
         });
         let ctx = SedonaContext::new();

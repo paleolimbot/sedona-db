@@ -37,10 +37,6 @@ use serde::{Deserialize, Serialize};
 
 pub use adapter::{DataFusionCatalog, DataFusionCatalogList, DataFusionSchema};
 
-pub type SedonaCatalogListRef = Arc<dyn SedonaCatalogList>;
-pub type SedonaCatalogRef = Arc<dyn SedonaCatalog>;
-pub type SedonaSchemaRef = Arc<dyn SedonaSchema>;
-
 /// Options for creating a table.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
@@ -82,22 +78,26 @@ pub struct DropTableOptions {
 
 /// A collection of catalogs backed by a SedonaDB extension.
 pub trait SedonaCatalogList: Debug + Send + Sync {
+    /// Return the names of the catalogs in this list.
     fn catalog_names(&self) -> Vec<String>;
 
-    fn catalog(&self, name: &str) -> Option<SedonaCatalogRef>;
+    /// Return the catalog named `name`, or `None` when it does not exist.
+    fn catalog(&self, name: &str) -> Option<Arc<dyn SedonaCatalog>>;
 
     /// Create a catalog in the backing catalog system.
-    fn create(&self, name: &str) -> Result<SedonaCatalogRef>;
+    fn create(&self, name: &str) -> Result<Arc<dyn SedonaCatalog>>;
 }
 
 /// A collection of schemas backed by a SedonaDB extension.
 pub trait SedonaCatalog: Debug + Send + Sync {
+    /// Return the names of the schemas in this catalog.
     fn schema_names(&self) -> Vec<String>;
 
-    fn schema(&self, name: &str) -> Option<SedonaSchemaRef>;
+    /// Return the schema named `name`, or `None` when it does not exist.
+    fn schema(&self, name: &str) -> Option<Arc<dyn SedonaSchema>>;
 
     /// Create a schema in the backing catalog system.
-    fn create(&self, name: &str) -> Result<SedonaSchemaRef>;
+    fn create(&self, name: &str) -> Result<Arc<dyn SedonaSchema>>;
 
     /// Drop a schema from the backing catalog system.
     ///
@@ -106,18 +106,21 @@ pub trait SedonaCatalog: Debug + Send + Sync {
         &self,
         name: &str,
         options: &DropSchemaOptions,
-    ) -> Result<Option<SedonaSchemaRef>>;
+    ) -> Result<Option<Arc<dyn SedonaSchema>>>;
 }
 
 /// A collection of tables backed by a SedonaDB extension.
 #[async_trait]
 pub trait SedonaSchema: Debug + Send + Sync {
+    /// Return the name of the schema owner, when one is available.
     fn owner_name(&self) -> Option<&str> {
         None
     }
 
+    /// Return the names of the tables in this schema.
     fn table_names(&self) -> Vec<String>;
 
+    /// Return the table named `name`, or `None` when it does not exist.
     async fn table(&self, name: &str) -> Result<Option<Arc<dyn TableProvider>>>;
 
     /// Create a table from a physical input plan.
@@ -139,5 +142,6 @@ pub trait SedonaSchema: Debug + Send + Sync {
         options: &DropTableOptions,
     ) -> Result<Option<Arc<dyn TableProvider>>>;
 
+    /// Return whether a table named `name` exists in this schema.
     fn table_exist(&self, name: &str) -> bool;
 }

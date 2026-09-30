@@ -50,7 +50,7 @@ use datafusion_expr::dml::InsertOp;
 use datafusion_expr::sqlparser::dialect::{dialect_from_str, Dialect};
 use datafusion_expr::{AggregateUDFImpl, LogicalPlan, LogicalPlanBuilder, ScalarUDFImpl, SortExpr};
 use parking_lot::Mutex;
-use sedona_catalog::SedonaCatalogListRef;
+use sedona_catalog::SedonaCatalogList;
 use sedona_common::{sedona_internal_datafusion_err, SedonaOptions};
 use sedona_datasource::format::ExternalFormatFactory;
 use sedona_datasource::spec::ExternalFormatSpec;
@@ -512,7 +512,7 @@ impl SedonaContext {
     ///
     /// Later registrations take precedence over earlier foreign catalogs and
     /// DataFusion's built-in catalogs when names overlap.
-    pub fn register_catalog_list(&self, catalogs: SedonaCatalogListRef) {
+    pub fn register_catalog_list(&self, catalogs: Arc<dyn SedonaCatalogList>) {
         self.catalogs.register_foreign(catalogs);
     }
 

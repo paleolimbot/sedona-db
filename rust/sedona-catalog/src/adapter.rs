@@ -22,21 +22,21 @@ use async_trait::async_trait;
 use datafusion_catalog::{CatalogProvider, CatalogProviderList, SchemaProvider, TableProvider};
 use datafusion_common::{Result, not_impl_err};
 
-use crate::{
-    DropSchemaOptions, DropTableOptions, SedonaCatalogListRef, SedonaCatalogRef, SedonaSchemaRef,
-};
+use crate::{DropSchemaOptions, DropTableOptions, SedonaCatalog, SedonaCatalogList, SedonaSchema};
 
 /// Exposes a [`crate::SedonaCatalogList`] to DataFusion's read-side catalog API.
 pub struct DataFusionCatalogList {
-    inner: SedonaCatalogListRef,
+    inner: Arc<dyn SedonaCatalogList>,
 }
 
 impl DataFusionCatalogList {
-    pub fn new(inner: SedonaCatalogListRef) -> Self {
+    /// Create an adapter over a Sedona catalog list.
+    pub fn new(inner: Arc<dyn SedonaCatalogList>) -> Self {
         Self { inner }
     }
 
-    pub fn inner(&self) -> &SedonaCatalogListRef {
+    /// Return the wrapped Sedona catalog list.
+    pub fn inner(&self) -> &Arc<dyn SedonaCatalogList> {
         &self.inner
     }
 }
@@ -74,15 +74,17 @@ impl CatalogProviderList for DataFusionCatalogList {
 
 /// Exposes a [`crate::SedonaCatalog`] to DataFusion's read-side catalog API.
 pub struct DataFusionCatalog {
-    inner: SedonaCatalogRef,
+    inner: Arc<dyn SedonaCatalog>,
 }
 
 impl DataFusionCatalog {
-    pub fn new(inner: SedonaCatalogRef) -> Self {
+    /// Create an adapter over a Sedona catalog.
+    pub fn new(inner: Arc<dyn SedonaCatalog>) -> Self {
         Self { inner }
     }
 
-    pub fn inner(&self) -> &SedonaCatalogRef {
+    /// Return the wrapped Sedona catalog.
+    pub fn inner(&self) -> &Arc<dyn SedonaCatalog> {
         &self.inner
     }
 }
@@ -130,15 +132,17 @@ impl CatalogProvider for DataFusionCatalog {
 
 /// Exposes a [`crate::SedonaSchema`] to DataFusion's read-side catalog API.
 pub struct DataFusionSchema {
-    inner: SedonaSchemaRef,
+    inner: Arc<dyn SedonaSchema>,
 }
 
 impl DataFusionSchema {
-    pub fn new(inner: SedonaSchemaRef) -> Self {
+    /// Create an adapter over a Sedona schema.
+    pub fn new(inner: Arc<dyn SedonaSchema>) -> Self {
         Self { inner }
     }
 
-    pub fn inner(&self) -> &SedonaSchemaRef {
+    /// Return the wrapped Sedona schema.
+    pub fn inner(&self) -> &Arc<dyn SedonaSchema> {
         &self.inner
     }
 }

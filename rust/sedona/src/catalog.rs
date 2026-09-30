@@ -29,7 +29,7 @@ use datafusion::datasource::TableProvider;
 use datafusion::error::Result;
 use datafusion::execution::context::SessionState;
 use parking_lot::RwLock;
-use sedona_catalog::{DataFusionCatalog, SedonaCatalogListRef, SedonaCatalogRef};
+use sedona_catalog::{DataFusionCatalog, SedonaCatalog, SedonaCatalogList};
 
 /// Owns the catalog composition for a Sedona session.
 ///
@@ -39,13 +39,14 @@ use sedona_catalog::{DataFusionCatalog, SedonaCatalogListRef, SedonaCatalogRef};
 /// register object stores dynamically for file locations.
 #[derive(Debug)]
 pub struct SedonaCatalogRegistry {
-    foreign: RwLock<Vec<SedonaCatalogListRef>>,
+    foreign: RwLock<Vec<Arc<dyn SedonaCatalogList>>>,
     fallback: Arc<dyn CatalogProviderList>,
     state: Weak<RwLock<SessionState>>,
     dynamic_object_store: bool,
 }
 
 impl SedonaCatalogRegistry {
+    /// Create a registry that layers foreign catalogs over `fallback`.
     pub fn new(
         fallback: Arc<dyn CatalogProviderList>,
         state: Weak<RwLock<SessionState>>,
@@ -60,12 +61,12 @@ impl SedonaCatalogRegistry {
     }
 
     /// Add a foreign catalog list. Later registrations take precedence.
-    pub fn register_foreign(&self, catalogs: SedonaCatalogListRef) {
+    pub fn register_foreign(&self, catalogs: Arc<dyn SedonaCatalogList>) {
         self.foreign.write().push(catalogs);
     }
 
     /// Find a catalog owned by a foreign catalog list.
-    pub fn foreign_catalog(&self, name: &str) -> Option<SedonaCatalogRef> {
+    pub fn foreign_catalog(&self, name: &str) -> Option<Arc<dyn SedonaCatalog>> {
         self.foreign
             .read()
             .iter()
@@ -73,6 +74,7 @@ impl SedonaCatalogRegistry {
             .find_map(|catalogs| catalogs.catalog(name))
     }
 
+    /// Return whether at least one foreign catalog list is registered.
     pub fn has_foreign_catalog_list(&self) -> bool {
         !self.foreign.read().is_empty()
     }
@@ -81,7 +83,7 @@ impl SedonaCatalogRegistry {
     ///
     /// `None` means that no foreign catalog list is installed and the caller
     /// should delegate the operation to DataFusion.
-    pub fn create_foreign_catalog(&self, name: &str) -> Option<Result<SedonaCatalogRef>> {
+    pub fn create_foreign_catalog(&self, name: &str) -> Option<Result<Arc<dyn SedonaCatalog>>> {
         let catalogs = self.foreign.read().last().cloned()?;
         Some(catalogs.create(name))
     }
