@@ -183,6 +183,24 @@ pub(crate) async fn execute_sedona_catalog_ddl(
                 plan: create,
             }))?))
         }
+        DdlStatement::CreateMemoryTable(cmd) => {
+            if targets_foreign_catalog(ctx, &cmd.name) {
+                return exec_err!(
+                    "CREATE TABLE AS is not supported for foreign table '{}'; use CREATE EXTERNAL TABLE instead",
+                    cmd.name
+                );
+            }
+            Ok(None)
+        }
+        DdlStatement::CreateView(cmd) => {
+            if targets_foreign_catalog(ctx, &cmd.name) {
+                return exec_err!(
+                    "Creating views is not supported for foreign view '{}'",
+                    cmd.name
+                );
+            }
+            Ok(None)
+        }
         DdlStatement::DropTable(cmd) => {
             drop_foreign_object(ctx, &cmd.name, cmd.if_exists, CatalogObjectType::Table)
         }
@@ -191,6 +209,18 @@ pub(crate) async fn execute_sedona_catalog_ddl(
         }
         _ => Ok(None),
     }
+}
+
+fn targets_foreign_catalog(ctx: &SedonaContext, name: &TableReference) -> bool {
+    let state = ctx.ctx.state();
+    let catalog_options = &state.config_options().catalog;
+    let resolved = name.clone().resolve(
+        &catalog_options.default_catalog,
+        &catalog_options.default_schema,
+    );
+    ctx.catalog_registry()
+        .foreign_catalog(&resolved.catalog)
+        .is_some()
 }
 
 fn drop_foreign_object(
@@ -427,6 +457,43 @@ mod tests {
                 },
             ]
         );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn unsupported_foreign_create_does_not_drop_existing_objects() -> Result<()> {
+        let schema = Arc::new(DropTestSchema {
+            objects: Mutex::new(HashMap::from([
+                ("table_one".to_owned(), CatalogObjectType::Table),
+                ("view_one".to_owned(), CatalogObjectType::View),
+            ])),
+            received: Mutex::new(Vec::new()),
+        });
+        let catalog: Arc<dyn SedonaCatalog> = Arc::new(DropTestCatalog {
+            schema: schema.clone(),
+        });
+        let ctx = SedonaContext::new();
+        ctx.register_catalog_list(Arc::new(DropTestCatalogList { catalog }));
+
+        let table_error = ctx
+            .sql("CREATE OR REPLACE TABLE foreign.public.table_one AS SELECT 1")
+            .await
+            .unwrap_err();
+        assert!(table_error
+            .to_string()
+            .contains("use CREATE EXTERNAL TABLE instead"));
+        assert!(schema.table_exist("table_one"));
+
+        let view_error = ctx
+            .sql("CREATE OR REPLACE VIEW foreign.public.view_one AS SELECT 1")
+            .await
+            .unwrap_err();
+        assert!(view_error
+            .to_string()
+            .contains("Creating views is not supported"));
+        assert!(schema.table_exist("view_one"));
+        assert!(schema.received.lock().unwrap().is_empty());
 
         Ok(())
     }
