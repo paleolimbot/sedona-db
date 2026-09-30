@@ -57,11 +57,26 @@ pub struct DropSchemaOptions {
     pub cascade: bool,
 }
 
+/// The kind of catalog object targeted by a table-like operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CatalogObjectType {
+    /// A physical table.
+    Table,
+    /// A non-materialized view.
+    View,
+}
+
 /// Options for dropping a table.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct DropTableOptions {
-    /// Whether data and metadata referenced by the table should also be deleted.
+    /// The expected kind of object, or `None` when the caller cannot distinguish it.
+    ///
+    /// Implementations should not drop an object whose kind does not match.
+    pub object_type: Option<CatalogObjectType>,
+    /// Whether data and metadata referenced by a table should also be deleted.
+    /// This option does not apply to views.
     pub purge: bool,
 }
 

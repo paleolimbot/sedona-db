@@ -528,7 +528,8 @@ struct SedonaCSchemaProvider {
 
   /// \brief Drop a table by name
   ///
-  /// `options` contains a JSON object with a `purge` boolean and may be NULL when
+  /// `options` contains a JSON object with an optional `object_type` string
+  /// (`"table"` or `"view"`) and a `purge` boolean. It may be NULL when
   /// `options_len` is zero.
   int (*drop_table)(const struct SedonaCSchemaProvider* self, const char* name,
                     const uint8_t* options, size_t options_len,

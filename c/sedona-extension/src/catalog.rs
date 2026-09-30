@@ -1081,7 +1081,7 @@ mod tests {
     use datafusion::datasource::empty::EmptyTable;
     use datafusion::prelude::SessionContext;
     use datafusion_physical_plan::placeholder_row::PlaceholderRowExec;
-    use sedona_catalog::{DataFusionCatalog, DataFusionCatalogList};
+    use sedona_catalog::{CatalogObjectType, DataFusionCatalog, DataFusionCatalogList};
 
     #[derive(Debug, Default)]
     struct TestCatalogList {
@@ -1178,8 +1178,15 @@ mod tests {
             name: &str,
             options: &DropTableOptions,
         ) -> Result<Option<Arc<dyn TableProvider>>> {
-            if name == "table_one" && !options.purge {
-                return sedona_common::sedona_internal_err!("table_one must be purged");
+            if name == "table_one"
+                && (!options.purge || options.object_type != Some(CatalogObjectType::Table))
+            {
+                return sedona_common::sedona_internal_err!(
+                    "table_one must be dropped as a purged table"
+                );
+            }
+            if name == "view_one" && options.object_type != Some(CatalogObjectType::View) {
+                return sedona_common::sedona_internal_err!("view_one must be dropped as a view");
             }
             Ok(self.tables.write().unwrap().remove(name))
         }
@@ -1334,7 +1341,10 @@ mod tests {
             .unwrap();
         assert!(create.name().contains("PlaceholderRowExec"));
 
-        let drop_options = DropTableOptions { purge: true };
+        let drop_options = DropTableOptions {
+            object_type: Some(CatalogObjectType::Table),
+            purge: true,
+        };
         assert!(schema
             .drop_table("table_one", &drop_options)
             .unwrap()
@@ -1342,6 +1352,15 @@ mod tests {
         assert!(!schema.table_exist("table_one"));
         assert!(schema
             .drop_table("table_one", &drop_options)
+            .unwrap()
+            .is_none());
+
+        let view_drop_options = DropTableOptions {
+            object_type: Some(CatalogObjectType::View),
+            purge: false,
+        };
+        assert!(schema
+            .drop_table("view_one", &view_drop_options)
             .unwrap()
             .is_none());
     }

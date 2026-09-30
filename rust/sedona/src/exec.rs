@@ -17,10 +17,10 @@
 use async_trait::async_trait;
 use datafusion::catalog::{Session, TableProvider};
 use datafusion::prelude::DataFrame;
-use datafusion_common::exec_err;
+use datafusion_common::{exec_err, TableReference};
 use datafusion_expr::{DdlStatement, LogicalPlan, TableType};
 use datafusion_physical_plan::ExecutionPlan;
-use sedona_catalog::{CreateTableOptions, DropTableOptions};
+use sedona_catalog::{CatalogObjectType, CreateTableOptions, DropTableOptions};
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -132,7 +132,13 @@ pub(crate) async fn execute_sedona_catalog_ddl(
                     return exec_err!("External table '{}' already exists", cmd.name)
                 }
                 (false, true, true) => {
-                    schema.drop_table(&resolved.table, &DropTableOptions::default())?;
+                    schema.drop_table(
+                        &resolved.table,
+                        &DropTableOptions {
+                            object_type: Some(CatalogObjectType::Table),
+                            purge: false,
+                        },
+                    )?;
                 }
                 _ => {}
             }
@@ -160,8 +166,51 @@ pub(crate) async fn execute_sedona_catalog_ddl(
                 plan: create,
             }))?))
         }
+        DdlStatement::DropTable(cmd) => {
+            drop_foreign_object(ctx, &cmd.name, cmd.if_exists, CatalogObjectType::Table)
+        }
+        DdlStatement::DropView(cmd) => {
+            drop_foreign_object(ctx, &cmd.name, cmd.if_exists, CatalogObjectType::View)
+        }
         _ => Ok(None),
     }
+}
+
+fn drop_foreign_object(
+    ctx: &SedonaContext,
+    name: &TableReference,
+    if_exists: bool,
+    object_type: CatalogObjectType,
+) -> Result<Option<DataFrame>, DataFusionError> {
+    let state = ctx.ctx.state();
+    let catalog_options = &state.config_options().catalog;
+    let resolved = name.clone().resolve(
+        &catalog_options.default_catalog,
+        &catalog_options.default_schema,
+    );
+    let Some(catalog) = ctx.catalog_registry().foreign_catalog(&resolved.catalog) else {
+        return Ok(None);
+    };
+    let dropped = match catalog.schema(&resolved.schema) {
+        Some(schema) => schema.drop_table(
+            &resolved.table,
+            &DropTableOptions {
+                object_type: Some(object_type),
+                purge: false,
+            },
+        )?,
+        None => None,
+    };
+
+    if dropped.is_some() || if_exists {
+        return Ok(Some(ctx.ctx.read_empty()?));
+    }
+
+    let kind = match object_type {
+        CatalogObjectType::Table => "Table",
+        CatalogObjectType::View => "View",
+    };
+    exec_err!("{kind} '{name}' doesn't exist.")
 }
 
 /// Presents a catalog DDL execution plan as a one-shot DataFrame so DDL keeps
@@ -201,15 +250,164 @@ impl TableProvider for CatalogDdlProvider {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+    use std::sync::Mutex;
 
+    use arrow_schema::Schema;
     use datafusion::common::plan_datafusion_err;
     use datafusion::common::plan_err;
+    use datafusion::datasource::empty::EmptyTable;
     use datafusion::datasource::listing::ListingTableUrl;
     use datafusion::sql::parser::DFParser;
     use datafusion_expr::sqlparser::dialect::dialect_from_str;
+    use sedona_catalog::{
+        DropSchemaOptions, SedonaCatalog, SedonaCatalogList, SedonaCatalogRef, SedonaSchema,
+        SedonaSchemaRef,
+    };
     use url::Url;
 
     use super::*;
+
+    #[derive(Debug)]
+    struct DropTestCatalogList {
+        catalog: SedonaCatalogRef,
+    }
+
+    impl SedonaCatalogList for DropTestCatalogList {
+        fn catalog_names(&self) -> Vec<String> {
+            vec!["foreign".to_owned()]
+        }
+
+        fn catalog(&self, name: &str) -> Option<SedonaCatalogRef> {
+            (name == "foreign").then(|| self.catalog.clone())
+        }
+
+        fn create(&self, _name: &str) -> Result<SedonaCatalogRef> {
+            datafusion_common::not_impl_err!("not needed by drop tests")
+        }
+    }
+
+    #[derive(Debug)]
+    struct DropTestCatalog {
+        schema: SedonaSchemaRef,
+    }
+
+    impl SedonaCatalog for DropTestCatalog {
+        fn schema_names(&self) -> Vec<String> {
+            vec!["public".to_owned()]
+        }
+
+        fn schema(&self, name: &str) -> Option<SedonaSchemaRef> {
+            (name == "public").then(|| self.schema.clone())
+        }
+
+        fn create(&self, _name: &str) -> Result<SedonaSchemaRef> {
+            datafusion_common::not_impl_err!("not needed by drop tests")
+        }
+
+        fn drop_schema(
+            &self,
+            _name: &str,
+            _options: &DropSchemaOptions,
+        ) -> Result<Option<SedonaSchemaRef>> {
+            datafusion_common::not_impl_err!("not needed by drop tests")
+        }
+    }
+
+    #[derive(Debug)]
+    struct DropTestSchema {
+        objects: Mutex<HashMap<String, CatalogObjectType>>,
+        received: Mutex<Vec<DropTableOptions>>,
+    }
+
+    #[async_trait]
+    impl SedonaSchema for DropTestSchema {
+        fn table_names(&self) -> Vec<String> {
+            self.objects.lock().unwrap().keys().cloned().collect()
+        }
+
+        async fn table(&self, _name: &str) -> Result<Option<Arc<dyn TableProvider>>> {
+            Ok(None)
+        }
+
+        fn create(
+            &self,
+            _name: &str,
+            _options: &CreateTableOptions,
+            _input: Arc<dyn ExecutionPlan>,
+        ) -> Result<Arc<dyn ExecutionPlan>> {
+            datafusion_common::not_impl_err!("not needed by drop tests")
+        }
+
+        fn drop_table(
+            &self,
+            name: &str,
+            options: &DropTableOptions,
+        ) -> Result<Option<Arc<dyn TableProvider>>> {
+            self.received.lock().unwrap().push(*options);
+            let mut objects = self.objects.lock().unwrap();
+            let Some(actual_type) = objects.get(name).copied() else {
+                return Ok(None);
+            };
+            if options.object_type.is_some() && options.object_type != Some(actual_type) {
+                return Ok(None);
+            }
+            objects.remove(name);
+            Ok(Some(Arc::new(EmptyTable::new(Arc::new(Schema::empty())))))
+        }
+
+        fn table_exist(&self, name: &str) -> bool {
+            self.objects.lock().unwrap().contains_key(name)
+        }
+    }
+
+    #[tokio::test]
+    async fn foreign_drop_distinguishes_tables_and_views() -> Result<()> {
+        let schema = Arc::new(DropTestSchema {
+            objects: Mutex::new(HashMap::from([
+                ("table_one".to_owned(), CatalogObjectType::Table),
+                ("view_one".to_owned(), CatalogObjectType::View),
+            ])),
+            received: Mutex::new(Vec::new()),
+        });
+        let catalog: SedonaCatalogRef = Arc::new(DropTestCatalog {
+            schema: schema.clone(),
+        });
+        let ctx = SedonaContext::new();
+        ctx.register_catalog_list(Arc::new(DropTestCatalogList { catalog }));
+
+        ctx.sql("DROP TABLE foreign.public.table_one").await?;
+        assert!(!schema.table_exist("table_one"));
+
+        let error = ctx
+            .sql("DROP TABLE foreign.public.view_one")
+            .await
+            .unwrap_err();
+        assert!(error.to_string().contains("doesn't exist"));
+        assert!(schema.table_exist("view_one"));
+
+        ctx.sql("DROP VIEW foreign.public.view_one").await?;
+        assert!(!schema.table_exist("view_one"));
+        assert_eq!(
+            *schema.received.lock().unwrap(),
+            vec![
+                DropTableOptions {
+                    object_type: Some(CatalogObjectType::Table),
+                    purge: false,
+                },
+                DropTableOptions {
+                    object_type: Some(CatalogObjectType::Table),
+                    purge: false,
+                },
+                DropTableOptions {
+                    object_type: Some(CatalogObjectType::View),
+                    purge: false,
+                },
+            ]
+        );
+
+        Ok(())
+    }
 
     async fn create_external_table_test(location: &str, sql: &str) -> Result<()> {
         let ctx = SedonaContext::new();
