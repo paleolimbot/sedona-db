@@ -31,8 +31,8 @@ import sedonadb_geopandas as sgpd
 
 gdf = sgpd.from_geopandas(geopandas.read_file("cities.geojson"))
 big = gdf[gdf["pop"] > 1_000_000]          # boolean-mask filter
-gdf["surveyed"] = True                     # broadcast a scalar column
-gdf["centers"] = gdf.geometry.centroid     # assign a computed column
+gdf["density"] = gdf["pop"] / gdf["area"]  # assign a computed column
+buffered = gdf.geometry.buffer(0.5)        # element-wise .geo operation
 web = gdf.to_crs("EPSG:3857")              # reproject (CRS tracked through)
 
 zones = gdf.dissolve(by="region")          # group and union geometry
@@ -66,6 +66,17 @@ deliberately *not* identical to GeoPandas:
   against the destination and silently write the wrong values. Assign a `Series`
   read from the same frame, or a scalar (a geometry included). For anything the
   wrapper does not cover, drop to the SedonaDB `DataFrame` API directly.
+
+Division follows pandas rather than SQL: `/` is true division, so integer
+columns do not silently truncate. `//` is not implemented, since SQL division
+truncates toward zero where Python floors. Duration arithmetic whose result
+overflows the 64-bit tick range raises when the result is computed, as in
+pandas 3 (pandas 2 silently wraps integer overflow, and pandas clamps finite
+positive float overflow to `Timedelta.max`; this layer raises for both). An
+integer operand that itself exceeds the 64-bit range raises `OverflowError`
+immediately, as in every pandas version. Mixed-unit duration
+operands are rebuilt in the column's own unit when exactly representable,
+rather than widening to the engine's interval type.
 
 `dissolve()` aggregates non-geometry columns with `"first"`, which is an
 unordered aggregate: it returns *some* value from the group rather than the one
