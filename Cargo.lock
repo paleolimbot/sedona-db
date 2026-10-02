@@ -5632,6 +5632,7 @@ dependencies = [
  "datafusion-expr",
  "datafusion-ffi",
  "datafusion-optimizer",
+ "datafusion-physical-plan",
  "datafusion-session",
  "dirs",
  "futures",
@@ -5641,6 +5642,7 @@ dependencies = [
  "parking_lot",
  "regex",
  "rstest",
+ "sedona-catalog",
  "sedona-common",
  "sedona-datasource",
  "sedona-expr",
@@ -5684,6 +5686,17 @@ dependencies = [
  "sedona",
  "sedona-extension",
  "tokio",
+]
+
+[[package]]
+name = "sedona-catalog"
+version = "0.5.0"
+dependencies = [
+ "async-trait",
+ "datafusion-catalog",
+ "datafusion-common",
+ "datafusion-physical-plan",
+ "serde",
 ]
 
 [[package]]
@@ -5784,6 +5797,7 @@ dependencies = [
  "futures",
  "libc",
  "prost",
+ "sedona-catalog",
  "sedona-common",
  "sedona-expr",
  "sedona-schema",
