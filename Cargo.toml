@@ -28,6 +28,7 @@ members = [
     "python/sedonadb-zarr",
     "r/sedonadb/src/rust",
     "rust/sedona-adbc",
+    "rust/sedona-catalog",
     "rust/sedona-datasource",
     "rust/sedona-expr",
     "rust/sedona-functions",
@@ -147,6 +148,7 @@ zarrs_object_store = "0.6"
 # Workspace path dependencies for internal crates
 sedona = { version = "0.5.0", path = "rust/sedona" }
 sedona-adbc = { version = "0.5.0", path = "rust/sedona-adbc" }
+sedona-catalog = { version = "0.5.0", path = "rust/sedona-catalog" }
 sedona-common = { version = "0.5.0", path = "rust/sedona-common" }
 sedona-datasource = { version = "0.5.0", path = "rust/sedona-datasource" }
 sedona-expr = { version = "0.5.0", path = "rust/sedona-expr" }
