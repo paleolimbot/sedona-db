@@ -98,22 +98,20 @@ impl GdalApiBuilder {
         let api = if let Some(shared_library) = &self.shared_library {
             GdalApi::try_from_shared_library(shared_library.clone())?
         } else {
-            GdalApi::try_from_current_process()?
+            #[cfg(feature = "gdal-sys")]
+            {
+                GdalApi::from_gdal_sys()
+            }
+            #[cfg(not(feature = "gdal-sys"))]
+            {
+                GdalApi::try_from_current_process().map_err(|e| {
+                    GdalInitLibraryError::LibraryError(format!(
+                        "GDAL is not configured; call configure_gdal() or sd_configure_gdal() before using GDAL-backed functions: {e}"
+                    ))
+                })?
+            }
         };
 
-        #[cfg(feature = "gdal-sys")]
-        let get_gdal_version_info = |arg: &str| unsafe {
-            // Calling into `gdal-sys` also forces the linker to include GDAL
-            // symbols, so that `try_from_current_process` (which resolves function pointers
-            // via `dlsym` on the current process) can find them at runtime.
-            let c_arg = std::ffi::CString::new(arg).unwrap();
-            let c_version = gdal_sys::GDALVersionInfo(c_arg.as_ptr());
-            std::ffi::CStr::from_ptr(c_version)
-                .to_string_lossy()
-                .into_owned()
-        };
-
-        #[cfg(not(feature = "gdal-sys"))]
         let get_gdal_version_info = |arg: &str| api.version_info(arg);
 
         check_gdal_version(get_gdal_version_info)?;
@@ -272,13 +270,13 @@ mod test {
     use super::*;
 
     /// Building with default options (no shared library) should succeed when
-    /// `gdal-sys` is linked, loading symbols from the current process.
+    /// `gdal-sys` is linked, using its statically linked symbols directly.
     #[test]
     fn test_builder_default() {
         let api = GdalApiBuilder::default()
             .build()
             .expect("GdalApiBuilder::default().build() should succeed with gdal-sys");
-        assert_eq!(api.name(), "current_process");
+        assert_eq!(api.name(), "gdal_sys");
     }
 
     /// Building with an explicit shared library path should use that path.

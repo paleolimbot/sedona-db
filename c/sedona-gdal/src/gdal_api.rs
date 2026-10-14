@@ -24,6 +24,27 @@ use crate::dyn_load;
 use crate::errors::{GdalError, GdalInitLibraryError};
 use crate::gdal_dyn_bindgen::{GDALTransformerFunc, SedonaGdalApi};
 
+#[cfg(feature = "gdal-sys")]
+unsafe extern "C" {
+    #[link_name = "VRTCreate"]
+    fn gdal_sys_vrt_create(x_size: i32, y_size: i32) -> *mut std::ffi::c_void;
+    #[link_name = "VRTAddSimpleSource"]
+    fn gdal_sys_vrt_add_simple_source(
+        vrt_band: *mut std::ffi::c_void,
+        source_band: *mut std::ffi::c_void,
+        src_x_off: i32,
+        src_y_off: i32,
+        src_x_size: i32,
+        src_y_size: i32,
+        dst_x_off: i32,
+        dst_y_off: i32,
+        dst_x_size: i32,
+        dst_y_size: i32,
+        resampling: *const std::ffi::c_char,
+        nodata: f64,
+    ) -> i32;
+}
+
 /// Invoke a function pointer from the `SedonaGdalApi` struct.
 ///
 /// # Panics
@@ -51,7 +72,7 @@ pub struct GdalApi {
     /// The dynamically loaded GDAL library. Kept alive for the lifetime of the
     /// function pointers in `inner`. This is never dropped because the `GdalApi`
     /// lives in a `static OnceLock` (see `global.rs`).
-    _lib: Library,
+    _lib: Option<Library>,
     name: String,
 }
 
@@ -60,7 +81,7 @@ impl GdalApi {
         let (lib, inner) = dyn_load::load_gdal_from_path(&shared_library)?;
         Ok(Self {
             inner,
-            _lib: lib,
+            _lib: Some(lib),
             name: shared_library.to_string_lossy().into_owned(),
         })
     }
@@ -69,9 +90,113 @@ impl GdalApi {
         let (lib, inner) = dyn_load::load_gdal_from_current_process()?;
         Ok(Self {
             inner,
-            _lib: lib,
+            _lib: Some(lib),
             name: "current_process".to_string(),
         })
+    }
+
+    /// Build the API table from statically linked `gdal-sys` symbols.
+    ///
+    /// Rtools distributes GDAL as static libraries on Windows, where looking
+    /// for those symbols in R's process image does not work.
+    #[cfg(feature = "gdal-sys")]
+    pub fn from_gdal_sys() -> Self {
+        let mut inner = SedonaGdalApi::default();
+
+        macro_rules! set_fn {
+            ($name:ident) => {
+                inner.$name = Some(unsafe { std::mem::transmute(gdal_sys::$name as *const ()) });
+            };
+        }
+
+        set_fn!(GDALOpenEx);
+        set_fn!(GDALClose);
+        set_fn!(GDALGetRasterXSize);
+        set_fn!(GDALGetRasterYSize);
+        set_fn!(GDALGetRasterCount);
+        set_fn!(GDALGetRasterBand);
+        set_fn!(GDALGetGeoTransform);
+        set_fn!(GDALSetGeoTransform);
+        set_fn!(GDALGetProjectionRef);
+        set_fn!(GDALSetProjection);
+        set_fn!(GDALGetSpatialRef);
+        set_fn!(GDALSetSpatialRef);
+        set_fn!(GDALCreateCopy);
+        set_fn!(GDALDatasetCreateLayer);
+        set_fn!(GDALAllRegister);
+        set_fn!(GDALGetDriverByName);
+        set_fn!(GDALCreate);
+        set_fn!(GDALAddBand);
+        set_fn!(GDALRasterIO);
+        set_fn!(GDALRasterIOEx);
+        set_fn!(GDALGetRasterDataType);
+        set_fn!(GDALGetRasterBandXSize);
+        set_fn!(GDALGetRasterBandYSize);
+        set_fn!(GDALGetBlockSize);
+        set_fn!(GDALGetRasterNoDataValue);
+        set_fn!(GDALGetRasterNoDataValueAsUInt64);
+        set_fn!(GDALGetRasterNoDataValueAsInt64);
+        set_fn!(GDALSetRasterNoDataValue);
+        set_fn!(GDALDeleteRasterNoDataValue);
+        set_fn!(GDALSetRasterNoDataValueAsUInt64);
+        set_fn!(GDALSetRasterNoDataValueAsInt64);
+        set_fn!(OSRNewSpatialReference);
+        set_fn!(OSRSetFromUserInput);
+        set_fn!(OSREPSGTreatsAsLatLong);
+        set_fn!(OSRGetDataAxisToSRSAxisMapping);
+        set_fn!(OSRGetAxisMappingStrategy);
+        set_fn!(OSRSetAxisMappingStrategy);
+        set_fn!(OSRDestroySpatialReference);
+        set_fn!(OSRExportToPROJJSON);
+        set_fn!(OSRExportToWkt);
+        set_fn!(OSRClone);
+        set_fn!(OSRRelease);
+        set_fn!(OGR_G_CreateFromWkb);
+        set_fn!(OGR_G_CreateFromWkt);
+        set_fn!(OGR_G_ExportToIsoWkb);
+        set_fn!(OGR_G_WkbSize);
+        set_fn!(OGR_G_GetEnvelope);
+        set_fn!(OGR_G_DestroyGeometry);
+        set_fn!(OGR_L_ResetReading);
+        set_fn!(OGR_L_GetNextFeature);
+        set_fn!(OGR_L_CreateField);
+        set_fn!(OGR_L_GetFeatureCount);
+        set_fn!(OGR_F_GetGeometryRef);
+        set_fn!(OGR_F_GetFieldIndex);
+        set_fn!(OGR_F_GetFieldAsDouble);
+        set_fn!(OGR_F_GetFieldAsInteger);
+        set_fn!(OGR_F_IsFieldSetAndNotNull);
+        set_fn!(OGR_F_Destroy);
+        set_fn!(OGR_Fld_Create);
+        set_fn!(OGR_Fld_Destroy);
+        set_fn!(VSIFileFromMemBuffer);
+        set_fn!(VSIFCloseL);
+        set_fn!(VSIUnlink);
+        set_fn!(VSIGetMemFileBuffer);
+        set_fn!(VSIFree);
+        set_fn!(VSIMalloc);
+        inner.VRTCreate = Some(gdal_sys_vrt_create);
+        inner.VRTAddSimpleSource = Some(gdal_sys_vrt_add_simple_source);
+        set_fn!(GDALReprojectImage);
+        set_fn!(GDALCreateGenImgProjTransformer);
+        set_fn!(GDALDestroyGenImgProjTransformer);
+        set_fn!(GDALSuggestedWarpOutput);
+        set_fn!(GDALGenImgProjTransform);
+        set_fn!(GDALRasterizeGeometries);
+        set_fn!(GDALFPolygonize);
+        set_fn!(GDALPolygonize);
+        set_fn!(GDALVersionInfo);
+        set_fn!(CPLSetThreadLocalConfigOption);
+        set_fn!(CPLGetLastErrorNo);
+        set_fn!(CPLGetLastErrorMsg);
+        set_fn!(CPLErrorReset);
+        set_fn!(GDALGetDataTypeSizeBytes);
+
+        Self {
+            inner,
+            _lib: None,
+            name: "gdal_sys".to_string(),
+        }
     }
 
     pub fn name(&self) -> &str {

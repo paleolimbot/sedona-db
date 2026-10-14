@@ -20,9 +20,9 @@
 # available (even if it isn't used). Here we just try pkg-config (LIB_DIR
 # can be used to specify the location of -lgeos_c)
 
-pkg-config geos  2>/dev/null
+pkg-config geos gdal proj 2>/dev/null
 if [ $? -eq 0 ]; then
-  PKGCONFIG_LIBS=`pkg-config --libs geos`
+  PKGCONFIG_LIBS=`pkg-config --libs geos gdal proj`
 fi
 
 if [ "$LIB_DIR" ]; then
@@ -105,7 +105,7 @@ fi
 # Build spherical geography support by default. Setting SAVVY_FEATURES keeps
 # its existing role as an explicit feature override.
 if [ -z "${SAVVY_FEATURES+x}" ]; then
-  SAVVY_FEATURES="s2geography"
+  SAVVY_FEATURES="s2geography gdal proj"
 fi
 
 # e.g. SAVVY_FEATURES="a b"  -->  "--features 'a b'"
@@ -126,6 +126,19 @@ case "$($CC -dumpmachine)" in
     ;;
 esac
 echo "using Rust target: '${TARGET}'"
+
+# gdal-sys ships pre-generated Windows bindings for x86_64 but not arm64.
+# Generate them from the Rtools headers for the gnullvm target.
+case "${TARGET}" in
+  aarch64-*)
+    case " ${SAVVY_FEATURES} " in
+      *" gdal "*)
+        SAVVY_FEATURES="${SAVVY_FEATURES} bindgen"
+        FEATURE_FLAGS="--features '${SAVVY_FEATURES}'"
+        ;;
+    esac
+    ;;
+esac
 
 # sedona-s2geography needs OpenSSL, Abseil, and s2geometry built with the same
 # MinGW/gnullvm compiler and flags as R. The usual vcpkg Windows triplets use

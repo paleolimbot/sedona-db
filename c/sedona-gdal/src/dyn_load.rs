@@ -213,13 +213,9 @@ fn load_all_symbols(lib: &Library, api: &mut SedonaGdalApi) -> Result<(), GdalIn
             b"?Create@MEMDataset@@SAPEAV1@PEBDHHHW4GDALDataType@@PEAPEAD@Z\0",
         ]
     );
-    if !have_mem_create && !have_mem_dataset_create {
-        return Err(GdalInitLibraryError::LibraryError(
-            "Failed to resolve a MEM dataset Create entry point (tried the \
-             MEMCreate C API and the MEMDataset::Create mangled names)"
-                .to_string(),
-        ));
-    }
+    // Older libraries may expose neither entry point. The higher-level
+    // implementation falls back to GDALCreate with the MEM driver.
+    let _ = (have_mem_create, have_mem_dataset_create);
 
     Ok(())
 }

@@ -246,13 +246,28 @@ pub(crate) fn create_mem_dataset(
                 c_data_type,
                 std::ptr::null()
             )
-        } else {
+        } else if api.inner.MEMDatasetCreate.is_some() {
             // Fallback: the C++ MEMDataset::Create takes a leading filename.
             let empty_filename = c"";
             call_gdal_api!(
                 api,
                 MEMDatasetCreate,
                 empty_filename.as_ptr(),
+                width.try_into()?,
+                height.try_into()?,
+                n_owned_bands.try_into()?,
+                c_data_type,
+                std::ptr::null_mut()
+            )
+        } else {
+            // Static GDAL builds do not expose the private C++ entry point.
+            // The public driver API is slightly more serialized but equivalent.
+            let driver = call_gdal_api!(api, GDALGetDriverByName, c"MEM".as_ptr());
+            call_gdal_api!(
+                api,
+                GDALCreate,
+                driver,
+                c"".as_ptr(),
                 width.try_into()?,
                 height.try_into()?,
                 n_owned_bands.try_into()?,

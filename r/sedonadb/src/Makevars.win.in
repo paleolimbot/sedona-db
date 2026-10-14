@@ -81,7 +81,7 @@ PKG_CONFIG_SYSROOT_DIR = /x86_64-w64-mingw32.static.posix/
 # also incompatible with aws-lc-sys.
 CFLAGS_TWEAKED = $(filter-out -O%,$(CFLAGS)) -Wno-pedantic
 
-all: $(SHLIB) clean_intermediate
+all: $(SHLIB) copy_native_data clean_intermediate
 
 $(SHLIB): $(STATLIB)
 
@@ -119,7 +119,17 @@ $(STATLIB):
 clean_intermediate: $(SHLIB)
 	rm -f $(STATLIB)
 
+# Rtools provides GDAL and PROJ as static libraries. Their runtime data is not
+# embedded in those archives, so include the same share trees copied by sf's
+# Windows build. This deliberately does not use vcpkg for GDAL or PROJ.
+copy_native_data:
+	test -d "$(R_TOOLS_SOFT)/share/gdal"
+	test -d "$(R_TOOLS_SOFT)/share/proj"
+	rm -rf ../inst/gdal ../inst/proj
+	cp -R "$(R_TOOLS_SOFT)/share/gdal" ../inst/gdal
+	cp -R "$(R_TOOLS_SOFT)/share/proj" ../inst/proj
+
 clean:
 	rm -Rf $(SHLIB) $(OBJECTS) $(STATLIB) ./rust/target
 
-.PHONY: all clean_intermediate clean
+.PHONY: all copy_native_data clean_intermediate clean
