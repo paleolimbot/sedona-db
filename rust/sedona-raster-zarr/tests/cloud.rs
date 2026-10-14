@@ -19,8 +19,6 @@
 //! `apache/sedona-testing`. HTTP reads use a small in-process Rust server,
 //! keeping the tests deterministic while exercising `object_store::http`.
 
-use std::collections::BTreeMap;
-use std::fs;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -32,37 +30,34 @@ use object_store::ObjectStore;
 use sedona_raster::array::RasterStructArray;
 use sedona_raster::traits::RasterRef;
 use sedona_raster_zarr::{ZarrChunkReader, object_store_for_uri, open_storage_from_uri};
-use serde::Deserialize;
 use tokio::task::JoinHandle;
 use tower_http::services::ServeDir;
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Copy, Debug)]
 struct FixtureExpectation {
-    crs_authority: String,
+    name: &'static str,
+    crs_authority: &'static str,
     geotransform: [f64; 6],
-    raster_arrays: Vec<String>,
-}
-
-fn fixture_manifest() -> BTreeMap<String, FixtureExpectation> {
-    let path = sedona_testing::data::test_zarr("manifest.json").unwrap();
-    serde_json::from_slice(&fs::read(path).unwrap()).unwrap()
+    raster_arrays: &'static [&'static str],
 }
 
 fn fixture_root() -> PathBuf {
-    PathBuf::from(sedona_testing::data::test_zarr("manifest.json").unwrap())
+    PathBuf::from(sedona_testing::data::test_zarr("v2-cf-grid-mapping.zarr").unwrap())
         .parent()
         .unwrap()
         .canonicalize()
         .unwrap()
 }
 
-async fn read_all(
-    uri: &str,
-    store: Arc<dyn ObjectStore>,
-    arrays: Option<&[String]>,
-) -> StructArray {
+async fn read_all(uri: &str, store: Arc<dyn ObjectStore>, arrays: Option<&[&str]>) -> StructArray {
+    let arrays = arrays.map(|arrays| {
+        arrays
+            .iter()
+            .map(|array| (*array).to_string())
+            .collect::<Vec<_>>()
+    });
     let storage = open_storage_from_uri(uri, store).expect("open fixture storage");
-    let reader = ZarrChunkReader::try_new(storage, uri, arrays, 1024)
+    let reader = ZarrChunkReader::try_new(storage, uri, arrays.as_deref(), 1024)
         .await
         .expect("create fixture reader");
     let batches = reader.collect::<Result<Vec<_>, _>>().unwrap();
@@ -88,7 +83,7 @@ fn assert_fixture(array: &StructArray, expected: &FixtureExpectation) {
                 raster
                     .band_name(band)
                     .map(|name| name.trim_start_matches('/')),
-                Some(expected_name.as_str())
+                Some(*expected_name)
             );
         }
         let transform = raster.transform().to_vec();
@@ -115,23 +110,88 @@ fn assert_fixture(array: &StructArray, expected: &FixtureExpectation) {
     );
 }
 
-#[tokio::test]
-async fn all_fixtures_match_manifest_on_local_filesystem() {
+async fn assert_local_fixture(expected: &FixtureExpectation, arrays: Option<&[&str]>) {
     let store: Arc<dyn ObjectStore> = Arc::new(object_store::local::LocalFileSystem::new());
-    for (name, expected) in fixture_manifest() {
-        let path = PathBuf::from(sedona_testing::data::test_zarr(&name).unwrap())
-            .canonicalize()
-            .unwrap();
-        let uri = format!("file://{}", path.display());
-        let arrays =
-            (name != "v3-geozarr-consolidated.zarr").then_some(expected.raster_arrays.as_slice());
-        let array = read_all(&uri, Arc::clone(&store), arrays).await;
-        assert_fixture(&array, &expected);
-    }
+    let path = PathBuf::from(sedona_testing::data::test_zarr(expected.name).unwrap())
+        .canonicalize()
+        .unwrap();
+    let uri = format!("file://{}", path.display());
+    let array = read_all(&uri, store, arrays).await;
+    assert_fixture(&array, expected);
+}
+
+#[tokio::test]
+async fn reads_v2_cf_grid_mapping_from_local_filesystem() {
+    let expected = FixtureExpectation {
+        name: "v2-cf-grid-mapping.zarr",
+        crs_authority: "EPSG:3857",
+        geotransform: [100.0, 1.0, 0.0, 200.0, 0.0, -1.0],
+        raster_arrays: &["temperature"],
+    };
+    assert_local_fixture(&expected, Some(expected.raster_arrays)).await;
+}
+
+#[tokio::test]
+async fn reads_v3_cf_grid_mapping_from_local_filesystem() {
+    let expected = FixtureExpectation {
+        name: "v3-cf-grid-mapping.zarr",
+        crs_authority: "EPSG:3857",
+        geotransform: [100.0, 1.0, 0.0, 200.0, 0.0, -1.0],
+        raster_arrays: &["precipitation"],
+    };
+    assert_local_fixture(&expected, Some(expected.raster_arrays)).await;
+}
+
+#[tokio::test]
+async fn reads_v3_geozarr_node_bbox_from_local_filesystem() {
+    let expected = FixtureExpectation {
+        name: "v3-geozarr-bbox-node.zarr",
+        crs_authority: "EPSG:32610",
+        geotransform: [500000.0, 30.0, 0.0, 5200000.0, 0.0, -30.0],
+        raster_arrays: &["elevation"],
+    };
+    assert_local_fixture(&expected, Some(expected.raster_arrays)).await;
+}
+
+#[tokio::test]
+async fn reads_v3_geozarr_pixel_bbox_from_local_filesystem() {
+    let expected = FixtureExpectation {
+        name: "v3-geozarr-bbox-pixel.zarr",
+        crs_authority: "EPSG:4326",
+        geotransform: [-124.0, 0.5, 0.0, 50.0, 0.0, -0.5],
+        raster_arrays: &["air_temperature"],
+    };
+    assert_local_fixture(&expected, Some(expected.raster_arrays)).await;
+}
+
+#[tokio::test]
+async fn discovers_v3_geozarr_consolidated_arrays_from_local_filesystem() {
+    let expected = FixtureExpectation {
+        name: "v3-geozarr-consolidated.zarr",
+        crs_authority: "EPSG:32610",
+        geotransform: [500000.0, 30.0, 0.0, 5200000.0, 0.0, -30.0],
+        raster_arrays: &["quality", "reflectance"],
+    };
+    assert_local_fixture(&expected, None).await;
+}
+
+#[tokio::test]
+async fn reads_v3_lon_lat_coordinates_from_local_filesystem() {
+    let expected = FixtureExpectation {
+        name: "v3-lon-lat-coordinates.zarr",
+        crs_authority: "EPSG:4326",
+        geotransform: [-124.0, 0.5, 0.0, 50.0, 0.0, -0.5],
+        raster_arrays: &["air_temperature"],
+    };
+    assert_local_fixture(&expected, Some(expected.raster_arrays)).await;
 }
 
 /// Static HTTP server for fixture tests. [`ServeDir`] implements GET, HEAD,
 /// byte ranges, and safe path handling for `object_store::http`.
+///
+/// The local filesystem tests cover Zarr parsing, while these HTTP tests also
+/// verify that metadata and chunks can be discovered and read through the
+/// remote object-store path, including its HEAD and byte-range requests.
 struct StaticHttpServer {
     address: SocketAddr,
     task: JoinHandle<()>,
@@ -165,21 +225,29 @@ impl Drop for StaticHttpServer {
 
 #[tokio::test]
 async fn reads_v2_fixture_over_http() {
-    let name = "v2-cf-grid-mapping.zarr";
-    let expected = fixture_manifest().remove(name).unwrap();
+    let expected = FixtureExpectation {
+        name: "v2-cf-grid-mapping.zarr",
+        crs_authority: "EPSG:3857",
+        geotransform: [100.0, 1.0, 0.0, 200.0, 0.0, -1.0],
+        raster_arrays: &["temperature"],
+    };
     let server = StaticHttpServer::start(fixture_root()).await;
-    let uri = server.uri(name);
+    let uri = server.uri(expected.name);
     let store = object_store_for_uri(&uri).unwrap();
-    let array = read_all(&uri, store, Some(&expected.raster_arrays)).await;
+    let array = read_all(&uri, store, Some(expected.raster_arrays)).await;
     assert_fixture(&array, &expected);
 }
 
 #[tokio::test]
 async fn discovers_inline_consolidated_v3_fixture_over_http() {
-    let name = "v3-geozarr-consolidated.zarr";
-    let expected = fixture_manifest().remove(name).unwrap();
+    let expected = FixtureExpectation {
+        name: "v3-geozarr-consolidated.zarr",
+        crs_authority: "EPSG:32610",
+        geotransform: [500000.0, 30.0, 0.0, 5200000.0, 0.0, -30.0],
+        raster_arrays: &["quality", "reflectance"],
+    };
     let server = StaticHttpServer::start(fixture_root()).await;
-    let uri = server.uri(name);
+    let uri = server.uri(expected.name);
     let store = object_store_for_uri(&uri).unwrap();
     let array = read_all(&uri, store, None).await;
     assert_fixture(&array, &expected);
