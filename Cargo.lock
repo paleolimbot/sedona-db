@@ -1231,9 +1231,9 @@ checksum = "37b2a672a2cb129a2e41c10b1224bb368f9f37a2b16b612598138befd7b37eb5"
 
 [[package]]
 name = "cc"
-version = "1.4.0"
+version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5add81bb678e6cb321aff7fa0dc7689ad82b112dbc032cea19f91d6b8e3582b9"
+checksum = "f74872d07caf508b30a21f6836e7d7016a2eaf7d9ff4f48deaa58cd8a0407630"
 dependencies = [
  "find-msvc-tools",
  "jobserver",
@@ -2783,9 +2783,9 @@ dependencies = [
 
 [[package]]
 name = "find-msvc-tools"
-version = "0.1.9"
+version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5baebc0774151f905a1a2cc41989300b1e6fbb29aff0ceffa1064fdd3088d582"
+checksum = "aedcfb3409746eddb02b9e19ebda1c3394f759a152e48ee875a0844d1b955484"
 
 [[package]]
 name = "fixedbitset"
@@ -3111,9 +3111,9 @@ dependencies = [
 
 [[package]]
 name = "geos"
-version = "11.2.2"
+version = "11.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "acbd75af3e7609d8c30dcefff46016dde2fdb355b38c3caefcf712fd48558372"
+checksum = "7b131d80ad838c8e5b9e0d31482f893961267fbd29903ea1b6a1565d814b07e5"
 dependencies = [
  "geo-types",
  "geos-sys",
@@ -3177,9 +3177,9 @@ dependencies = [
 
 [[package]]
 name = "glam"
-version = "0.33.0"
+version = "0.34.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8fb167719045debebe9f532320accc7b5c993c5a3b813f5696a11d5ca7bdc57b"
+checksum = "fc148d4ddd3930c52f9e5ae79b89805c6f07e9ff417e7b083e0348cea60a5aba"
 
 [[package]]
 name = "glob"
@@ -5468,9 +5468,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.36"
+version = "0.23.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c665f33d38cea657d9614f766881e4d510e0eda4239891eea56b4cadcf01801b"
+checksum = "0d41d731c7d2f962d1ccc364cec258de3c0e93b38c2fb3ba97ac74513048d634"
 dependencies = [
  "aws-lc-rs",
  "once_cell",
@@ -5505,9 +5505,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.13"
+version = "0.103.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61c429a8649f110dddef65e2a5ad240f747e85f7758a6bccc7e5777bd33f756e"
+checksum = "f3c3cf1d8b1e7d4927e2d154c3fcb02979afb9939629c62cd9048d4f07b60ac2"
 dependencies = [
  "aws-lc-rs",
  "ring",
@@ -5664,7 +5664,7 @@ dependencies = [
 
 [[package]]
 name = "sedona"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -5723,7 +5723,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-adbc"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "adbc_core",
  "adbc_ffi",
@@ -5738,7 +5738,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-catalog"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "async-trait",
  "datafusion-catalog",
@@ -5749,7 +5749,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-cli"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow",
  "async-trait",
@@ -5774,7 +5774,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-common"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "datafusion-common",
  "regex",
@@ -5783,7 +5783,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-datasource"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow-array",
  "arrow-schema",
@@ -5808,7 +5808,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-expr"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -5829,7 +5829,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-extension"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow-array",
  "arrow-schema",
@@ -5858,7 +5858,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-functions"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -5886,7 +5886,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-gdal"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "gdal-sys",
  "libloading 0.9.0",
@@ -5897,7 +5897,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-geo"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -5924,7 +5924,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-geo-generic-alg"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "approx",
  "criterion",
@@ -5948,7 +5948,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-geo-traits-ext"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "byteorder",
  "geo-traits",
@@ -5961,7 +5961,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-geoarrow-c"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow-array",
  "arrow-schema",
@@ -5981,7 +5981,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-geometry"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "geo-traits",
  "geo-types",
@@ -5998,7 +5998,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-geoparquet"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow-array",
  "arrow-schema",
@@ -6039,7 +6039,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-geos"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow-array",
  "arrow-schema",
@@ -6064,7 +6064,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-libgpuspatial"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow-array",
  "arrow-schema",
@@ -6083,7 +6083,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-pointcloud"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -6118,7 +6118,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-proj"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "approx",
  "geo-traits",
@@ -6133,7 +6133,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-query-planner"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow",
  "arrow-array",
@@ -6157,7 +6157,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-raster"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "approx",
  "arrow-array",
@@ -6177,7 +6177,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-raster-functions"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -6203,7 +6203,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-raster-gdal"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -6228,7 +6228,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-raster-zarr"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -6255,7 +6255,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-s2geography"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow-array",
  "arrow-schema",
@@ -6281,7 +6281,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-schema"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow-array",
  "arrow-schema",
@@ -6295,7 +6295,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-spatial-join"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow",
  "arrow-array",
@@ -6345,7 +6345,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-spatial-join-geography"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow",
  "arrow-array",
@@ -6376,7 +6376,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-spatial-join-gpu"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow",
  "arrow-array",
@@ -6408,7 +6408,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-spatial-join-raster"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow-array",
  "arrow-schema",
@@ -6433,7 +6433,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-testing"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow-array",
  "arrow-cast",
@@ -6460,7 +6460,7 @@ dependencies = [
 
 [[package]]
 name = "sedona-tg"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow-array",
  "arrow-schema",
@@ -6481,7 +6481,7 @@ dependencies = [
 
 [[package]]
 name = "sedonadb"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "adbc_core",
  "arrow-array",
@@ -6518,7 +6518,7 @@ dependencies = [
 
 [[package]]
 name = "sedonadb-zarr"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow-array",
  "arrow-buffer",
@@ -6533,7 +6533,7 @@ dependencies = [
 
 [[package]]
 name = "sedonadbr"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "arrow-array",
  "arrow-schema",
@@ -6637,9 +6637,9 @@ dependencies = [
 
 [[package]]
 name = "serde_with"
-version = "3.23.0"
+version = "3.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "935177bb8c0cd8ca1a4e6d1a2ac8988bea69cab4f9d3a31311e012ad27868ea4"
+checksum = "df9adc193c780ef8f159aee8b61e2d5801aaa555e6eb0947fe45530ec506296f"
 dependencies = [
  "base64 0.23.1",
  "bs58",
@@ -6658,9 +6658,9 @@ dependencies = [
 
 [[package]]
 name = "serde_with_macros"
-version = "3.23.0"
+version = "3.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d607aa01a3cb0ad757d6fd216136910db3c97b102fe686585689615a02dbcdc"
+checksum = "3e17bbc68e28663bbbb90df47e058aa7eda4fb445b89fe70457bb94fbccf6e49"
 dependencies = [
  "darling",
  "proc-macro2",
