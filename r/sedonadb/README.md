@@ -54,9 +54,9 @@ libgeos-dev libgdal-dev libproj-dev pkg-config curl`, or on macOS use
 `brew install geos gdal proj pkg-config`.
 
 The Windows build automatically sets up a pinned vcpkg checkout and
-builds GDAL, PROJ, S2, Abseil, and OpenSSL with the Rtools compiler. The
-GDAL and PROJ DLLs and the matching GDAL/PROJ data files are bundled in
-the installed package. Set
+builds and statically links GDAL, PROJ, S2, Abseil, and OpenSSL with the
+Rtools compiler. The matching GDAL/PROJ data files are bundled in the
+installed package. Set
 `SEDONADB_USE_VCPKG=false` to disable automatic setup and provide a
 bootstrapped checkout through `VCPKG_ROOT` instead.
 

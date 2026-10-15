@@ -20,9 +20,9 @@
 # available (even if it isn't used). Here we just try pkg-config (LIB_DIR
 # can be used to specify the location of -lgeos_c)
 
-pkg-config geos gdal proj 2>/dev/null
+pkg-config geos 2>/dev/null
 if [ $? -eq 0 ]; then
-  PKGCONFIG_LIBS=`pkg-config --libs geos gdal proj`
+  PKGCONFIG_LIBS=`pkg-config --libs geos`
 fi
 
 if [ "$LIB_DIR" ]; then
@@ -150,7 +150,6 @@ S2_CMAKE_TOOLCHAIN_FILE=""
 S2_CMAKE_PREFIX_PATH=""
 S2_OPENSSL_ROOT_DIR=""
 SPATIAL_VCPKG_PREFIX=""
-SPATIAL_VCPKG_BIN=""
 GDAL_VERSION=""
 SAVVY_FEATURE_WORDS="$(printf '%s' "${SAVVY_FEATURES}" | tr ',' ' ')"
 
@@ -246,7 +245,6 @@ if [ "${NEEDS_GDAL}" = true ] || [ "${NEEDS_PROJ}" = true ]; then
   fi
 
   SPATIAL_VCPKG_PREFIX="${VCPKG_ROOT}/installed/${SPATIAL_VCPKG_TARGET_TRIPLET}"
-  SPATIAL_VCPKG_BIN="${SPATIAL_VCPKG_PREFIX}/bin"
   if [ "${NEEDS_GDAL}" = true ]; then
     GDAL_VERSION="$(awk '
       /#define GDAL_VERSION_MAJOR/ { major=$3 }
@@ -254,9 +252,12 @@ if [ "${NEEDS_GDAL}" = true ] || [ "${NEEDS_PROJ}" = true ]; then
       /#define GDAL_VERSION_REV/ { patch=$3 }
       END { print major "." minor "." patch }
     ' "${SPATIAL_VCPKG_PREFIX}/include/gdal_version.h")"
-    PKG_LIBS="-L${SPATIAL_VCPKG_PREFIX}/lib -lgdal -lproj ${PKGCONFIG_LIBS:--lgeos_c -lgeos}"
+    SPATIAL_PKG_CONFIG_PATH="${SPATIAL_VCPKG_PREFIX}/lib/pkgconfig:${SPATIAL_VCPKG_PREFIX}/share/pkgconfig"
+    SPATIAL_LIBS="$(PKG_CONFIG_PATH="${SPATIAL_PKG_CONFIG_PATH}" PKG_CONFIG_SYSROOT_DIR= pkg-config --static --libs gdal proj)" || exit 1
+    PKG_LIBS="${SPATIAL_LIBS} ${PKGCONFIG_LIBS:--lgeos_c -lgeos}"
   else
-    PKG_LIBS="-L${SPATIAL_VCPKG_PREFIX}/lib -lproj"
+    SPATIAL_PKG_CONFIG_PATH="${SPATIAL_VCPKG_PREFIX}/lib/pkgconfig:${SPATIAL_VCPKG_PREFIX}/share/pkgconfig"
+    PKG_LIBS="$(PKG_CONFIG_PATH="${SPATIAL_PKG_CONFIG_PATH}" PKG_CONFIG_SYSROOT_DIR= pkg-config --static --libs proj)" || exit 1
   fi
 fi
 
@@ -272,7 +273,6 @@ sed \
   -e "s|@CMAKE_PREFIX_PATH@|${S2_CMAKE_PREFIX_PATH}|" \
   -e "s|@OPENSSL_ROOT_DIR@|${S2_OPENSSL_ROOT_DIR}|" \
   -e "s|@SPATIAL_VCPKG_PREFIX@|${SPATIAL_VCPKG_PREFIX}|" \
-  -e "s|@SPATIAL_VCPKG_BIN@|${SPATIAL_VCPKG_BIN}|" \
   -e "s|@GDAL_VERSION@|${GDAL_VERSION}|" \
   -e "s|@PKG_LIBS@|${PKG_LIBS}|" \
   src/Makevars.win.in > src/Makevars.win

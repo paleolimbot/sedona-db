@@ -28,7 +28,6 @@ CMAKE_TOOLCHAIN_FILE = @CMAKE_TOOLCHAIN_FILE@
 CMAKE_PREFIX_PATH = @CMAKE_PREFIX_PATH@
 OPENSSL_ROOT_DIR = @OPENSSL_ROOT_DIR@
 SPATIAL_VCPKG_PREFIX = @SPATIAL_VCPKG_PREFIX@
-SPATIAL_VCPKG_BIN = @SPATIAL_VCPKG_BIN@
 GDAL_VERSION = @GDAL_VERSION@
 SEDONADB_R_CC = $(strip $(CC))
 SEDONADB_R_CXX = $(strip $(CXX17))
@@ -84,7 +83,7 @@ PKG_CONFIG_SYSROOT_DIR = /x86_64-w64-mingw32.static.posix/
 # also incompatible with aws-lc-sys.
 CFLAGS_TWEAKED = $(filter-out -O%,$(CFLAGS)) -Wno-pedantic
 
-all: $(SHLIB) copy_native_runtime copy_native_data clean_intermediate
+all: $(SHLIB) copy_native_data clean_intermediate
 
 $(SHLIB): $(STATLIB)
 
@@ -99,9 +98,10 @@ $(STATLIB):
 	  export PKG_CONFIG_SYSROOT_DIR="$(PKG_CONFIG_SYSROOT_DIR)" && \
 	  if [ -n "$(SPATIAL_VCPKG_PREFIX)" ]; then \
 	    export PKG_CONFIG_ALLOW_CROSS=1; \
+	    export PKG_CONFIG_ALL_STATIC=1; \
 	    export PKG_CONFIG_SYSROOT_DIR=""; \
-	    export PKG_CONFIG_PATH="$(SPATIAL_VCPKG_PREFIX)/lib/pkgconfig$${PKG_CONFIG_PATH:+:$${PKG_CONFIG_PATH}}"; \
-	    export GDAL_DYNAMIC=1; \
+	    export PKG_CONFIG_PATH="$(SPATIAL_VCPKG_PREFIX)/lib/pkgconfig:$(SPATIAL_VCPKG_PREFIX)/share/pkgconfig$${PKG_CONFIG_PATH:+:$${PKG_CONFIG_PATH}}"; \
+	    export GDAL_STATIC=1; \
 	    export GDAL_INCLUDE_DIR="$(SPATIAL_VCPKG_PREFIX)/include"; \
 	    export GDAL_LIB_DIR="$(SPATIAL_VCPKG_PREFIX)/lib"; \
 	    export GDAL_VERSION="$(GDAL_VERSION)"; \
@@ -131,17 +131,6 @@ $(STATLIB):
 clean_intermediate: $(SHLIB)
 	rm -f $(STATLIB)
 
-# Stage the vcpkg-built spatial DLLs for src/install.libs.R, which installs them
-# beside sedonadb.dll where the Windows loader and the R runtime resolver can
-# find them.
-copy_native_runtime: $(SHLIB)
-	if [ -n "$(SPATIAL_VCPKG_BIN)" ]; then \
-	  test -d "$(SPATIAL_VCPKG_BIN)"; \
-	  rm -rf vcpkg-dlls; \
-	  mkdir -p vcpkg-dlls; \
-	  cp "$(SPATIAL_VCPKG_BIN)"/*.dll vcpkg-dlls/; \
-	fi
-
 # GDAL and PROJ runtime data must match the vcpkg libraries bundled above.
 # Copying these trees follows the Windows packaging pattern used by sf/vapour.
 copy_native_data:
@@ -154,6 +143,6 @@ copy_native_data:
 	fi
 
 clean:
-	rm -Rf $(SHLIB) $(OBJECTS) $(STATLIB) vcpkg-dlls ./rust/target
+	rm -Rf $(SHLIB) $(OBJECTS) $(STATLIB) ./rust/target
 
-.PHONY: all copy_native_runtime copy_native_data clean_intermediate clean
+.PHONY: all copy_native_data clean_intermediate clean

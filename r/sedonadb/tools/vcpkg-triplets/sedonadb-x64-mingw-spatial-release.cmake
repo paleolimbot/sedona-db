@@ -16,14 +16,6 @@
 # under the License.
 
 set(VCPKG_TARGET_ARCHITECTURE x64)
-
-# Keep transitive dependencies static so the R package only has to ship the
-# spatial DLLs it uses directly. Loading GDAL from its DLL preserves access to
-# the exported MEMDataset::Create fast path.
-if(PORT MATCHES "^(gdal|proj)$")
-  set(VCPKG_LIBRARY_LINKAGE dynamic)
-else()
-  set(VCPKG_LIBRARY_LINKAGE static)
-endif()
+set(VCPKG_LIBRARY_LINKAGE static)
 
 include("${CMAKE_CURRENT_LIST_DIR}/sedonadb-mingw-static-release.cmake")

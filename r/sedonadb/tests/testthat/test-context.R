@@ -213,21 +213,6 @@ test_that("configure_gdal() errors for invalid inputs", {
   )
 })
 
-test_that("bundled native libraries are selected by name", {
-  directory <- local_tempdir()
-  file.create(file.path(directory, "gdal.dll"))
-  file.create(file.path(directory, "proj_9_7.dll"))
-
-  expect_match(
-    find_bundled_native_library("^(lib)?gdal.*\\.dll$", directory),
-    "gdal\\.dll$"
-  )
-  expect_match(
-    find_bundled_native_library("^(lib)?proj.*\\.dll$", directory),
-    "proj_9_7\\.dll$"
-  )
-})
-
 test_that(".fns can have its contents listed", {
   expect_contains(names(.fns), "st_intersects")
   expect_contains(.DollarNames(.fns, "st_int"), "st_intersects")

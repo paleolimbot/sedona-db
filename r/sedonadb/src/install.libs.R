@@ -19,9 +19,10 @@ destination <- file.path(R_PACKAGE_DIR, paste0("libs", R_ARCH))
 dir.create(destination, recursive = TRUE, showWarnings = FALSE)
 
 package_dll <- Sys.glob(paste0("*", SHLIB_EXT))
-native_dlls <- Sys.glob(file.path("vcpkg-dlls", "*.dll"))
-dlls <- c(package_dll, native_dlls)
 
-if (length(dlls) == 0L || !all(file.copy(dlls, destination, overwrite = TRUE))) {
-  stop("Failed to install sedonadb native libraries")
+if (
+  length(package_dll) == 0L ||
+    !all(file.copy(package_dll, destination, overwrite = TRUE))
+) {
+  stop("Failed to install the sedonadb native library")
 }
