@@ -27,8 +27,12 @@
   init_r_runtime_interrupts(call, ns)
 
   bundled_proj <- system.file("proj", package = "sedonadb")
+  bundled_proj_library <- find_bundled_native_library(
+    "^(lib)?proj.*\\.dll$"
+  )
   if (nzchar(bundled_proj)) {
     configure_proj_shared(
+      shared_library_path = bundled_proj_library,
       database_path = file.path(bundled_proj, "proj.db"),
       search_path = bundled_proj
     )
@@ -37,12 +41,31 @@
   }
 
   bundled_gdal <- system.file("gdal", package = "sedonadb")
+  bundled_gdal_library <- find_bundled_native_library("^(lib)?gdal.*\\.dll$")
   if (nzchar(bundled_gdal)) {
     Sys.setenv(GDAL_DATA = bundled_gdal)
-    configure_gdal_shared()
+    configure_gdal_shared(bundled_gdal_library)
   } else {
     sd_configure_gdal("auto")
   }
+}
+
+find_bundled_native_library <- function(pattern, directory = NULL) {
+  if (is.null(directory)) {
+    directory <- system.file("libs", package = "sedonadb")
+  }
+  if (!nzchar(directory)) {
+    return(NULL)
+  }
+
+  candidates <- list.files(
+    directory,
+    pattern = pattern,
+    full.names = TRUE,
+    recursive = TRUE,
+    ignore.case = TRUE
+  )
+  if (length(candidates) == 0L) NULL else candidates[[1L]]
 }
 
 # The function we call from Rust to check for interrupts. R checks for

@@ -75,7 +75,7 @@ fn configure_proj_shared(
 fn configure_proj_prefix_native(prefix: &str) -> savvy::Result<()> {
     let installation = NativeLibrary::Proj
         .from_prefix(prefix.as_ref())
-        .map_err(|e| savvy::Error::GeneralError(e.into()))?;
+        .map_err(savvy::Error::GeneralError)?;
     configure_proj_shared(
         Some(installation.shared_library.to_string_lossy().as_ref()),
         Some(
@@ -116,7 +116,7 @@ fn configure_gdal_shared(shared_library_path: Option<&str>) -> savvy::Result<()>
 fn configure_gdal_prefix_native(prefix: &str) -> savvy::Result<()> {
     let installation = NativeLibrary::Gdal
         .from_prefix(prefix.as_ref())
-        .map_err(|e| savvy::Error::GeneralError(e.into()))?;
+        .map_err(savvy::Error::GeneralError)?;
     configure_gdal_shared(Some(installation.shared_library.to_string_lossy().as_ref()))
 }
 

@@ -16,4 +16,5 @@
 # under the License.
 
 rm -f src/Makevars.win
+rm -rf src/vcpkg-dlls
 rm -rf inst/gdal inst/proj

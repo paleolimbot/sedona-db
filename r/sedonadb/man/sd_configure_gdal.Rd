@@ -15,7 +15,7 @@ sd_configure_gdal(preset = NULL, shared_library = NULL)
 NULL, invisibly.
 }
 \description{
-SedonaDB loads GDAL dynamically at runtime on Linux and macOS. Windows
-binary packages use the GDAL linked from Rtools. Automatic configuration is
-attempted when the package is loaded.
+SedonaDB loads GDAL dynamically at runtime. Windows binary packages bundle
+the GDAL DLL and matching data files built by vcpkg. Automatic configuration
+is attempted when the package is loaded.
 }

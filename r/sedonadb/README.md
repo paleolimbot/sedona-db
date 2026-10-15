@@ -53,12 +53,12 @@ transformation functions. For example, on Ubuntu use `apt-get install
 libgeos-dev libgdal-dev libproj-dev pkg-config curl`, or on macOS use
 `brew install geos gdal proj pkg-config`.
 
-The Windows build uses the GDAL and PROJ static libraries and data files
-provided by Rtools. It does not use vcpkg for GDAL or PROJ. The install
-automatically sets up a pinned vcpkg checkout only for the S2, Abseil,
-and OpenSSL dependencies. Set `SEDONADB_USE_VCPKG=false` to disable
-automatic setup and use dependencies provided through `VCPKG_ROOT` or
-the system instead.
+The Windows build automatically sets up a pinned vcpkg checkout and
+builds GDAL, PROJ, GEOS, S2, Abseil, and OpenSSL with the Rtools
+compiler. The GDAL, PROJ, and GEOS DLLs and the matching GDAL/PROJ data
+files are bundled in the installed package. Set
+`SEDONADB_USE_VCPKG=false` to disable automatic setup and provide a
+bootstrapped checkout through `VCPKG_ROOT` instead.
 
 ## Example
 
