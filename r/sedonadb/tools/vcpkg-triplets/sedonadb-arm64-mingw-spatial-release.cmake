@@ -20,7 +20,7 @@ set(VCPKG_TARGET_ARCHITECTURE arm64)
 # Keep transitive dependencies static so the R package only has to ship the
 # spatial DLLs it uses directly. Loading GDAL from its DLL preserves access to
 # the exported MEMDataset::Create fast path.
-if(PORT MATCHES "^(gdal|geos|proj)$")
+if(PORT MATCHES "^(gdal|proj)$")
   set(VCPKG_LIBRARY_LINKAGE dynamic)
 else()
   set(VCPKG_LIBRARY_LINKAGE static)

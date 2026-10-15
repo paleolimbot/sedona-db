@@ -213,6 +213,7 @@ if [ "${NEEDS_S2}" = true ]; then
   echo "building s2geography dependencies with R's compiler (${CC}, ${CXX})"
   "${VCPKG_ROOT}/vcpkg.exe" \
     --overlay-triplets="${VCPKG_OVERLAY_TRIPLETS}" \
+    --host-triplet=x64-mingw-static \
     --triplet="${S2_VCPKG_TARGET_TRIPLET}" \
     install openssl abseil s2geometry || exit 1
 
@@ -229,15 +230,17 @@ if [ "${NEEDS_GDAL}" = true ] || [ "${NEEDS_PROJ}" = true ]; then
   esac
 
   if [ "${NEEDS_GDAL}" = true ]; then
-    echo "building GDAL, PROJ, and GEOS with R's compiler (${CC}, ${CXX})"
+    echo "building GDAL and PROJ with R's compiler (${CC}, ${CXX})"
     "${VCPKG_ROOT}/vcpkg.exe" \
       --overlay-triplets="${VCPKG_OVERLAY_TRIPLETS}" \
+      --host-triplet=x64-mingw-static \
       --triplet="${SPATIAL_VCPKG_TARGET_TRIPLET}" \
-      install "gdal[core,geos]" || exit 1
+      install "gdal[core]" || exit 1
   else
     echo "building PROJ with R's compiler (${CC}, ${CXX})"
     "${VCPKG_ROOT}/vcpkg.exe" \
       --overlay-triplets="${VCPKG_OVERLAY_TRIPLETS}" \
+      --host-triplet=x64-mingw-static \
       --triplet="${SPATIAL_VCPKG_TARGET_TRIPLET}" \
       install proj || exit 1
   fi
@@ -251,7 +254,7 @@ if [ "${NEEDS_GDAL}" = true ] || [ "${NEEDS_PROJ}" = true ]; then
       /#define GDAL_VERSION_REV/ { patch=$3 }
       END { print major "." minor "." patch }
     ' "${SPATIAL_VCPKG_PREFIX}/include/gdal_version.h")"
-    PKG_LIBS="-L${SPATIAL_VCPKG_PREFIX}/lib -lgdal -lproj -lgeos_c -lgeos"
+    PKG_LIBS="-L${SPATIAL_VCPKG_PREFIX}/lib -lgdal -lproj ${PKGCONFIG_LIBS:--lgeos_c -lgeos}"
   else
     PKG_LIBS="-L${SPATIAL_VCPKG_PREFIX}/lib -lproj"
   fi
