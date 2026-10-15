@@ -24,7 +24,7 @@ use crate::dyn_load;
 use crate::errors::{GdalError, GdalInitLibraryError};
 use crate::gdal_dyn_bindgen::{GDALTransformerFunc, SedonaGdalApi};
 
-#[cfg(all(feature = "gdal-sys", windows, target_env = "gnu"))]
+#[cfg(feature = "gdal-sys")]
 unsafe extern "C" {
     #[link_name = "VRTCreate"]
     fn gdal_sys_vrt_create(x_size: i32, y_size: i32) -> *mut std::ffi::c_void;
@@ -45,10 +45,14 @@ unsafe extern "C" {
     ) -> i32;
 }
 
-// GDAL 3.12 predates the public MEMCreate C API. R's pinned vcpkg build uses
-// the GNU/LLVM C++ ABI, so referencing the private constructor here both keeps
-// the fast path and makes the static linker pull its object from libgdal.a.
-#[cfg(all(feature = "gdal-sys", windows, target_env = "gnu"))]
+// GDAL 3.12 and earlier predate the public MEMCreate C API. Unix and MinGW use
+// the Itanium C++ ABI, so referencing the private constructor preserves the
+// fast path and makes static linkers retain its object from libgdal.a.
+#[cfg(all(
+    feature = "gdal-sys",
+    not(gdal_has_mem_create),
+    any(unix, all(windows, target_env = "gnu"))
+))]
 unsafe extern "C" {
     #[link_name = "_ZN10MEMDataset6CreateEPKciii12GDALDataTypePPc"]
     fn gdal_sys_mem_dataset_create(
@@ -113,9 +117,10 @@ impl GdalApi {
 
     /// Build the API table directly from functions linked by `gdal-sys`.
     ///
-    /// Static GDAL functions are not exported from R's DLL for lookup through
-    /// `GetProcAddress`, so Windows must retain their addresses at link time.
-    #[cfg(all(feature = "gdal-sys", windows, target_env = "gnu"))]
+    /// Linked GDAL functions are not guaranteed to be exported from the final
+    /// executable or DLL for runtime symbol lookup, so retain their addresses
+    /// directly when the platform has a supported MEM creator ABI.
+    #[cfg(all(feature = "gdal-sys", any(unix, all(windows, target_env = "gnu"))))]
     pub fn from_gdal_sys() -> Self {
         let mut inner = SedonaGdalApi::default();
 
@@ -215,7 +220,10 @@ impl GdalApi {
         set_fn!(CPLErrorReset);
         set_fn!(GDALGetDataTypeSizeBytes);
 
-        #[cfg(all(windows, target_env = "gnu"))]
+        #[cfg(gdal_has_mem_create)]
+        set_fn!(MEMCreate);
+
+        #[cfg(not(gdal_has_mem_create))]
         {
             inner.MEMDatasetCreate = Some(gdal_sys_mem_dataset_create);
         }

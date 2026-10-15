@@ -92,17 +92,17 @@ impl GdalApiBuilder {
     /// Build a [`GdalApi`] with the configured options.
     ///
     /// When `shared_library` is set, loads GDAL from that path. Otherwise,
-    /// resolves symbols from the current process (with an optional
-    /// compile-time version check when the `gdal-sys` feature is enabled).
+    /// uses the linked `gdal-sys` function table when supported, otherwise
+    /// resolves symbols from the current process.
     pub fn build(&self) -> Result<GdalApi, GdalInitLibraryError> {
         let api = if let Some(shared_library) = &self.shared_library {
             GdalApi::try_from_shared_library(shared_library.clone())?
         } else {
-            #[cfg(all(feature = "gdal-sys", windows, target_env = "gnu"))]
+            #[cfg(all(feature = "gdal-sys", any(unix, all(windows, target_env = "gnu"))))]
             {
                 GdalApi::from_gdal_sys()
             }
-            #[cfg(not(all(feature = "gdal-sys", windows, target_env = "gnu")))]
+            #[cfg(not(all(feature = "gdal-sys", any(unix, all(windows, target_env = "gnu")))))]
             {
                 GdalApi::try_from_current_process().map_err(|e| {
                     GdalInitLibraryError::LibraryError(format!(
@@ -271,15 +271,15 @@ mod test {
     use super::*;
 
     /// Building with default options (no shared library) should succeed when
-    /// `gdal-sys` is linked, loading symbols from the current process.
+    /// `gdal-sys` is linked, using its function table on supported platforms.
     #[test]
     fn test_builder_default() {
         let api = GdalApiBuilder::default()
             .build()
             .expect("GdalApiBuilder::default().build() should succeed with gdal-sys");
-        #[cfg(all(windows, target_env = "gnu"))]
+        #[cfg(any(unix, all(windows, target_env = "gnu")))]
         assert_eq!(api.name(), "gdal_sys");
-        #[cfg(not(all(windows, target_env = "gnu")))]
+        #[cfg(not(any(unix, all(windows, target_env = "gnu"))))]
         assert_eq!(api.name(), "current_process");
     }
 
