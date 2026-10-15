@@ -245,6 +245,8 @@ if [ "${NEEDS_GDAL}" = true ] || [ "${NEEDS_PROJ}" = true ]; then
   fi
 
   SPATIAL_VCPKG_PREFIX="${VCPKG_ROOT}/installed/${SPATIAL_VCPKG_TARGET_TRIPLET}"
+  SPATIAL_PKG_CONFIG_PREFIX="$(cygpath -u "${SPATIAL_VCPKG_PREFIX}")"
+  SPATIAL_PKG_CONFIG_LIBDIR="${SPATIAL_PKG_CONFIG_PREFIX}/lib/pkgconfig:${SPATIAL_PKG_CONFIG_PREFIX}/share/pkgconfig"
   if [ "${NEEDS_GDAL}" = true ]; then
     GDAL_VERSION="$(awk '
       /#define GDAL_VERSION_MAJOR/ { major=$3 }
@@ -252,13 +254,24 @@ if [ "${NEEDS_GDAL}" = true ] || [ "${NEEDS_PROJ}" = true ]; then
       /#define GDAL_VERSION_REV/ { patch=$3 }
       END { print major "." minor "." patch }
     ' "${SPATIAL_VCPKG_PREFIX}/include/gdal_version.h")"
+    SPATIAL_LIBS_RAW="$(PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="${SPATIAL_PKG_CONFIG_LIBDIR}" PKG_CONFIG_SYSROOT_DIR= pkg-config --static --libs gdal)" || exit 1
+
+    # gdal-sys bundles libgdal.a into libsedonadbr.a, but a Rust staticlib
+    # does not propagate GDAL's transitive native link requirements to R.
+    # Keep the vcpkg dependency closure while removing the duplicate archive.
+    SPATIAL_LIBS=""
+    for SPATIAL_LIB in ${SPATIAL_LIBS_RAW}; do
+      if [ "${SPATIAL_LIB}" != "-lgdal" ]; then
+        SPATIAL_LIBS="${SPATIAL_LIBS} ${SPATIAL_LIB}"
+      fi
+    done
+  else
+    SPATIAL_LIBS="$(PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="${SPATIAL_PKG_CONFIG_LIBDIR}" PKG_CONFIG_SYSROOT_DIR= pkg-config --static --libs proj)" || exit 1
   fi
 
-  # Cargo bundles native static libraries from gdal-sys/proj-sys into the
-  # sedonadbr staticlib. Linking GDAL or PROJ here a second time can select the
-  # Rtools copies and produce duplicate definitions. Only the pre-existing
-  # package-level GEOS dependency belongs on R's final DLL link line.
-  PKG_LIBS="${PKGCONFIG_LIBS:--lgeos_c -lgeos}"
+  # Rescan the static dependency closure because GDAL and PROJ contain cycles.
+  # The package-level GEOS dependency remains separate and follows the group.
+  PKG_LIBS="-Wl,--start-group ${SPATIAL_LIBS} -Wl,--end-group ${PKGCONFIG_LIBS:--lgeos_c -lgeos}"
 fi
 
 sed \
