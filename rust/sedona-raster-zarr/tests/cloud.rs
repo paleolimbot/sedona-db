@@ -28,8 +28,11 @@ use arrow_array::cast::AsArray;
 use axum::Router;
 use object_store::ObjectStore;
 use sedona_raster::array::RasterStructArray;
+use sedona_raster::raster_loader::{AsyncRasterLoader, RasterLoadRequest};
 use sedona_raster::traits::RasterRef;
-use sedona_raster_zarr::{ZarrChunkReader, object_store_for_uri, open_storage_from_uri};
+use sedona_raster_zarr::{
+    ZarrChunkReader, ZarrLoader, object_store_for_uri, open_storage_from_uri,
+};
 use tokio::task::JoinHandle;
 use tower_http::services::ServeDir;
 
@@ -108,6 +111,22 @@ fn assert_fixture(array: &StructArray, expected: &FixtureExpectation) {
         found_grid_origin,
         "expected a chunk at the fixture's grid origin"
     );
+}
+
+async fn load_first_band(array: &StructArray) -> Vec<u8> {
+    let rasters = RasterStructArray::try_new(array).unwrap();
+    let raster = rasters.get(0).unwrap();
+    let band = raster.band(0).unwrap();
+    let dim_names = band.dim_names();
+    let request = RasterLoadRequest {
+        uri: band.outdb_uri().unwrap(),
+        dim_names: &dim_names,
+        source_shape: band.raw_source_shape(),
+        view: band.view(),
+        data_type: band.data_type(),
+    };
+    let result = ZarrLoader::new().load(&[&request]).await.unwrap();
+    result[0].bytes.to_vec()
 }
 
 async fn assert_local_fixture(expected: &FixtureExpectation, arrays: Option<&[&str]>) {
@@ -190,8 +209,9 @@ async fn reads_v3_lon_lat_coordinates_from_local_filesystem() {
 /// byte ranges, and safe path handling for `object_store::http`.
 ///
 /// The local filesystem tests cover Zarr parsing, while these HTTP tests also
-/// verify that metadata and chunks can be discovered and read through the
-/// remote object-store path, including its HEAD and byte-range requests.
+/// verify metadata discovery through the remote object-store path. The v2
+/// test additionally dereferences one emitted chunk anchor, covering payload
+/// and byte-range reads.
 struct StaticHttpServer {
     address: SocketAddr,
     task: JoinHandle<()>,
@@ -236,6 +256,14 @@ async fn reads_v2_fixture_over_http() {
     let store = object_store_for_uri(&uri).unwrap();
     let array = read_all(&uri, store, Some(expected.raster_arrays)).await;
     assert_fixture(&array, &expected);
+    let bytes = load_first_band(&array).await;
+    let pixels = bytes
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|bytes| i16::from_le_bytes(*bytes))
+        .collect::<Vec<_>>();
+    assert_eq!(pixels, [0, 1, 2, 6, 7, 8]);
 }
 
 #[tokio::test]
