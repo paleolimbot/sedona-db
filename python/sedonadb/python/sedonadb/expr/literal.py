@@ -180,8 +180,7 @@ def _resolve_geometry_array(values, type):
         is_geometry = None
 
     if is_geometry is not None and all(
-        value is None or bool(is_geom)
-        for value, is_geom in zip(values, is_geometry)
+        value is None or bool(is_geom) for value, is_geom in zip(values, is_geometry)
     ):
         wkb = shapely.to_wkb(values)
         if pa.types.is_binary(type.storage_type) or pa.types.is_large_binary(

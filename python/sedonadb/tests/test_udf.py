@@ -158,15 +158,10 @@ def test_python_udf(con):
 
     assert format_value._name == "format_value"
     con.register(format_value)
-    assert (
-        con.sql(
-            "SELECT format_value(x, n) AS col "
-            "FROM (VALUES ('a', 1), ('b', 2), ('c', 3), (NULL, 4)) AS t(x, n)"
-        )
-        .to_arrow_table()["col"]
-        .to_pylist()
-        == ["a / 1", "b / 2", "c / 3", None]
-    )
+    assert con.sql(
+        "SELECT format_value(x, n) AS col "
+        "FROM (VALUES ('a', 1), ('b', 2), ('c', 3), (NULL, 4)) AS t(x, n)"
+    ).to_arrow_table()["col"].to_pylist() == ["a / 1", "b / 2", "c / 3", None]
     assert set(calls) == {("a", 1), ("b", 2), ("c", 3), (None, 4)}
 
 
@@ -181,15 +176,10 @@ def test_python_udf_uses_literal_result_conversion(con):
         return shapely.Point(x, y)
 
     con.register(make_point)
-    assert (
-        con.sql(
-            "SELECT ST_AsText(make_point(x, y)) AS col "
-            "FROM (VALUES (1.0, 2.0), (3.0, 4.0), (NULL, 5.0)) AS t(x, y)"
-        )
-        .to_arrow_table()["col"]
-        .to_pylist()
-        == ["POINT(1 2)", "POINT(3 4)", None]
-    )
+    assert con.sql(
+        "SELECT ST_AsText(make_point(x, y)) AS col "
+        "FROM (VALUES (1.0, 2.0), (3.0, 4.0), (NULL, 5.0)) AS t(x, y)"
+    ).to_arrow_table()["col"].to_pylist() == ["POINT(1 2)", "POINT(3 4)", None]
 
 
 def test_python_udf_reuses_converted_scalar_object(con):
@@ -201,15 +191,9 @@ def test_python_udf_reuses_converted_scalar_object(con):
         return len(value) + number
 
     con.register(add_list_length)
-    assert (
-        con.sql(
-            "SELECT add_list_length([10, 20], x) AS col "
-            "FROM (VALUES (1), (2), (3)) AS t(x)"
-        )
-        .to_arrow_table()["col"]
-        .to_pylist()
-        == [3, 4, 5]
-    )
+    assert con.sql(
+        "SELECT add_list_length([10, 20], x) AS col FROM (VALUES (1), (2), (3)) AS t(x)"
+    ).to_arrow_table()["col"].to_pylist() == [3, 4, 5]
     assert len(values_seen) == 3
     assert all(value is values_seen[0] for value in values_seen)
 
@@ -231,16 +215,11 @@ def test_python_udf_raster_round_trip(con):
         return value
 
     con.register(raster_identity)
-    assert (
-        con.sql(
-            "SELECT RS_Width(raster_identity("
-            "RS_MakeEmptyRaster(1, 'B', 3, 2, 0.0, 0.0, 1.0)"
-            ")) AS col"
-        )
-        .to_arrow_table()["col"]
-        .to_pylist()
-        == [3]
-    )
+    assert con.sql(
+        "SELECT RS_Width(raster_identity("
+        "RS_MakeEmptyRaster(1, 'B', 3, 2, 0.0, 0.0, 1.0)"
+        ")) AS col"
+    ).to_arrow_table()["col"].to_pylist() == [3]
     assert len(received) == 1
 
 

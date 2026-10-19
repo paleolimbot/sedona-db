@@ -371,8 +371,7 @@ def _python_values_from_raster(array):
 
     storage = array.storage if isinstance(array, pa.ExtensionArray) else array
     return [
-        None if not array[i].is_valid else Raster(storage, i)
-        for i in range(len(array))
+        None if not array[i].is_valid else Raster(storage, i) for i in range(len(array))
     ]
 
 
