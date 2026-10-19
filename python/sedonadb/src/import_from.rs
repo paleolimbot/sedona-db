@@ -228,23 +228,28 @@ pub fn import_arg_matcher(
     obj: &Bound<PyAny>,
 ) -> Result<Arc<dyn TypeMatcher + Send + Sync>, PySedonaError> {
     if let Ok(string_value) = obj.extract::<String>() {
-        match string_value.as_str() {
-            "geometry" => return Ok(ArgMatcher::is_geometry()),
-            "geography" => return Ok(ArgMatcher::is_geography()),
-            "numeric" => return Ok(ArgMatcher::is_numeric()),
-            "string" => return Ok(ArgMatcher::is_string()),
-            "binary" => return Ok(ArgMatcher::is_binary()),
-            "boolean" => return Ok(ArgMatcher::is_boolean()),
-            v => {
-                return Err(PySedonaError::SedonaPython(format!(
-                    "Can't interpret literal string '{v}' as ArgMatcher"
-                )))
-            }
-        }
+        return arg_matcher_from_name(&string_value);
     }
 
     let sedona_type = import_sedona_type(obj)?;
     Ok(ArgMatcher::is_exact(sedona_type))
+}
+
+pub(crate) fn arg_matcher_from_name(
+    name: &str,
+) -> Result<Arc<dyn TypeMatcher + Send + Sync>, PySedonaError> {
+    match name {
+        "geometry" => Ok(ArgMatcher::is_geometry()),
+        "geography" => Ok(ArgMatcher::is_geography()),
+        "raster" => Ok(ArgMatcher::is_raster()),
+        "numeric" => Ok(ArgMatcher::is_numeric()),
+        "string" => Ok(ArgMatcher::is_string()),
+        "binary" => Ok(ArgMatcher::is_binary()),
+        "boolean" => Ok(ArgMatcher::is_boolean()),
+        _ => Err(PySedonaError::SedonaPython(format!(
+            "Can't interpret literal string '{name}' as ArgMatcher"
+        ))),
+    }
 }
 
 pub fn import_sedona_type(obj: &Bound<PyAny>) -> Result<SedonaType, PySedonaError> {

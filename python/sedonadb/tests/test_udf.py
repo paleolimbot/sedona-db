@@ -44,6 +44,38 @@ def test_udf_matchers(con):
     )
 
 
+@pytest.mark.parametrize(
+    ("matcher", "expected_type"),
+    [
+        (udf.BINARY, pa.binary()),
+        (udf.BOOLEAN, pa.bool_()),
+        (udf.NUMERIC, pa.float64()),
+        (udf.STRING, pa.string()),
+    ],
+)
+def test_type_matcher_arrow_c_schema(matcher, expected_type):
+    assert isinstance(matcher, udf.TypeMatcher)
+    field = pa.Field._import_from_c_capsule(matcher.__arrow_c_schema__())
+    assert field.type == expected_type
+
+
+@pytest.mark.parametrize(
+    ("matcher", "extension_name"),
+    [
+        (udf.GEOGRAPHY, b"geoarrow.wkb"),
+        (udf.GEOMETRY, b"geoarrow.wkb"),
+        (udf.RASTER, b"sedona.raster"),
+    ],
+)
+def test_extension_type_matcher_arrow_c_schema(matcher, extension_name):
+    field = pa.Field._import_from_c_capsule(matcher.__arrow_c_schema__())
+    if isinstance(field.type, pa.ExtensionType):
+        actual_extension_name = field.type.extension_name.encode()
+    else:
+        actual_extension_name = field.metadata[b"ARROW:extension:name"]
+    assert actual_extension_name == extension_name
+
+
 def test_large_wkb_geography_matcher_preserves_edge_type(con):
     import geoarrow.pyarrow as ga
     from shapely.geometry import Point
