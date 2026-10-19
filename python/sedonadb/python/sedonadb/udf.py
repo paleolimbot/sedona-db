@@ -287,6 +287,105 @@ def arrow_udf(
     return decorator
 
 
+def python_udf(
+    return_type: Any,
+    input_types: Optional[list[Union[TypeMatcher, Any]]] = None,
+    volatility: Literal["immutable", "stable", "volatile"] = "immutable",
+    name: Optional[str] = None,
+    metadata: Optional[Mapping[str, str]] = None,
+):
+    """Python object-based user-defined scalar function decorator.
+
+    The decorated function is called once per row with ordinary Python objects.
+    Input values are converted using PyArrow's scalar conversion. Raster values
+    are the exception: they are passed as :class:`sedonadb.raster.Raster`
+    objects that reference the input Arrow buffers instead of materializing the
+    raster's inline pixel bytes as a Python ``bytes`` object.
+
+    Return conversion is selected by the declared Arrow type. Most values use
+    ``pyarrow.array(values, type=return_type)`` directly. Geometry/geography
+    results additionally accept Shapely objects, and raster results preserve
+    the Arrow-backed representation used by :func:`sedonadb.expr.lit`.
+
+    Args:
+        return_type: The return data type, or a callable return type resolver.
+        input_types: The accepted input data types or type matchers. ``None``
+            accepts any number of arguments of any type.
+        volatility: ``"immutable"`` (default), ``"stable"``, or ``"volatile"``.
+        name: An optional SQL name. By default the decorated function's name is
+            used.
+        metadata: Optional key/value information used by optimizer rules.
+
+    Examples:
+
+        >>> import pyarrow as pa
+        >>> from sedonadb import udf
+        >>> @udf.python_udf(pa.int64(), [udf.STRING])
+        ... def char_count(value):
+        ...     return None if value is None else len(value)
+    """
+
+    def decorator(func):
+        def invoke_batch(args, resolved_return_type, num_rows):
+            columns = [_python_udf_values(arg, num_rows) for arg in args]
+            if columns:
+                results = (func(*row) for row in zip(*columns))
+            else:
+                results = (func() for _ in range(num_rows))
+
+            return _python_udf_result(results, resolved_return_type)
+
+        name_arg = func.__name__ if name is None and hasattr(func, "__name__") else name
+        return ScalarUdfImpl(
+            invoke_batch, return_type, input_types, volatility, name_arg, metadata
+        )
+
+    return decorator
+
+
+def _python_udf_values(value, num_rows):
+    """Convert an input once, reusing a scalar's Python object for every row."""
+    import pyarrow as pa
+
+    type = pa.field(value.type).type
+    array = pa.array(value)
+    values = _python_values_from_arrow(array, type)
+    if value.is_scalar():
+        return [values[0]] * num_rows
+    return values
+
+
+def _python_values_from_arrow(array, type):
+    """Convert an Arrow array according to its logical type."""
+    extension_name = getattr(type, "extension_name", None)
+    if extension_name == "sedona.raster":
+        return _python_values_from_raster(array)
+    return array.to_pylist()
+
+
+def _python_values_from_raster(array):
+    """Wrap raster storage by row without materializing inline pixel bytes."""
+    import pyarrow as pa
+
+    from sedonadb.raster import Raster
+
+    storage = array.storage if isinstance(array, pa.ExtensionArray) else array
+    return [
+        None if not array[i].is_valid else Raster(storage, i)
+        for i in range(len(array))
+    ]
+
+
+def _python_udf_result(values, return_type):
+    """Build an Arrow result array using type-specific literal conversion."""
+    import pyarrow as pa
+
+    from sedonadb.expr.literal import _resolve_arrow_array
+
+    arrow_type = pa.field(return_type).type
+    return _resolve_arrow_array(values, arrow_type)
+
+
 BINARY: TypeMatcher = TypeMatcher("binary")
 """Match any binary argument (i.e., binary, binary view, large binary,
 fixed-size binary)"""

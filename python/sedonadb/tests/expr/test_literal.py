@@ -23,7 +23,7 @@ import pandas as pd
 import geoarrow.pyarrow as ga
 import geopandas.testing
 
-from sedonadb.expr.literal import lit
+from sedonadb.expr.literal import _resolve_arrow_array, lit
 from sedonadb.expr.expression import Expr
 import pytest
 
@@ -87,6 +87,28 @@ def test_shapely_linearring():
 
     array = pa.array(literal)
     assert array == ga.as_wkb(["LINESTRING (0 0, 1 0, 0 1, 0 0)"])
+
+
+@pytest.mark.parametrize(
+    "type",
+    [ga.wkb(), ga.large_wkb(), ga.wkt(), ga.point()],
+    ids=["wkb", "large_wkb", "wkt", "native_point"],
+)
+def test_shapely_array(type):
+    values = [shapely.Point(1, 2), None, shapely.Point(3, 4)]
+    array = _resolve_arrow_array(values, type)
+
+    assert array.type == type
+    assert ga.as_wkb(array).storage.to_pylist() == shapely.to_wkb(values).tolist()
+
+
+def test_shapely_geography_array_preserves_type():
+    type = ga.wkb().with_edge_type(ga.EdgeType.SPHERICAL).with_crs(ga.OGC_CRS84)
+    array = _resolve_arrow_array([shapely.Point(1, 2), None], type)
+
+    assert array.type == type
+    assert array.type.edge_type == ga.EdgeType.SPHERICAL
+    assert array.type.crs == ga.OGC_CRS84
 
 
 def test_geopandas_literal():

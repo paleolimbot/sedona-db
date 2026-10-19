@@ -147,6 +147,76 @@ def _resolve_arrow_lit(obj: Any):
         ) from e
 
 
+def _resolve_arrow_array(values, type):
+    """Resolve Python values to an array, with extension-specific handling.
+
+    This is the array counterpart of ``_resolve_arrow_lit``. Most Arrow types
+    can consume the Python values directly. Extension types whose Python
+    objects carry buffer ownership or require domain-specific conversion are
+    dispatched separately here so more cases can be added without changing
+    callers.
+    """
+    extension_name = getattr(type, "extension_name", None)
+    if extension_name == "sedona.raster":
+        return _resolve_raster_array(values, type)
+    if extension_name is not None and extension_name.startswith("geoarrow."):
+        return _resolve_geometry_array(values, type)
+
+    import pyarrow as pa
+
+    return pa.array(values, type=type)
+
+
+def _resolve_geometry_array(values, type):
+    """Resolve a sequence, vectorizing lists of Shapely geometries."""
+    import pyarrow as pa
+
+    values = list(values)
+    try:
+        import shapely
+
+        is_geometry = shapely.is_geometry(values)
+    except (ImportError, TypeError):
+        is_geometry = None
+
+    if is_geometry is not None and all(
+        value is None or bool(is_geom)
+        for value, is_geom in zip(values, is_geometry)
+    ):
+        wkb = shapely.to_wkb(values)
+        if pa.types.is_binary(type.storage_type) or pa.types.is_large_binary(
+            type.storage_type
+        ):
+            return type.wrap_array(pa.array(wkb, type=type.storage_type))
+
+        import geoarrow.pyarrow as ga
+
+        return ga.as_geoarrow(pa.array(wkb, type=pa.binary()), type=type)
+
+    return pa.array(values, type=type)
+
+
+def _resolve_raster_array(values, type):
+    """Resolve rasters individually so their Arrow buffers remain authoritative."""
+    import pyarrow as pa
+
+    arrays = []
+    for value in values:
+        array = pa.array(_resolve_arrow_lit(value))
+        if isinstance(array, pa.ChunkedArray):
+            array = array.combine_chunks()
+        if len(array) != 1:
+            raise ValueError(
+                "Expected a raster value to resolve to one Arrow value "
+                f"but got {len(array)}"
+            )
+        arrays.append(array.cast(type))
+
+    if not arrays:
+        return pa.array([], type=type)
+    return pa.concat_arrays(arrays)
+
+
 def _lit_from_geoarrow_scalar(obj):
     # Every GeoArrow scalar (WKB, WKT, native point/linestring/...) exposes
     # its WKB, so one path serves them all. The edge type travels with the

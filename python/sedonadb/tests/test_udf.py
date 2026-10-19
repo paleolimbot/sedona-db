@@ -146,6 +146,104 @@ def test_udf_array_input(con):
     )
 
 
+def test_python_udf(con):
+    calls = []
+
+    @udf.python_udf(pa.string(), [udf.STRING, udf.NUMERIC])
+    def format_value(value, number):
+        calls.append((value, number))
+        if value is None:
+            return None
+        return f"{value} / {number}"
+
+    assert format_value._name == "format_value"
+    con.register(format_value)
+    assert (
+        con.sql(
+            "SELECT format_value(x, n) AS col "
+            "FROM (VALUES ('a', 1), ('b', 2), ('c', 3), (NULL, 4)) AS t(x, n)"
+        )
+        .to_arrow_table()["col"]
+        .to_pylist()
+        == ["a / 1", "b / 2", "c / 3", None]
+    )
+    assert set(calls) == {("a", 1), ("b", 2), ("c", 3), (None, 4)}
+
+
+def test_python_udf_uses_literal_result_conversion(con):
+    import geoarrow.pyarrow as ga
+    import shapely
+
+    @udf.python_udf(ga.wkb(), [pa.float64(), pa.float64()])
+    def make_point(x, y):
+        if x is None:
+            return None
+        return shapely.Point(x, y)
+
+    con.register(make_point)
+    assert (
+        con.sql(
+            "SELECT ST_AsText(make_point(x, y)) AS col "
+            "FROM (VALUES (1.0, 2.0), (3.0, 4.0), (NULL, 5.0)) AS t(x, y)"
+        )
+        .to_arrow_table()["col"]
+        .to_pylist()
+        == ["POINT(1 2)", "POINT(3 4)", None]
+    )
+
+
+def test_python_udf_reuses_converted_scalar_object(con):
+    values_seen = []
+
+    @udf.python_udf(pa.int64())
+    def add_list_length(value, number):
+        values_seen.append(value)
+        return len(value) + number
+
+    con.register(add_list_length)
+    assert (
+        con.sql(
+            "SELECT add_list_length([10, 20], x) AS col "
+            "FROM (VALUES (1), (2), (3)) AS t(x)"
+        )
+        .to_arrow_table()["col"]
+        .to_pylist()
+        == [3, 4, 5]
+    )
+    assert len(values_seen) == 3
+    assert all(value is values_seen[0] for value in values_seen)
+
+
+def test_python_udf_raster_round_trip(con):
+    from sedonadb.raster import Raster
+
+    received = []
+
+    @udf.python_udf(
+        udf.RASTER,
+        [udf.RASTER],
+        metadata={"needs_pixels": "true", "returns_bytes": "true"},
+    )
+    def raster_identity(value):
+        received.append(value)
+        assert isinstance(value, Raster)
+        assert value.to_numpy().sum() == 0
+        return value
+
+    con.register(raster_identity)
+    assert (
+        con.sql(
+            "SELECT RS_Width(raster_identity("
+            "RS_MakeEmptyRaster(1, 'B', 3, 2, 0.0, 0.0, 1.0)"
+            ")) AS col"
+        )
+        .to_arrow_table()["col"]
+        .to_pylist()
+        == [3]
+    )
+    assert len(received) == 1
+
+
 def test_udf_name():
     udf_impl = udf.arrow_udf(pa.binary(), name="foofy")(some_udf)
     assert udf_impl._name == "foofy"
