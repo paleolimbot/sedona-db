@@ -329,9 +329,9 @@ def python_udf(
         def invoke_batch(args, resolved_return_type, num_rows):
             columns = [_python_udf_values(arg, num_rows) for arg in args]
             if columns:
-                results = (func(*row) for row in zip(*columns))
+                results = [func(*row) for row in zip(*columns)]
             else:
-                results = (func() for _ in range(num_rows))
+                results = [func() for _ in range(num_rows)]
 
             return _python_udf_result(results, resolved_return_type)
 
@@ -376,13 +376,11 @@ def _python_values_from_raster(array):
 
 
 def _python_udf_result(values, return_type):
-    """Build an Arrow result array using type-specific literal conversion."""
-    import pyarrow as pa
+    """Build an Arrow result array using literal conversion."""
 
     from sedonadb.expr.literal import _resolve_arrow_array
 
-    arrow_type = pa.field(return_type).type
-    return _resolve_arrow_array(values, arrow_type)
+    return _resolve_arrow_array(values, return_type)
 
 
 BINARY: TypeMatcher = TypeMatcher("binary")
