@@ -17,7 +17,8 @@
 
 from typing import TYPE_CHECKING, Any
 
-from sedonadb.utility import sedona  # noqa: F401
+from sedonadb._lib import PySedonaType
+from sedonadb.utility import register_pyarrow_extension_types, sedona  # noqa: F401
 
 if TYPE_CHECKING:
     from sedonadb_expr import GeoMethods, RasterMethods
@@ -55,7 +56,7 @@ class Literal:
         return resolved_lit.__arrow_c_array__(requested_schema=requested_schema)
 
     def __repr__(self):
-        return f"<Literal>\n{repr(self._value)}"
+        return f"<Literal>\n{self._value!r}"
 
     @property
     def funcs(self) -> "Functions":
@@ -150,70 +151,81 @@ def _resolve_arrow_lit(obj: Any):
 def _resolve_arrow_array(values, type):
     """Resolve Python values to an array, with extension-specific handling.
 
-    This is the array counterpart of ``_resolve_arrow_lit``. Most Arrow types
-    can consume the Python values directly. Extension types whose Python
-    objects carry buffer ownership or require domain-specific conversion are
-    dispatched separately here so more cases can be added without changing
-    callers.
+    This is the array counterpart of `_resolve_arrow_lit`, spiritually equivalent
+    to `_resolve_arrow_lit` except (1) arrays that are resolved do not have to have
+    a length of 1 and (2) iterables resolve to their element form (e.g., lists) instead
+    of as a list of elements.
     """
-    extension_name = getattr(type, "extension_name", None)
-    if extension_name == "sedona.raster":
-        return _resolve_raster_array(values, type)
-    if extension_name is not None and extension_name.startswith("geoarrow."):
-        return _resolve_geometry_array(values, type)
-
     import pyarrow as pa
 
-    return pa.array(values, type=type)
+    register_pyarrow_extension_types()
 
+    target_sedona_type = PySedonaType(type) if type is not None else None
 
-def _resolve_geometry_array(values, type):
-    """Resolve a sequence, vectorizing lists of Shapely geometries."""
-    import pyarrow as pa
+    # Special case arrow arrays first
+    if hasattr(values, "__arrow_c_array__"):
+        schema, array = values.__arrow_c_array__()
+        source_sedona_type = PySedonaType(schema)
+        if target_sedona_type is None:
+            target_sedona_type = source_sedona_type
 
-    values = list(values)
-    try:
-        import shapely
-
-        is_geometry = shapely.is_geometry(values)
-    except (ImportError, TypeError):
-        is_geometry = None
-
-    if is_geometry is not None and all(
-        value is None or bool(is_geom) for value, is_geom in zip(values, is_geometry)
-    ):
-        wkb = shapely.to_wkb(values)
-        if pa.types.is_binary(type.storage_type) or pa.types.is_large_binary(
-            type.storage_type
-        ):
-            return type.wrap_array(pa.array(wkb, type=type.storage_type))
-
-        import geoarrow.pyarrow as ga
-
-        return ga.as_geoarrow(pa.array(wkb, type=pa.binary()), type=type)
-
-    return pa.array(values, type=type)
-
-
-def _resolve_raster_array(values, type):
-    """Resolve rasters individually so their Arrow buffers remain authoritative."""
-    import pyarrow as pa
-
-    arrays = []
-    for value in values:
-        array = pa.array(_resolve_arrow_lit(value))
-        if isinstance(array, pa.ChunkedArray):
-            array = array.combine_chunks()
-        if len(array) != 1:
-            raise ValueError(
-                "Expected a raster value to resolve to one Arrow value "
-                f"but got {len(array)}"
+        if target_sedona_type == source_sedona_type:
+            return pa.Array._import_from_c_capsule(
+                target_sedona_type.__arrow_c_schema__(), array
             )
-        arrays.append(array.cast(type))
 
-    if not arrays:
-        return pa.array([], type=type)
-    return pa.concat_arrays(arrays)
+        source_pyarrow_array = pa.Array._import_from_c_capsule(
+            source_sedona_type.__arrow_c_schema__(), array
+        )
+
+        if target_sedona_type.extension_name is None:
+            return source_pyarrow_array.cast(pa.DataType._import_from_c_capsule(target_sedona_type))
+        elif target_sedona_type.extension_name.starts_with("geoarrow."):
+            import geoarrow.pyarrow
+
+            return geoarrow.pyarrow.as_geoarrow(source_pyarrow_array, target_sedona_type)
+        else:
+            raise TypeError(f"Unsupported cast to extension {target_sedona_type!r}")
+
+    # If we don't have a target type, resolve it by literalifying the first element
+    # We could make this faster by separating literalifying and schema inference
+    if isinstance(values, list) and target_sedona_type is None:
+        target_sedona_type = PySedonaType(pa.null())
+        for item in values:
+            if item is None:
+                continue
+            else:
+                schema, array = lit(item).__arrow_c_array__()
+                target_sedona_type = PySedonaType(schema)
+                break
+
+    # TODO: Also try inferring from a GeoPandas series or DataFrame
+
+    # Dispatch on extension type. If none, or if not an extension type, use pa.array().
+    # if geometry, use geoarrow.pyarrow.array() but you'll have to special case a list
+    # of shapely objects first because that's not handled. raster also needs a special case.
+
+
+
+
+    # Otherwise, the destination type gets to handle conversion
+    if target_sedona_type is None or target_sedona_type.extension_name is None:
+        return _array_from_literals(values, target_sedona_type)
+    elif target_sedona_type.extension_name.starts_with("geoarrow."):
+        return _resolve_geometry_array(values, target_sedona_type)
+    elif target_sedona_type.extension_name == "sedona.raster":
+        return _resolve_raster_array(values, target_sedona_type)
+
+
+def _resolve_geometry_array(values, target_sedona_type):
+    pass
+
+
+def _resolve_raster_array(values, target_sedona_type):
+    pass
+
+
+
 
 
 def _lit_from_geoarrow_scalar(obj):
