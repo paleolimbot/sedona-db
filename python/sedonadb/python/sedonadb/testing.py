@@ -575,7 +575,9 @@ class DuckDB(DBEngine):
         return self
 
     def execute_and_collect(self, query) -> pa.Table:
-        return self.con.execute(query).arrow().read_all()
+        # A relation's to_arrow_table() works across DuckDB versions; DuckDB
+        # 2.0 removed arrow() from an execute() result.
+        return self.con.sql(query).to_arrow_table()
 
 
 class DuckDBSingleThread(DuckDB):
