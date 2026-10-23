@@ -166,7 +166,9 @@ def _resolve_arrow_array(values, type):
     register_pyarrow_extension_types()
 
     if type is None:
-        raise ValueError("Resolving an array without a target type is not yet supported")
+        raise ValueError(
+            "Resolving an array without a target type is not yet supported"
+        )
 
     target_sedona_type = PySedonaType(type)
     target_pyarrow_type = pa.DataType._import_from_c_capsule(
@@ -217,11 +219,15 @@ def _resolve_geometry_array(values, target_pyarrow_type):
     # https://github.com/geoarrow/geoarrow-python/pull/84
     if isinstance(values, pa.ExtensionArray):
         if values.type.extension_name != "geoarrow.wkb":
-            raise TypeError(f"Unsupported cast from {values.type} to {target_pyarrow_type}")
+            raise TypeError(
+                f"Unsupported cast from {values.type} to {target_pyarrow_type}"
+            )
 
         # Normalize storage to compare metadata using Sedona's CRS equality.
         source_type = ga.wkb().with_metadata(values.type.__arrow_ext_serialize__())
-        target_type = ga.wkb().with_metadata(target_pyarrow_type.__arrow_ext_serialize__())
+        target_type = ga.wkb().with_metadata(
+            target_pyarrow_type.__arrow_ext_serialize__()
+        )
         if PySedonaType(source_type) != PySedonaType(target_type):
             raise TypeError(
                 f"Can't cast geometry with different CRS or edge type: "
@@ -245,12 +251,27 @@ def _resolve_geometry_array(values, target_pyarrow_type):
 
 
 def _resolve_raster_array(values, target_pyarrow_type):
+    import pyarrow as pa
+
+    from sedonadb.raster import Raster
+
     # The equal array type should already have been handled, this is just
     # from a list of Raster (or None) objects.
-    pass
+    if not isinstance(values, list):
+        raise TypeError("Expected a list of Raster or None objects")
 
+    storage_type = target_pyarrow_type.storage_type
+    arrays = []
+    for value in values:
+        if value is None:
+            arrays.append(pa.nulls(1, storage_type))
+        elif isinstance(value, Raster):
+            arrays.append(pa.array(value).storage)
+        else:
+            raise TypeError("Expected a list of Raster or None objects")
 
-
+    storage = pa.concat_arrays(arrays) if arrays else pa.nulls(0, storage_type)
+    return target_pyarrow_type.wrap_array(storage)
 
 
 def _lit_from_geoarrow_scalar(obj):

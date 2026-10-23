@@ -149,6 +149,34 @@ def test_geometry_array_rejects_metadata_change(source_type):
         _resolve_arrow_array(source, ga.large_wkb())
 
 
+@pytest.mark.parametrize("kind", ["empty", "null", "mixed"])
+def test_raster_array(kind):
+    from sedonadb._lib import raster_type
+    from sedonadb.raster import Raster
+
+    pixels = np.arange(6, dtype=np.uint8).reshape(2, 3)
+    raster = Raster.from_numpy(pixels)
+    values = {"empty": [], "null": [None, None], "mixed": [raster, None, raster]}[kind]
+
+    result = _resolve_arrow_array(values, raster_type())
+
+    result.validate(full=True)
+    assert result.type == pa.array(raster).type
+    assert len(result) == len(values)
+    assert result.is_null().to_pylist() == [value is None for value in values]
+    for i, value in enumerate(values):
+        if value is not None:
+            assert result.slice(i, 1).equals(pa.array(value))
+            np.testing.assert_array_equal(result[i].as_py().to_numpy(), pixels[None])
+
+
+def test_raster_array_rejects_invalid_element():
+    from sedonadb._lib import raster_type
+
+    with pytest.raises(TypeError, match="list of Raster or None"):
+        _resolve_arrow_array([None, 1], raster_type())
+
+
 def test_geopandas_literal():
     geoseries = geopandas.GeoSeries.from_wkt(["POINT (0 1)"], crs=3857)
 
