@@ -28,6 +28,7 @@ from sedonadb._lib import (
 from sedonadb._lib import (
     sedona_native_scalar_udf as _sedona_native_scalar_udf,
 )
+from sedonadb.expr.literal import _resolve_arrow_array
 from sedonadb.utility import sedona  # noqa: F401
 
 
@@ -92,7 +93,9 @@ def arrow_udf(
     Arrow array wrappers implementing the
     [Arrow PyCapsule Interface](https://arrow.apache.org/docs/format/CDataInterface/PyCapsuleInterface.html).
     The annotated function must return a value of a consistent length of the
-    appropriate type.
+    appropriate type. Outputs are resolved to the declared return type: ordinary
+    Arrow arrays may be cast, and Python lists may contain ordinary values,
+    Shapely geometries, or Raster objects (including None for nulls).
 
     !!! warning
         SedonaDB will call the provided function from multiple threads. Attempts
@@ -261,23 +264,28 @@ def arrow_udf(
     """
 
     def decorator(func):
+        from sedonadb.expr.literal import _resolve_arrow_array
+
         kwarg_names = _callable_kwarg_only_names(func)
         if "return_type" in kwarg_names and "num_rows" in kwarg_names:
 
             def func_wrapper(args, return_type, num_rows):
-                return func(*args, return_type=return_type, num_rows=num_rows)
+                result = func(*args, return_type=return_type, num_rows=num_rows)
+                return _resolve_arrow_array(result, return_type)
         elif "return_type" in kwarg_names:
 
             def func_wrapper(args, return_type, num_rows):
-                return func(*args, return_type=return_type)
+                result = func(*args, return_type=return_type)
+                return _resolve_arrow_array(result, return_type)
         elif "num_rows" in kwarg_names:
 
             def func_wrapper(args, return_type, num_rows):
-                return func(*args, num_rows=num_rows)
+                result = func(*args, num_rows=num_rows)
+                return _resolve_arrow_array(result, return_type)
         else:
 
             def func_wrapper(args, return_type, num_rows):
-                return func(*args)
+                return _resolve_arrow_array(func(*args), return_type)
 
         name_arg = func.__name__ if name is None and hasattr(func, "__name__") else name
         return ScalarUdfImpl(
@@ -333,7 +341,7 @@ def python_udf(
             else:
                 results = [func() for _ in range(num_rows)]
 
-            return _python_udf_result(results, resolved_return_type)
+            return _resolve_arrow_array(results, resolved_return_type)
 
         name_arg = func.__name__ if name is None and hasattr(func, "__name__") else name
         return ScalarUdfImpl(
@@ -352,19 +360,23 @@ def _python_udf_values(value, num_rows):
     values = _python_values_from_arrow(array, type)
     if value.is_scalar():
         return [values[0]] * num_rows
-    return values
+    else:
+        return values
 
 
 def _python_values_from_arrow(array, type):
     """Convert an Arrow array according to its logical type."""
     extension_name = getattr(type, "extension_name", None)
+
+    # Special case raster because its default to_pylist() will copy
+    # raster buffers under current pyarrow
     if extension_name == "sedona.raster":
         return _python_values_from_raster(array)
-    return array.to_pylist()
+    else:
+        return array.to_pylist()
 
 
 def _python_values_from_raster(array):
-    """Wrap raster storage by row without materializing inline pixel bytes."""
     import pyarrow as pa
 
     from sedonadb.raster import Raster
@@ -373,14 +385,6 @@ def _python_values_from_raster(array):
     return [
         None if not array[i].is_valid else Raster(storage, i) for i in range(len(array))
     ]
-
-
-def _python_udf_result(values, return_type):
-    """Build an Arrow result array using literal conversion."""
-
-    from sedonadb.expr.literal import _resolve_arrow_array
-
-    return _resolve_arrow_array(values, return_type)
 
 
 BINARY: TypeMatcher = TypeMatcher("binary")

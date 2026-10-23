@@ -138,7 +138,8 @@ def test_resolve_array_cast_rejects_overflow():
         ga.wkt(),
         ga.point(),
         pa.field(
-            "custom", pa.int64(),
+            "custom",
+            pa.int64(),
             metadata={b"ARROW:extension:name": b"test.unregistered"},
         ),
     ],
@@ -174,8 +175,12 @@ def test_shapely_geography_array_preserves_type():
 @pytest.mark.parametrize("target_type", [ga.wkb(), ga.large_wkb(), ga.wkb_view()])
 @pytest.mark.parametrize("extension", [False, True])
 def test_geometry_array_storage_cast(source_type, target_type, extension):
-    source_type = source_type.with_crs(ga.OGC_CRS84).with_edge_type(ga.EdgeType.SPHERICAL)
-    target_type = target_type.with_crs(ga.OGC_CRS84).with_edge_type(ga.EdgeType.SPHERICAL)
+    source_type = source_type.with_crs(ga.OGC_CRS84).with_edge_type(
+        ga.EdgeType.SPHERICAL
+    )
+    target_type = target_type.with_crs(ga.OGC_CRS84).with_edge_type(
+        ga.EdgeType.SPHERICAL
+    )
     values = shapely.to_wkb([shapely.Point(1, 2), None], flavor="iso").tolist()
     source = pa.array(values, source_type.storage_type)
     if extension:

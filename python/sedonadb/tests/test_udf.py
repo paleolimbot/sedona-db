@@ -318,26 +318,90 @@ def test_udf_bad_return_object(con):
     con.register(questionable_udf)
     with pytest.raises(
         sedonadb._lib.SedonaError,
-        match="Expected result of user-defined function to return an object implementing __arrow_c_array__",
+        match="NoneType.*not iterable",
     ):
         con.sql("SELECT questionable_udf(123) as col").to_pandas()
 
 
-def test_udf_bad_return_type(con):
+def test_udf_cast_return_type(con):
     @udf.arrow_udf(pa.binary())
     def questionable_udf(arg):
         return pa.array(["abc"], pa.string())
 
     con.register(questionable_udf)
-    with pytest.raises(
-        sedonadb._lib.SedonaError,
-        match=(
-            "Expected result of user-defined function to "
-            "return array of type Binary or its storage "
-            "but got Utf8"
-        ),
-    ):
-        con.sql("SELECT questionable_udf(123) as col").to_pandas()
+    result = con.sql("SELECT questionable_udf(123) as col").to_arrow_table()["col"]
+    assert result.type == pa.binary()
+    assert result.to_pylist() == [b"abc"]
+
+
+@pytest.mark.parametrize("kwargs", ["neither", "return_type", "num_rows", "both"])
+def test_arrow_udf_list_output(con, kwargs):
+    def plain(arg):
+        return pa.array(arg).to_pylist()
+
+    def with_type(arg, *, return_type):
+        assert pa.field(return_type).type == pa.int32()
+        return plain(arg)
+
+    def with_rows(arg, *, num_rows):
+        assert num_rows == len(pa.array(arg))
+        return plain(arg)
+
+    def with_both(arg, *, return_type, num_rows):
+        with_rows(arg, num_rows=num_rows)
+        return with_type(arg, return_type=return_type)
+
+    func = {
+        "neither": plain,
+        "return_type": with_type,
+        "num_rows": with_rows,
+        "both": with_both,
+    }[kwargs]
+    # Exercise a resolved return type, rather than only a fixed decorator type.
+    decorated = udf.arrow_udf(
+        lambda arg_types, scalar_args: pa.int32(), name="list_output"
+    )(func)
+    con.register(decorated)
+    result = con.sql(
+        "SELECT list_output(x) AS col FROM (VALUES (1), (NULL), (3)) AS t(x)"
+    ).to_arrow_table()["col"]
+    assert result.type == pa.int32()
+    assert result.to_pylist() == [1, None, 3]
+
+
+def test_arrow_udf_shapely_list_output(con):
+    import geoarrow.pyarrow as ga
+    import shapely
+
+    @udf.arrow_udf(ga.large_wkb(), [pa.int64()])
+    def points(arg):
+        return [
+            None if x is None else shapely.Point(x, 2)
+            for x in pa.array(arg).to_pylist()
+        ]
+
+    con.register(points)
+    result = con.sql(
+        "SELECT ST_X(points(x)) AS col FROM (VALUES (1), (NULL), (3)) AS t(x)"
+    ).to_arrow_table()["col"]
+    assert result.to_pylist() == [1.0, None, 3.0]
+
+
+def test_arrow_udf_raster_list_output(con):
+    import numpy as np
+    from sedonadb.raster import Raster
+
+    raster = Raster.from_numpy(np.zeros((2, 3), dtype=np.uint8))
+
+    @udf.arrow_udf(udf.RASTER, [pa.int64()])
+    def rasters(arg):
+        return [None if x is None else raster for x in pa.array(arg).to_pylist()]
+
+    con.register(rasters)
+    result = con.sql(
+        "SELECT RS_Width(rasters(x)) AS col FROM (VALUES (1), (NULL), (3)) AS t(x)"
+    ).to_arrow_table()["col"]
+    assert result.to_pylist() == [3, None, 3]
 
 
 def test_udf_bad_return_length(con):
