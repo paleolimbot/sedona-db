@@ -154,6 +154,7 @@ def test_schema(con):
     assert repr(df.schema.field(0).type) == "SedonaType int64<Int64>"
     assert df.schema.field(0).type.edge_type is None
     assert df.schema.field(0).type.crs is None
+    assert df.schema.field(0).type.extension_name is None
 
     # Geometry field accessor
     assert df.schema.field(1).name == "geom"
@@ -161,6 +162,7 @@ def test_schema(con):
     assert repr(df.schema.field(1).type) == "SedonaType geometry<Wkb>"
     assert df.schema.field(1).type.edge_type == gat.EdgeType.PLANAR
     assert df.schema.field(1).type.crs is None
+    assert df.schema.field(1).type.extension_name == "geoarrow.wkb"
 
     # Arrow export
     assert pa.schema(df.schema) == pa.schema(
@@ -177,6 +179,16 @@ def test_schema(con):
 
     with pytest.raises(TypeError):
         df.schema.field({})
+
+
+def test_type_extension_name():
+    assert sedonadb._lib.raster_type().extension_name == "sedona.raster"
+    field = pa.field(
+        "custom",
+        pa.int64(),
+        metadata={b"ARROW:extension:name": b"custom.extension"},
+    )
+    assert sedonadb._lib.PySedonaType(field).extension_name == "custom.extension"
 
 
 def test_columns(con):

@@ -169,6 +169,7 @@ def _resolve_arrow_array(values, type):
         raise ValueError("Resolving an array without a target type is not yet supported")
 
     target_sedona_type = PySedonaType(type)
+    target_pyarrow_type = pa.DataType._import_from_c_capsule(target_sedona_type)
 
     # Special case arrow arrays first
     if hasattr(values, "__arrow_c_array__"):
@@ -181,11 +182,12 @@ def _resolve_arrow_array(values, type):
                 target_sedona_type.__arrow_c_schema__(), array
             )
 
-        target_pyarrow_type = pa.DataType._import_from_c_capsule(target_sedona_type)
         source_pyarrow_array = pa.Array._import_from_c_capsule(
             source_sedona_type.__arrow_c_schema__(), array
         )
 
+        # Use SedonaType's extension name to avoid pyarrow's stripping of
+        # unrecognized extensions
         if target_sedona_type.extension_name is None:
             return source_pyarrow_array.cast(target_pyarrow_type)
         elif target_sedona_type.extension_name == "geoarrow.wkb":
@@ -200,6 +202,8 @@ def _resolve_arrow_array(values, type):
         return _resolve_geometry_array(values, target_pyarrow_type)
     elif target_sedona_type.extension_name == "sedona.raster":
         return _resolve_raster_array(values, target_pyarrow_type)
+    else:
+        raise TypeError(f"Unsupported cast to extension {target_sedona_type!r}")
 
 
 def _resolve_geometry_array(values, target_pyarrow_type):

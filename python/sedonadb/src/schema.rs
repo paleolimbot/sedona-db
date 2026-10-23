@@ -213,6 +213,11 @@ impl PySedonaType {
     }
 
     #[getter]
+    fn extension_name(&self) -> Option<&str> {
+        self.inner.extension_name()
+    }
+
+    #[getter]
     fn crs<'py>(&self, py: Python<'py>) -> Result<Option<Py<PyAny>>, PySedonaError> {
         if let Some(crs) = self.inner.crs() {
             let json = py.import("json")?;
