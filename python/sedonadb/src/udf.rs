@@ -69,7 +69,7 @@ pub fn type_matcher_type_if_null(name: &str) -> Result<PySedonaType, PySedonaErr
 /// implement overloading such that registration adds to existing overloads instead
 /// of replacing a function with a given name. This struct is primarily used to
 /// generate an Expr scalar function call.
-#[pyclass(skip_from_py_object)]
+#[pyclass]
 #[derive(Clone)]
 pub struct PyScalarUdf {
     pub inner: Arc<ScalarUDF>,
@@ -110,7 +110,7 @@ impl PyScalarUdf {
 /// implement overloading such that registration adds to existing overloads instead
 /// of replacing a function with a given name. This struct is primarily used to
 /// generate an Expr aggregate function call.
-#[pyclass(skip_from_py_object)]
+#[pyclass]
 #[derive(Clone)]
 pub struct PyAggregateUdf {
     pub inner: Arc<AggregateUDF>,

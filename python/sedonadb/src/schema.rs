@@ -189,7 +189,7 @@ impl PySedonaField {
     }
 }
 
-#[pyclass(eq, skip_from_py_object)]
+#[pyclass]
 #[derive(Clone, Debug, PartialEq)]
 pub struct PySedonaType {
     pub inner: SedonaType,
