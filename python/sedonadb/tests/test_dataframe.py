@@ -191,6 +191,21 @@ def test_type_extension_name():
     assert sedonadb._lib.PySedonaType(field).extension_name == "custom.extension"
 
 
+@pytest.mark.parametrize(
+    "type",
+    [pa.int64(), ga.wkb().with_crs(ga.OGC_CRS84), sedonadb._lib.raster_type()],
+)
+def test_type_from_schema_capsule(type):
+    actual = sedonadb._lib.PySedonaType(type.__arrow_c_schema__())
+    assert actual == sedonadb._lib.PySedonaType(type)
+
+
+def test_type_rejects_array_capsule():
+    _, array = pa.array([1]).__arrow_c_array__()
+    with pytest.raises(sedonadb._lib.SedonaError):
+        sedonadb._lib.PySedonaType(array)
+
+
 def test_columns(con):
     df = con.sql("SELECT 1 as one, ST_GeomFromWKT('POINT (0 1)') as geom")
     assert len(df.columns) == 2

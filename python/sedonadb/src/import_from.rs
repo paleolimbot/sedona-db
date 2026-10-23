@@ -258,19 +258,23 @@ pub fn import_sedona_type(obj: &Bound<PyAny>) -> Result<SedonaType, PySedonaErro
 }
 
 pub fn import_arrow_field(obj: &Bound<PyAny>) -> Result<Field, PySedonaError> {
-    let capsule = obj.getattr("__arrow_c_schema__")?.call0()?;
-    let schema =
-        unsafe { FFI_ArrowSchema::from_raw(check_pycapsule(&capsule, "arrow_schema")? as _) };
-
+    let schema = import_arrow_ffi_schema(obj)?;
     Ok(Field::try_from(&schema)?)
 }
 
 pub fn import_arrow_schema(obj: &Bound<PyAny>) -> Result<Schema, PySedonaError> {
-    let capsule = obj.getattr("__arrow_c_schema__")?.call0()?;
-    let schema =
-        unsafe { FFI_ArrowSchema::from_raw(check_pycapsule(&capsule, "arrow_schema")? as _) };
-
+    let schema = import_arrow_ffi_schema(obj)?;
     Ok(Schema::try_from(&schema)?)
+}
+
+/// Consume an Arrow schema capsule, either directly or via the export protocol.
+fn import_arrow_ffi_schema(obj: &Bound<PyAny>) -> Result<FFI_ArrowSchema, PySedonaError> {
+    let capsule = if obj.is_instance_of::<PyCapsule>() {
+        obj.clone()
+    } else {
+        obj.getattr("__arrow_c_schema__")?.call0()?
+    };
+    Ok(unsafe { FFI_ArrowSchema::from_raw(check_pycapsule(&capsule, "arrow_schema")? as _) })
 }
 
 pub fn check_pycapsule(obj: &Bound<PyAny>, name: &str) -> Result<*mut c_void, PySedonaError> {

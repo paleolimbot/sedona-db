@@ -111,6 +111,44 @@ def test_shapely_geography_array_preserves_type():
     assert array.type.crs == ga.OGC_CRS84
 
 
+@pytest.mark.parametrize("source_type", [ga.wkb(), ga.large_wkb(), ga.wkb_view()])
+@pytest.mark.parametrize("target_type", [ga.wkb(), ga.large_wkb(), ga.wkb_view()])
+@pytest.mark.parametrize("extension", [False, True])
+def test_geometry_array_storage_cast(source_type, target_type, extension):
+    source_type = source_type.with_crs(ga.OGC_CRS84).with_edge_type(ga.EdgeType.SPHERICAL)
+    target_type = target_type.with_crs(ga.OGC_CRS84).with_edge_type(ga.EdgeType.SPHERICAL)
+    values = shapely.to_wkb([shapely.Point(1, 2), None], flavor="iso").tolist()
+    source = pa.array(values, source_type.storage_type)
+    if extension:
+        source = source_type.wrap_array(source)
+
+    result = _resolve_arrow_array(source, target_type)
+
+    result.validate(full=True)
+    assert result.type == target_type
+    assert result.storage.to_pylist() == values
+
+
+@pytest.mark.parametrize("target_type", [ga.wkb(), ga.large_wkb(), ga.wkb_view()])
+@pytest.mark.parametrize("values", [[], [None], [shapely.Point(1, 2, 3), None]])
+def test_shapely_array_wkb_storage(target_type, values):
+    result = _resolve_arrow_array(values, target_type)
+
+    result.validate(full=True)
+    assert result.type == target_type
+    assert result.storage.to_pylist() == shapely.to_wkb(values, flavor="iso").tolist()
+
+
+@pytest.mark.parametrize(
+    "source_type",
+    [ga.wkb().with_crs(ga.OGC_CRS84), ga.wkb().with_edge_type(ga.EdgeType.SPHERICAL)],
+)
+def test_geometry_array_rejects_metadata_change(source_type):
+    source = source_type.wrap_array(pa.array([None], pa.binary()))
+    with pytest.raises(TypeError, match="different CRS or edge type"):
+        _resolve_arrow_array(source, ga.large_wkb())
+
+
 def test_geopandas_literal():
     geoseries = geopandas.GeoSeries.from_wkt(["POINT (0 1)"], crs=3857)
 

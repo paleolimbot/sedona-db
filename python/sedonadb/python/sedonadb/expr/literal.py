@@ -169,7 +169,9 @@ def _resolve_arrow_array(values, type):
         raise ValueError("Resolving an array without a target type is not yet supported")
 
     target_sedona_type = PySedonaType(type)
-    target_pyarrow_type = pa.DataType._import_from_c_capsule(target_sedona_type)
+    target_pyarrow_type = pa.DataType._import_from_c_capsule(
+        target_sedona_type.__arrow_c_schema__()
+    )
 
     # Special case arrow arrays first
     if hasattr(values, "__arrow_c_array__"):
@@ -191,7 +193,7 @@ def _resolve_arrow_array(values, type):
         if target_sedona_type.extension_name is None:
             return source_pyarrow_array.cast(target_pyarrow_type)
         elif target_sedona_type.extension_name == "geoarrow.wkb":
-            return _resolve_geometry_array(array, target_pyarrow_type)
+            return _resolve_geometry_array(source_pyarrow_array, target_pyarrow_type)
         else:
             raise TypeError(f"Unsupported cast to extension {target_sedona_type!r}")
 
@@ -207,17 +209,27 @@ def _resolve_arrow_array(values, type):
 
 
 def _resolve_geometry_array(values, target_pyarrow_type):
+    """Resolve WKB storage or Shapely objects to the declared geometry type."""
     import geoarrow.pyarrow as ga
     import pyarrow as pa
 
     # We can't quite use ga.array() or ga.as_geoarrow() here because of some bugs
     # https://github.com/geoarrow/geoarrow-python/pull/84
     if isinstance(values, pa.ExtensionArray):
-        # TODO: check for equal type except for the storage type; cast storage type and wrap
-        pass
+        if values.type.extension_name != "geoarrow.wkb":
+            raise TypeError(f"Unsupported cast from {values.type} to {target_pyarrow_type}")
+
+        # Normalize storage to compare metadata using Sedona's CRS equality.
+        source_type = ga.wkb().with_metadata(values.type.__arrow_ext_serialize__())
+        target_type = ga.wkb().with_metadata(target_pyarrow_type.__arrow_ext_serialize__())
+        if PySedonaType(source_type) != PySedonaType(target_type):
+            raise TypeError(
+                f"Can't cast geometry with different CRS or edge type: "
+                f"{values.type} to {target_pyarrow_type}"
+            )
+        storage = values.storage.cast(target_pyarrow_type.storage_type)
     elif isinstance(values, pa.Array):
-        # TODO: cast to the storage type of the target and wrap
-        pass
+        storage = values.cast(target_pyarrow_type.storage_type)
     elif isinstance(values, list):
         import shapely
 
@@ -225,7 +237,11 @@ def _resolve_geometry_array(values, target_pyarrow_type):
         # We could extend this in the future to support raw WKB storage or WKT
         # like ga.as_geoarrow().
         wkb_storage = shapely.to_wkb(values, flavor="iso")
-        wkb_storage_array = pa.array(wkb_storage, target_pyarrow_type.storage_type)
+        storage = pa.array(wkb_storage, target_pyarrow_type.storage_type)
+    else:
+        raise TypeError(f"Can't create geometry array from {type(values).__name__}")
+
+    return target_pyarrow_type.wrap_array(storage)
 
 
 def _resolve_raster_array(values, target_pyarrow_type):
