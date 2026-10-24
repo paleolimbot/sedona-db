@@ -317,6 +317,13 @@ def python_udf(
     results additionally accept GeoArrow scalars and Shapely objects, and raster
     results preserve the Arrow-backed representation used by [`lit`][sedonadb.expr.lit].
 
+    Geometry/geography results must use a consistent representation: WKB bytes,
+    GeoArrow scalars, or Shapely objects, optionally mixed with `None`. Conversion
+    is selected from the first non-null result in each batch; mixing these
+    representations within a batch is unsupported. This avoids per-row type
+    dispatch and preserves vectorized conversion, which is substantially faster
+    for small geometries such as Shapely points.
+
     Args:
         return_type: The return data type, or a callable return type resolver.
         input_types: The accepted input data types or type matchers. `None`
