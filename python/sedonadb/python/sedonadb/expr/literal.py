@@ -237,6 +237,11 @@ def _resolve_geometry_array(values, target_pyarrow_type):
     elif isinstance(values, pa.Array):
         storage = values.cast(target_pyarrow_type.storage_type)
     elif isinstance(values, list):
+        # For lists, we find the first non-null element and choose the conversion
+        # based on that. This doesn't support mixed types in the list; however,
+        # adds significant overhead (~2x slower) for lists of small objects like
+        # Shapely points. For now, we just support a single element type in a
+        # list.
         first_value = next((value for value in values if value is not None), None)
         qualified_name = _qualified_type_name(first_value)
         if qualified_name in ("builtins.bytes", "builtins.NoneType"):
