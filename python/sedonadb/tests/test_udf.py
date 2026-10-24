@@ -202,10 +202,10 @@ def test_python_udf_geometry_identity(con, srid):
     ).to_arrow_table()
     assert actual.equals(expected)
 
-    assert con.sql(
-        f"SELECT geom_identity(ST_Point(1, 2, {srid})) AS geom"
-    ).to_arrow_table().equals(
-        con.sql(f"SELECT ST_Point(1, 2, {srid}) AS geom").to_arrow_table()
+    assert (
+        con.sql(f"SELECT geom_identity(ST_Point(1, 2, {srid})) AS geom")
+        .to_arrow_table()
+        .equals(con.sql(f"SELECT ST_Point(1, 2, {srid}) AS geom").to_arrow_table())
     )
 
 
