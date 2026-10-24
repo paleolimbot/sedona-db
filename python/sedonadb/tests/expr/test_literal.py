@@ -111,6 +111,16 @@ def test_wkb_list_array(type, values):
     assert array.storage.to_pylist() == values
 
 
+@pytest.mark.parametrize("source_type", [ga.wkb(), ga.wkt(), ga.point()])
+@pytest.mark.parametrize("target_type", [ga.wkb(), ga.large_wkb(), ga.wkb_view()])
+def test_geoarrow_scalar_list_array(source_type, target_type):
+    source = ga.as_geoarrow(["POINT (1 2)", None], type=source_type)
+    result = _resolve_arrow_array([None, source[0], source[1]], target_type)
+
+    assert result.type == target_type
+    assert result.storage.to_pylist() == [None, shapely.Point(1, 2).wkb, None]
+
+
 def test_resolve_array_requires_target_type():
     with pytest.raises(ValueError, match="without a target type"):
         _resolve_arrow_array([1], None)

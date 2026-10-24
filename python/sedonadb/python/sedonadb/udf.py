@@ -16,6 +16,7 @@
 # under the License.
 
 import inspect
+import itertools
 import re
 from collections.abc import Mapping
 from typing import Any, Literal, Optional, Union
@@ -305,15 +306,16 @@ def python_udf(
     """Python object-based user-defined scalar function decorator.
 
     The decorated function is called once per row with ordinary Python objects.
-    Input values are converted using PyArrow's scalar conversion. Raster values
-    are the exception: they are passed as [`Raster`][sedonadb.raster.Raster]
+    Input values are converted lazily using PyArrow's scalar conversion.
+    Geometry/geography values are passed as GeoArrow scalars (or `None`).
+    Raster values are passed as [`Raster`][sedonadb.raster.Raster]
     objects that reference the input Arrow buffers instead of materializing the
     raster's inline pixel bytes as a Python `bytes` object.
 
     Return conversion is selected by the declared Arrow type. Most values use
     `pyarrow.array(values, type=return_type)` directly. Geometry/geography
-    results additionally accept Shapely objects, and raster results preserve
-    the Arrow-backed representation used by [`lit`][sedonadb.expr.lit].
+    results additionally accept GeoArrow scalars and Shapely objects, and raster
+    results preserve the Arrow-backed representation used by [`lit`][sedonadb.expr.lit].
 
     Args:
         return_type: The return data type, or a callable return type resolver.
@@ -415,7 +417,7 @@ def _python_udf_values(value, num_rows):
     array = pa.array(value)
     values = _python_values_from_arrow(array, type)
     if value.is_scalar():
-        return [values[0]] * num_rows
+        return itertools.repeat(next(values), num_rows)
     else:
         return values
 
@@ -428,8 +430,10 @@ def _python_values_from_arrow(array, type):
     # raster buffers under current pyarrow
     if extension_name == "sedona.raster":
         return _python_values_from_raster(array)
+    elif extension_name == "geoarrow.wkb":
+        return (scalar if scalar.is_valid else None for scalar in array)
     else:
-        return array.to_pylist()
+        return (scalar.as_py() for scalar in array)
 
 
 def _python_values_from_raster(array):
@@ -438,9 +442,9 @@ def _python_values_from_raster(array):
     from sedonadb.raster import Raster
 
     storage = array.storage if isinstance(array, pa.ExtensionArray) else array
-    return [
+    return (
         None if not array[i].is_valid else Raster(storage, i) for i in range(len(array))
-    ]
+    )
 
 
 BINARY: TypeMatcher = TypeMatcher("binary")

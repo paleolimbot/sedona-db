@@ -240,9 +240,17 @@ def _resolve_geometry_array(values, target_pyarrow_type):
         first_value = next((value for value in values if value is not None), None)
         qualified_name = _qualified_type_name(first_value)
         if qualified_name in ("builtins.bytes", "builtins.NoneType"):
-            # Geometry inputs to Python UDFs are WKB bytes. Empty and all-null
-            # lists can also be converted directly to the target storage type.
+            # Empty and all-null lists also convert directly to WKB storage.
             wkb_storage = values
+        elif qualified_name in (
+            "geoarrow.pyarrow._scalar.WkbScalar",
+            "geoarrow.pyarrow._scalar.WktScalar",
+            "geoarrow.pyarrow._scalar.GeometryExtensionScalar",
+        ):
+            wkb_storage = (
+                None if value is None or not value.is_valid else value.wkb
+                for value in values
+            )
         else:
             import shapely
 

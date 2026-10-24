@@ -184,8 +184,11 @@ def test_python_udf_uses_literal_result_conversion(con):
 
 @pytest.mark.parametrize("srid", [0, 3857])
 def test_python_udf_geometry_identity(con, srid):
+    from geoarrow.pyarrow._scalar import WkbScalar
+
     @udf.python_udf(udf.GEOMETRY, [udf.GEOMETRY])
     def geom_identity(value):
+        assert value is None or isinstance(value, WkbScalar)
         return value
 
     con.register(geom_identity)
@@ -204,6 +207,42 @@ def test_python_udf_geometry_identity(con, srid):
     ).to_arrow_table().equals(
         con.sql(f"SELECT ST_Point(1, 2, {srid}) AS geom").to_arrow_table()
     )
+
+
+@pytest.mark.parametrize("geometry", [False, True])
+def test_python_udf_input_iterator(geometry):
+    import geoarrow.pyarrow as ga
+
+    array = ga.as_wkb([None, "POINT (1 2)"]) if geometry else pa.array([None, 1])
+    values = udf._python_values_from_arrow(array, array.type)
+    assert iter(values) is values
+    assert next(values) is None
+    value = next(values)
+    assert value == (array[1] if geometry else 1)
+    with pytest.raises(StopIteration):
+        next(values)
+
+
+def test_python_udf_scalar_iterator():
+    import itertools
+
+    class ScalarInput:
+        type = pa.field("", pa.list_(pa.int64()))
+
+        def is_scalar(self):
+            return True
+
+        def __arrow_c_array__(self, requested_schema=None):
+            return pa.array([[1, 2]]).__arrow_c_array__(requested_schema)
+
+    values = udf._python_udf_values(ScalarInput(), 3)
+    assert isinstance(values, itertools.repeat)
+    first = next(values)
+    assert first == [1, 2]
+    assert next(values) is first
+    assert next(values) is first
+    with pytest.raises(StopIteration):
+        next(values)
 
 
 def test_python_udf_reuses_converted_scalar_object(con):
