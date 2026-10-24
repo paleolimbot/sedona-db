@@ -63,7 +63,6 @@ pub fn default_function_set() -> FunctionSet {
         crate::rs_geotransform::rs_upperleftx_udf,
         crate::rs_geotransform::rs_upperlefty_udf,
         crate::rs_minconvexhull::rs_minconvexhull_udf,
-        crate::rs_ndvi::rs_ndvi_udf,
         crate::rs_numbands::rs_numbands_udf,
         crate::rs_pixel_functions::rs_pixelaspoint_udf,
         crate::rs_pixel_functions::rs_pixelascentroid_udf,

@@ -36,7 +36,6 @@ pub mod rs_geotransform;
 pub mod rs_isempty;
 pub mod rs_make_empty_raster;
 pub mod rs_minconvexhull;
-pub mod rs_ndvi;
 pub mod rs_numbands;
 pub mod rs_pixel_functions;
 pub mod rs_rastercoordinate;
