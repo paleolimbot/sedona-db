@@ -306,20 +306,20 @@ def python_udf(
 
     The decorated function is called once per row with ordinary Python objects.
     Input values are converted using PyArrow's scalar conversion. Raster values
-    are the exception: they are passed as :class:`sedonadb.raster.Raster`
+    are the exception: they are passed as [`Raster`][sedonadb.raster.Raster]
     objects that reference the input Arrow buffers instead of materializing the
-    raster's inline pixel bytes as a Python ``bytes`` object.
+    raster's inline pixel bytes as a Python `bytes` object.
 
     Return conversion is selected by the declared Arrow type. Most values use
-    ``pyarrow.array(values, type=return_type)`` directly. Geometry/geography
+    `pyarrow.array(values, type=return_type)` directly. Geometry/geography
     results additionally accept Shapely objects, and raster results preserve
-    the Arrow-backed representation used by :func:`sedonadb.expr.lit`.
+    the Arrow-backed representation used by [`lit`][sedonadb.expr.lit].
 
     Args:
         return_type: The return data type, or a callable return type resolver.
-        input_types: The accepted input data types or type matchers. ``None``
+        input_types: The accepted input data types or type matchers. `None`
             accepts any number of arguments of any type.
-        volatility: ``"immutable"`` (default), ``"stable"``, or ``"volatile"``.
+        volatility: `"immutable"` (default), `"stable"`, or `"volatile"`.
         name: An optional SQL name. By default the decorated function's name is
             used.
         metadata: Optional key/value information used by optimizer rules.
@@ -331,6 +331,62 @@ def python_udf(
         >>> @udf.python_udf(pa.int64(), [udf.STRING])
         ... def char_count(value):
         ...     return None if value is None else len(value)
+        ...
+        >>> sd = sedona.db.connect()
+        >>> sd.register(char_count)
+        >>> sd.sql("SELECT char_count('abcde') AS col").show()
+        ┌───────┐
+        │  col  │
+        │ int64 │
+        ╞═══════╡
+        │     5 │
+        └───────┘
+
+        Geometry results can be returned as Shapely objects by declaring a
+        geometry return type.
+
+        >>> import shapely
+        >>> @udf.python_udf(udf.GEOMETRY, [udf.NUMERIC, udf.NUMERIC])
+        ... def make_point(x, y):
+        ...     if x is None or y is None:
+        ...         return None
+        ...     return shapely.Point(x, y)
+        ...
+        >>> sd.register(make_point)
+        >>> sd.sql("SELECT make_point(1.0, 2.0) AS col").show()
+        ┌────────────┐
+        │     col    │
+        │  geometry  │
+        ╞════════════╡
+        │ POINT(1 2) │
+        └────────────┘
+
+        Raster arguments arrive as [`Raster`][sedonadb.raster.Raster] objects.
+        Set `needs_pixels` when reading pixels so that externally stored
+        raster data is loaded before the UDF runs. This example averages all
+        pixels and bands without excluding nodata values; the sample raster
+        contains a single band filled with zeros.
+
+        >>> @udf.python_udf(
+        ...     pa.float64(), [udf.RASTER], metadata={"needs_pixels": "true"}
+        ... )
+        ... def pixel_mean(value):
+        ...     if value is None:
+        ...         return None
+        ...     return float(value.to_numpy().mean())
+        ...
+        >>> sd.register(pixel_mean)
+        >>> sd.sql(
+        ...     "SELECT pixel_mean("
+        ...     "RS_MakeEmptyRaster(1, 'B', 3, 2, 0.0, 0.0, 1.0)"
+        ...     ") AS col"
+        ... ).show()
+        ┌─────────┐
+        │   col   │
+        │ float64 │
+        ╞═════════╡
+        │     0.0 │
+        └─────────┘
     """
 
     def decorator(func):
