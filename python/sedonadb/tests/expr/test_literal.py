@@ -102,6 +102,15 @@ def test_shapely_array(type):
     assert ga.as_wkb(array).storage.to_pylist() == shapely.to_wkb(values).tolist()
 
 
+@pytest.mark.parametrize("type", [ga.wkb(), ga.large_wkb()])
+@pytest.mark.parametrize("values", [[], [None], [None, shapely.Point(1, 2).wkb, None]])
+def test_wkb_list_array(type, values):
+    array = _resolve_arrow_array(values, type)
+
+    assert array.type == type
+    assert array.storage.to_pylist() == values
+
+
 def test_resolve_array_requires_target_type():
     with pytest.raises(ValueError, match="without a target type"):
         _resolve_arrow_array([1], None)

@@ -182,6 +182,30 @@ def test_python_udf_uses_literal_result_conversion(con):
     ).to_arrow_table()["col"].to_pylist() == ["POINT(1 2)", "POINT(3 4)", None]
 
 
+@pytest.mark.parametrize("srid", [0, 3857])
+def test_python_udf_geometry_identity(con, srid):
+    @udf.python_udf(udf.GEOMETRY, [udf.GEOMETRY])
+    def geom_identity(value):
+        return value
+
+    con.register(geom_identity)
+    source = (
+        f"SELECT ST_Point(x, y, {srid}) AS geom "
+        "FROM (VALUES (NULL, NULL), (1.0, 2.0), (3.0, 4.0)) AS t(x, y)"
+    )
+    expected = con.sql(source).to_arrow_table()
+    actual = con.sql(
+        f"SELECT geom_identity(geom) AS geom FROM ({source})"
+    ).to_arrow_table()
+    assert actual.equals(expected)
+
+    assert con.sql(
+        f"SELECT geom_identity(ST_Point(1, 2, {srid})) AS geom"
+    ).to_arrow_table().equals(
+        con.sql(f"SELECT ST_Point(1, 2, {srid}) AS geom").to_arrow_table()
+    )
+
+
 def test_python_udf_reuses_converted_scalar_object(con):
     values_seen = []
 

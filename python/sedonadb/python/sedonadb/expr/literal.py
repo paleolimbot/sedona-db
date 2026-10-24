@@ -237,12 +237,16 @@ def _resolve_geometry_array(values, target_pyarrow_type):
     elif isinstance(values, pa.Array):
         storage = values.cast(target_pyarrow_type.storage_type)
     elif isinstance(values, list):
-        import shapely
+        first_value = next((value for value in values if value is not None), None)
+        qualified_name = _qualified_type_name(first_value)
+        if qualified_name in ("builtins.bytes", "builtins.NoneType"):
+            # Geometry inputs to Python UDFs are WKB bytes. Empty and all-null
+            # lists can also be converted directly to the target storage type.
+            wkb_storage = values
+        else:
+            import shapely
 
-        # Assume a bare list is a list of shapely compatible objects.
-        # We could extend this in the future to support raw WKB storage or WKT
-        # like ga.as_geoarrow().
-        wkb_storage = shapely.to_wkb(values, flavor="iso")
+            wkb_storage = shapely.to_wkb(values, flavor="iso")
         storage = pa.array(wkb_storage, target_pyarrow_type.storage_type)
     else:
         raise TypeError(f"Can't create geometry array from {type(values).__name__}")
