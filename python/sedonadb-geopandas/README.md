@@ -106,6 +106,13 @@ it into a 3D empty, or one of another type (`POLYGON EMPTY` becomes
 `LINEARRING Z EMPTY`). `set_precision()` modes other than `"valid_output"` are
 not supported.
 
+The affine transformations (`affine_transform()`, `translate()`, `rotate()`,
+`scale()`, `skew()`) give Shapely's coordinates to the last bit, but keep M
+values, which Shapely drops (and overwrites, with Z, as NaN in a geometry
+with both). `interpolate()` and `project()` raise for a multi-line when the
+result is computed, as the engine works along single lines only, and
+`interpolate()` gives a 2D point on a 3D line.
+
 `explode()` takes parts one level deep and drops rows whose geometry has no
 parts, as GeoPandas does. Without an index it cannot number the parts
 (`index_parts=True`), and it explodes the active geometry column only:
