@@ -1934,13 +1934,16 @@ class GeoSeries(Series):
         """The bounding rectangle of each geometry (`ST_Envelope`).
 
         The envelope of an empty geometry is `POINT EMPTY`, as in GeoPandas,
-        whatever the empty geometry's type (the engine keeps the type). For a
-        geography column the engine's envelope is a planar longitude/latitude
-        box (geometry, not geography), and it stays one here.
+        whatever the empty geometry's type (the engine keeps the type), and a
+        box with no width or no height is a polygon with no area, as GeoPandas
+        (GEOS) gives it, where the engine gives a line. For a geography column
+        the engine's envelope is a planar longitude/latitude box (geometry, not
+        geography), and it stays one here.
         """
         import shapely
 
-        return self._geo(self._empty_as(self._expr.geo.envelope(), shapely.Point()))
+        envelope = self._flat_boxes(self._expr.geo.envelope())
+        return self._geo(self._empty_as(envelope, shapely.Point()))
 
     def _empty_as(self, result, empty):
         """`result`, but `empty` (a Shapely geometry) where this geometry is
@@ -1965,6 +1968,23 @@ class GeoSeries(Series):
         result_type = self._df.select(result.alias("x")).schema.field("x").type
         spherical = "SPHERICAL" in str(getattr(result_type, "edge_type", "")).upper()
         return _geometry_from_wkb(wkb, spherical, result_type.crs, ctx)
+
+    def _flat_boxes(self, envelope):
+        """`envelope`, with each box that has no width or no height as a
+        polygon with no area rather than a line.
+
+        The engine gives a line there, as PostGIS does; GEOS, and so
+        GeoPandas, gives a polygon with the box's corners (and a point only
+        when the box has neither width nor height, as the engine does too).
+        """
+        geo = envelope.geo
+        flat = (geo.geometry_type() == lit("ST_LineString")).funcs.coalesce(lit(False))
+        corners = geo.x_min().funcs.st_makeenvelope(
+            geo.y_min(), geo.x_max(), geo.y_max()
+        )
+        # ST_MakeEnvelope goes round the box clockwise, GEOS counterclockwise.
+        box = corners.geo.reverse().geo.as_binary()
+        return self._replace_where(flat, box, envelope)
 
     @property
     def convex_hull(self):
