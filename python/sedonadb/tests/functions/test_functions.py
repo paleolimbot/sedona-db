@@ -3086,6 +3086,56 @@ def test_st_iscollection(eng, geom, expected):
 
 @pytest.mark.parametrize("eng", [SedonaDB, PostGIS])
 @pytest.mark.parametrize(
+    ("geom", "expected_cw", "expected_ccw"),
+    [
+        (None, None, None),
+        ("POLYGON ((0 0, 0 1, 1 1, 1 0, 0 0))", True, False),
+        ("POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))", False, True),
+        (
+            "POLYGON ((0 0, 0 4, 4 4, 4 0, 0 0), (1 1, 2 1, 2 2, 1 2, 1 1))",
+            True,
+            False,
+        ),
+        (
+            "POLYGON ((0 0, 0 4, 4 4, 4 0, 0 0), (1 1, 1 2, 2 2, 2 1, 1 1))",
+            False,
+            False,
+        ),
+        (
+            "MULTIPOLYGON (((0 0, 0 1, 1 1, 1 0, 0 0)), ((5 5, 6 5, 6 6, 5 6, 5 5)))",
+            False,
+            False,
+        ),
+        (
+            "GEOMETRYCOLLECTION (POINT (1 1), POLYGON ((0 0, 0 1, 1 1, 1 0, 0 0)))",
+            True,
+            False,
+        ),
+        ("LINESTRING (0 0, 1 1)", True, True),
+        ("POLYGON EMPTY", True, True),
+        ("GEOMETRYCOLLECTION EMPTY", True, True),
+        (
+            "POLYGON ((10000000 10000000, 10000000.1 10000000, 10000000.1 10000000.1, 10000000 10000000.1, 10000000 10000000))",
+            False,
+            True,
+        ),
+        (
+            "POLYGON ((10000000 10000000, 10000000 10000000.1, 10000000.1 10000000.1, 10000000.1 10000000, 10000000 10000000))",
+            True,
+            False,
+        ),
+    ],
+)
+def test_st_ispolygoncw_ccw(eng, geom, expected_cw, expected_ccw):
+    eng = eng.create_or_skip()
+    eng.assert_query_result(f"SELECT ST_IsPolygonCW({geom_or_null(geom)})", expected_cw)
+    eng.assert_query_result(
+        f"SELECT ST_IsPolygonCCW({geom_or_null(geom)})", expected_ccw
+    )
+
+
+@pytest.mark.parametrize("eng", [SedonaDB, PostGIS])
+@pytest.mark.parametrize(
     ("geom", "expected"),
     [
         (None, None),
