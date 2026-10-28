@@ -1213,8 +1213,12 @@ def test_to_wkb_matches_geopandas_iso_flavor():
     gs = gpd.GeoSeries.from_wkt(CORPUS, crs="EPSG:3857")
     g = sgpd.from_geopandas(gpd.GeoDataFrame(geometry=gs)).geometry
     assert g.to_wkb().to_pandas().tolist() == gs.to_wkb(flavor="iso").tolist()
-    with pytest.raises(NotImplementedError, match="hex"):
-        g.to_wkb(hex=True)
+    # pandas 3's string dtype marks a missing value as NaN, on either side.
+    hexed = g.to_wkb(hex=True).to_pandas().tolist()
+    expected = gs.to_wkb(hex=True, flavor="iso").tolist()
+    assert [None if pd.isna(h) else h for h in hexed] == [
+        None if pd.isna(h) else h for h in expected
+    ]
 
 
 def test_set_crs_follows_geopandas_override_rules():
