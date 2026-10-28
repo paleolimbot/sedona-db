@@ -19,6 +19,7 @@
 import math
 import numbers
 import operator
+import warnings
 
 import pyarrow as pa
 from sedonadb.expr import Expr, lit
@@ -1611,6 +1612,16 @@ def _empty(geometry):
     return geometry.geo.n_points() == lit(0)
 
 
+class _CoordinateIndexer:
+    """The `cx` indexer: `cx[xmin:xmax, ymin:ymax]` gives `select(key)`."""
+
+    def __init__(self, select):
+        self._select = select
+
+    def __getitem__(self, key):
+        return self._select(key)
+
+
 def _check_align(align):
     """GeoPandas' `align` argument.
 
@@ -1822,6 +1833,11 @@ class GeoSeries(Series):
         return Series(self._df, self._expr.geo.z(), "z")
 
     @property
+    def m(self):
+        """The M coordinate of each point (`ST_M`); see `x`."""
+        return Series(self._df, self._expr.geo.m(), "m")
+
+    @property
     def bounds(self):
         """The bounds of each geometry, as a frame of minx, miny, maxx, maxy.
 
@@ -1858,6 +1874,99 @@ class GeoSeries(Series):
         return np.array(
             [row[c].iloc[0] for c in ("minx", "miny", "maxx", "maxy")], dtype=float
         )
+
+    def get_coordinates(
+        self, include_z=False, ignore_index=False, index_parts=False, *, include_m=False
+    ):
+        """The coordinates of every vertex, as a frame of x and y (and z or m,
+        with `include_z` or `include_m`), as in GeoPandas.
+
+        One row per vertex, in order, a ring's closing vertex included; a
+        missing Z or M is NaN, and empty or missing geometries have none.
+        Lazy, as for `bounds`, but the result has a different number of rows,
+        so it belongs to a new frame (as for `explode()`). `ignore_index` is
+        accepted for compatibility; `index_parts=True` is not supported,
+        since there is no index.
+        """
+        from sedonadb_geopandas._frame import GeoDataFrame, _explode_parts
+
+        if index_parts:
+            raise NotImplementedError(
+                "get_coordinates() cannot number parts with index_parts=True: "
+                "there is no index"
+            )
+        # ST_Points gives every vertex as a multipoint, exploded to one point
+        # per row.
+        vertices = _explode_parts(
+            self._df.select(self._expr.geo.points().alias("vertex")), "vertex"
+        )
+        point = vertices["vertex"].geo
+        columns = [point.x().alias("x"), point.y().alias("y")]
+        if include_z:
+            columns.append(point.z().alias("z"))
+        if include_m:
+            columns.append(point.m().alias("m"))
+        return GeoDataFrame(vertices.select(*columns), geometry=None)
+
+    @property
+    def cx(self):
+        """Coordinate indexer: `cx[xmin:xmax, ymin:ymax]` keeps the geometries
+        that intersect that box, as in GeoPandas (see `_in_box`).
+
+        Keeping some rows makes a new frame, as for `dropna()`.
+        """
+        return _CoordinateIndexer(
+            lambda key: GeoSeries(
+                self._df.filter(self._in_box(key)), self._expr, self._name
+            )
+        )
+
+    def _in_box(self, key):
+        """Whether each geometry intersects the box `key` selects in `cx`.
+
+        The box is one in coordinates, as in GeoPandas, so a geography is
+        tested as planar geometry: a spherical box's edges would bow away
+        from its corners. A number is a range of that one value, and a step
+        is ignored with a warning, as in GeoPandas.
+
+        An open side is unbounded: it is closed at each geometry's own bound,
+        and a geometry wholly past the other side is left out explicitly, as
+        the box would otherwise turn around to reach it. GeoPandas closes an
+        open side at the bounds of all the geometries, which would need them
+        computed (and which reaches back to the geometries at the edge for a
+        range starting past it).
+        """
+        if not isinstance(key, tuple) or len(key) != 2:
+            raise TypeError("cx takes an x and a y range: cx[xmin:xmax, ymin:ymax]")
+        ctx = self._df._ctx
+        geometry, crs = self._expr, self.crs
+        if self._is_geography():
+            geometry, crs = geometry.geo.as_binary().funcs.st_geomfromwkb(), None
+
+        def bound(value):
+            return None if value is None else ctx.lit(_number(value, "cx", "bounds"))
+
+        sides, within = [], []
+        for bounds, low, high in (
+            (key[0], geometry.geo.x_min(), geometry.geo.x_max()),
+            (key[1], geometry.geo.y_min(), geometry.geo.y_max()),
+        ):
+            if not isinstance(bounds, slice):
+                bounds = slice(bounds, bounds)
+            if bounds.step is not None:
+                warnings.warn("Ignoring step - full interval is used.", stacklevel=4)
+            start, stop = bound(bounds.start), bound(bounds.stop)
+            sides += [low if start is None else start, high if stop is None else stop]
+            if stop is None and start is not None:
+                within.append(high >= start)
+            if start is None and stop is not None:
+                within.append(low <= stop)
+        xmin, xmax, ymin, ymax = sides
+        box = _with_crs(xmin.funcs.st_makeenvelope(ymin, xmax, ymax), False, crs, ctx)
+        result = geometry.geo.intersects(box)
+        for condition in within:
+            result = result & condition
+        return result
 
     # -- measures ---------------------------------------------------------
 
@@ -2613,6 +2722,14 @@ class GeoSeries(Series):
         """Whether each geometry is disjoint from `other` (`ST_Disjoint`)."""
         return self._predicate("disjoint", other, align)
 
+    def contains_properly(self, other, align=None):
+        """Whether each geometry contains `other` with none of it on its
+        boundary: `ST_Relate` with the pattern `T**FF*FF*`, as GEOS defines
+        it. False where either side is missing."""
+        _check_align(align)
+        expr = self._expr.geo.relate(self._other(other), lit("T**FF*FF*"))
+        return Series(self._df, expr.funcs.coalesce(lit(False)), "contains_properly")
+
     def geom_equals(self, other, align=None):
         """Whether each geometry equals `other` topologically (`ST_Equals`)."""
         from sedonadb.expr import lit
@@ -2747,6 +2864,13 @@ class GeoSeries(Series):
         _check_align(align)
         return self._geo(self._expr.geo.sym_difference(self._other(other)))
 
+    def shortest_line(self, other, align=None):
+        """The shortest line from each geometry to `other`
+        (`ST_ShortestLine`); missing where either is empty or missing, as in
+        GeoPandas."""
+        _check_align(align)
+        return self._geo(self._expr.geo.shortest_line(self._other(other)))
+
     def snap(self, other, tolerance, align=None):
         """Each geometry with its vertices snapped to `other`'s within
         `tolerance` (`ST_Snap`).
@@ -2814,6 +2938,27 @@ class GeoSeries(Series):
             self._expr = expr
             return self
         return self._geo(expr)
+
+    def to_crs(self, crs=None, epsg=None):
+        """Each geometry transformed to `crs` (`ST_Transform`).
+
+        GeoPandas' signature and rules: `crs` takes precedence over `epsg`,
+        one of them is required, and geometries without a CRS can't be
+        transformed. The result is labeled with the CRS as given, as in
+        GeoPandas, rather than the engine's canonical form of it (OGC:CRS84
+        for EPSG:4326).
+        """
+        if crs is None and epsg is None:
+            raise ValueError("Must pass either crs or epsg.")
+        if self.crs is None:
+            raise ValueError(
+                "Cannot transform naive geometries. Please set a crs on the "
+                "object first."
+            )
+        if crs is None:
+            crs = f"EPSG:{int(epsg)}"
+        target = self._df._ctx.lit(_normalize_crs(crs))
+        return self._geo(self._expr.geo.transform(target))
 
     @property
     def crs(self):
