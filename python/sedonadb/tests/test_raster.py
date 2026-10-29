@@ -382,6 +382,31 @@ def test_raster_from_numpy_2d():
     assert np.shares_memory(b.to_numpy(), arr)
 
 
+@pytest.mark.parametrize("version", ["21.0.0", "22.0.0", "24.0.0"])
+def test_raster_from_numpy_requires_pyarrow_25(monkeypatch, version):
+    monkeypatch.setattr(pa, "__version__", version)
+    with pytest.raises(ImportError, match=r"requires PyArrow >= 25\.0\.0"):
+        Raster.from_numpy(np.arange(6, dtype=np.uint8).reshape(2, 3))
+
+
+@pytest.mark.parametrize("nbytes", [0, 1, 6, 12, 13, 1024])
+@pytest.mark.parametrize("strided", [False, True])
+def test_raster_from_numpy_arrow_roundtrip(nbytes, strided):
+    source = np.arange(nbytes * (2 if strided else 1), dtype=np.uint8)
+    pixels = (source[::2] if strided else source).reshape(1, nbytes)
+    raster = Raster.from_numpy(pixels)
+
+    # Exporting an inline binary view cast from binary crashes older PyArrow.
+    # Exercise the C Data protocol, not just Arrow's array validation.
+    schema, array = raster.__arrow_c_array__()
+    result = pa.Array._import_from_c_capsule(schema, array)
+    result.validate(full=True)
+    restored = Raster(result).to_numpy()[0]
+    np.testing.assert_array_equal(restored, pixels)
+    if nbytes > 12:
+        assert np.shares_memory(restored, pixels) == (not strided)
+
+
 def test_raster_from_numpy_nd_with_crs():
     arr = np.arange(2 * 2 * 3, dtype="float32").reshape(2, 2, 3)
     r = Raster.from_numpy(arr, dim_names=["time", "y", "x"], crs="EPSG:4326")

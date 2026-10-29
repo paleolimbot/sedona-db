@@ -106,7 +106,10 @@ class Raster:
         The mirror of `lazy`: identical dimension/CRS conventions, but the
         pixel data is carried in the raster rather than referenced by URI.
 
-        This operation is zero-copy for contiguous arrays.
+        Requires PyArrow >= 25.0.0.
+
+        Contiguous arrays with more than 12 bytes share their pixel buffer.
+        Smaller arrays are copied into Arrow's inline binary view storage.
 
         Args:
             array: The pixel data. The trailing two axes are the spatial `(y, x)`
@@ -709,10 +712,15 @@ def _get_binary_view_buffer(
 def _wrap_data_zero_copy(data) -> pa.BinaryViewArray:
     """Wrap data as a single-element BinaryViewArray without copying.
 
-    For numpy arrays and memoryviews, this creates a zero-copy view.
-    For bytes, pyarrow handles the wrapping efficiently.
+    For contiguous buffers larger than 12 bytes, this creates a zero-copy
+    view. Smaller buffers are copied into the binary view's inline storage.
     """
     import numpy as np
+
+    # Earlier Arrow releases can segfault when exporting inline binary views:
+    # https://github.com/apache/arrow/pull/50166
+    if int(pa.__version__.split(".")[0]) < 25:
+        raise ImportError("Raster.from_numpy() requires PyArrow >= 25.0.0")
 
     view = memoryview(data)
     if not view.c_contiguous:
