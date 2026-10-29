@@ -170,7 +170,10 @@ def _rasterio_clip(
         if band < 0 or band > src.count:
             raise ValueError(f"band {band} out of range for a {src.count}-band raster")
         if crop:
-            window = rasterio.features.geometry_window(src, [geom])
+            # RS_Clip crops to the world-space envelope. Rasterio <1.5 uses
+            # the geometry's vertices directly, which gives a tighter window
+            # on rotated grids; pass the envelope explicitly on all versions.
+            window = rasterio.features.geometry_window(src, [geom.envelope])
         else:
             window = rasterio.windows.Window(0, 0, src.width, src.height)
         transform = src.window_transform(window)

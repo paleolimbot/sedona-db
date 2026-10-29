@@ -233,7 +233,7 @@ def test_geometry_array_rejects_metadata_change(source_type):
 
 
 @pytest.mark.parametrize("kind", ["empty", "null", "mixed"])
-def test_raster_array(kind):
+def test_raster_array(pyarrow25, kind):
     from sedonadb._lib import raster_type
     from sedonadb.raster import Raster
 
@@ -260,7 +260,7 @@ def test_raster_array_rejects_invalid_element():
         _resolve_arrow_array([None, 1], raster_type())
 
 
-def test_raster_array_same_type():
+def test_raster_array_same_type(pyarrow25):
     from sedonadb._lib import raster_type
     from sedonadb.raster import Raster
 

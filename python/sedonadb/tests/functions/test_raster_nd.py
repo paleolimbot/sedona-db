@@ -56,13 +56,13 @@ def _eval(expr, *rasters):
 
 
 @pytest.fixture
-def r2d():
+def r2d(pyarrow25):
     """2-D raster ``[y=4, x=5]`` with sequential pixel values 0..19."""
     return Raster.from_numpy(np.arange(4 * 5, dtype="uint8").reshape(4, 5))
 
 
 @pytest.fixture
-def r3d():
+def r3d(pyarrow25):
     """3-D raster ``[time=3, y=4, x=5]`` with sequential pixel values 0..59."""
     return Raster.from_numpy(
         np.arange(3 * 4 * 5, dtype="uint8").reshape(3, 4, 5),

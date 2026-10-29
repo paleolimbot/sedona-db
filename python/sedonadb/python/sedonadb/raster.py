@@ -717,11 +717,6 @@ def _wrap_data_zero_copy(data) -> pa.BinaryViewArray:
     """
     import numpy as np
 
-    # Earlier Arrow releases can segfault when exporting inline binary views:
-    # https://github.com/apache/arrow/pull/50166
-    if int(pa.__version__.split(".")[0]) < 25:
-        raise ImportError("Raster.from_numpy() requires PyArrow >= 25.0.0")
-
     view = memoryview(data)
     if not view.c_contiguous:
         # Must copy if not contiguous
@@ -733,6 +728,11 @@ def _wrap_data_zero_copy(data) -> pa.BinaryViewArray:
         return pa.array([b""], type=pa.binary_view())
     elif nbytes >= 2**31:
         raise ValueError(f"Can't store {nbytes} (>2GB) in a single raster band")
+
+    # Earlier Arrow releases can segfault when exporting inline binary views:
+    # https://github.com/apache/arrow/pull/50166
+    if int(pa.__version__.split(".")[0]) < 25:
+        raise ImportError("Raster.from_numpy() requires PyArrow >= 25.0.0")
 
     # Build BinaryArray zero-copy using from_buffers, then cast to binary_view
     # BinaryArray buffers: [validity, offsets, data]

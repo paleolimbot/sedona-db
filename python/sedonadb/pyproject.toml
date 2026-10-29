@@ -42,7 +42,6 @@ test = [
     "geopandas",
     "pandas",
     "polars",
-    "pyarrow>=25",
     "pytest",
     "pyyaml",
     "rasterio",
@@ -58,12 +57,10 @@ geopandas = [
 [tool.cibuildwheel]
 # PyO3's stable ABI support makes this one wheel per platform compatible with
 # every supported CPython version, rather than producing one wheel per version.
-# Test with Python 3.10 so PyArrow >= 25 is available for raster construction.
-# The wheel remains compatible with Python 3.9 via abi3-py39 below.
-build = "cp310-*"
+build = "cp39-*"
 # Set here rather than via CIBW_TEST_REQUIRES in the workflow: environment
 # variables take precedence over the overrides below.
-test-requires = ["pyarrow>=25", "pytest", "adbc_driver_manager", "geoarrow-pyarrow", "geopandas", "duckdb"]
+test-requires = ["pytest", "adbc_driver_manager", "geoarrow-pyarrow", "geopandas", "duckdb"]
 
 [tool.maturin]
 features = ["pyo3/extension-module", "pyo3/abi3-py39"]

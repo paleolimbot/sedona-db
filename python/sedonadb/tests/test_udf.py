@@ -450,7 +450,7 @@ def test_arrow_udf_shapely_list_output(con):
     assert result.to_pylist() == [1.0, None, 3.0]
 
 
-def test_arrow_udf_raster_list_output(con):
+def test_arrow_udf_raster_list_output(pyarrow25, con):
     import numpy as np
     from sedonadb.raster import Raster
 
@@ -574,7 +574,7 @@ def test_native_scalar_udf_register_appends_overload(con):
     )
 
 
-def test_raster_udf_over_loaded_raster_as_pixel_argument(con, tmp_path):
+def test_raster_udf_over_loaded_raster_as_pixel_argument(pyarrow25, con, tmp_path):
     """A Python raster UDF over RS_EnsureLoaded(..), passed as the raster of
     functions that read pixels. The planner wraps the UDF's output in another
     RS_EnsureLoaded, which passes the already loaded pixels through. Two calls
