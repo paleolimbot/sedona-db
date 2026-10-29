@@ -491,7 +491,9 @@ mod tests {
             drop(held);
             // Leaving the queue happens before acquire_blocking() returns.
             // Wait for the recorded acquisition before inspecting the order.
-            acquired_first.recv_timeout(Duration::from_secs(10)).unwrap();
+            acquired_first
+                .recv_timeout(Duration::from_secs(10))
+                .unwrap();
             assert_eq!(budget.waiting(), 1);
             assert_eq!(*order.lock().unwrap(), ["first"]);
             assert_eq!(budget.in_use(), 1);
