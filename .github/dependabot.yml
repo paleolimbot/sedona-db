@@ -34,6 +34,9 @@ updates:
       # For all packages, ignore all patch updates
       - dependency-name: "*"
         update-types: ["version-update:semver-patch"]
+      # This release permits syn 3 while its formatter still requires syn 2.
+      - dependency-name: "bindgen"
+        versions: ["0.73.2"]
     groups:
       datafusion-arrow-parquet:
         applies-to: version-updates
