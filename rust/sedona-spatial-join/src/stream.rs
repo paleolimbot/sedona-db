@@ -615,7 +615,9 @@ impl SpatialJoinStream {
 
                 // Check if iterator is complete
                 if iterator.is_complete() {
-                    self.knn_results_merger = iterator.take_knn_results_merger();
+                    if let Some(merger) = iterator.take_knn_results_merger() {
+                        self.knn_results_merger = Some(merger);
+                    }
                     self.state = SpatialJoinStreamState::FetchProbeBatch(partition_desc);
                 } else {
                     // Iterator is not complete, continue processing the current probe batch
@@ -630,7 +632,9 @@ impl SpatialJoinStream {
             }
             None => {
                 // Iterator finished, move to the next probe batch
-                self.knn_results_merger = iterator.take_knn_results_merger();
+                if let Some(merger) = iterator.take_knn_results_merger() {
+                    self.knn_results_merger = Some(merger);
+                }
                 self.state = SpatialJoinStreamState::FetchProbeBatch(partition_desc);
                 Poll::Ready(Ok(StatefulStreamResult::Continue))
             }
@@ -837,7 +841,14 @@ impl SpatialJoinStream {
 
         // Move out the knn_results_merger to the iterator, we'll move it back when the iterator is complete
         // by calling `SpatialJoinBatchIterator::take_knn_results_merger`.
-        let knn_results_merger = std::mem::take(&mut self.knn_results_merger);
+        // Only Multi probe rows are revisited across build partitions. Regular
+        // partitions have their own row-index space and must not enter the
+        // merger's ordered spill stream.
+        let knn_results_merger = if matches!(partition_desc.partition, SpatialPartition::Multi) {
+            self.knn_results_merger.take()
+        } else {
+            None
+        };
 
         let iterator = SpatialJoinBatchIterator::new(SpatialJoinBatchIteratorParams {
             schema: self.schema.clone(),
