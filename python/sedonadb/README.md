@@ -23,8 +23,6 @@ This package is a Python interface to [SedonaDB](https://sedona.apache.org/sedon
 
 ## Installation
 
-Requires Python 3.10 or later and PyArrow 25 or later.
-
 SedonaDB for Python can be installed from [PyPI](https://pypi.org):
 
 ```shell

@@ -28,9 +28,6 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
 ]
 dynamic = ["version"]
-# Earlier PyArrow releases can segfault when exporting inline binary views.
-# https://github.com/apache/arrow/pull/50166
-dependencies = ["pyarrow>=25.0.0"]
 
 [project.optional-dependencies]
 test = [
@@ -45,6 +42,8 @@ test = [
     "geopandas",
     "pandas",
     "polars",
+    # Raster export tests need the inline binary view fix in Arrow 25.
+    "pyarrow>=25.0.0",
     "pytest",
     "pyyaml",
     "rasterio",
@@ -63,7 +62,7 @@ geopandas = [
 build = "cp310-*"
 # Set here rather than via CIBW_TEST_REQUIRES in the workflow: environment
 # variables take precedence over the overrides below.
-test-requires = ["pytest", "adbc_driver_manager", "geoarrow-pyarrow", "geopandas", "duckdb"]
+test-requires = ["pyarrow>=25.0.0", "pytest", "adbc_driver_manager", "geoarrow-pyarrow", "geopandas", "duckdb"]
 
 [tool.maturin]
 features = ["pyo3/extension-module", "pyo3/abi3-py310"]
