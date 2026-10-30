@@ -230,7 +230,7 @@ def test_rs_worldtorastercoord_empty_point_is_null():
     )
 
 
-def test_rs_value_matches_rasterio(pyarrow25, con):
+def test_rs_value_matches_rasterio(con):
     """Cross-check RS_Value against rasterio on a random raster.
 
     Builds an in-memory raster from a random numpy array with a known
@@ -527,7 +527,7 @@ def test_rs_values_ensureloaded_outdb(con, sedona_testing):
         con.drop_view(view)
 
 
-def test_rs_values_matches_rasterio(pyarrow25, con):
+def test_rs_values_matches_rasterio(con):
     """Cross-check RS_Values against rasterio on a random raster.
 
     The plural counterpart of `test_rs_value_matches_rasterio`: the same dense
@@ -643,7 +643,7 @@ def test_rs_asgeotiff_out_of_range_quality_errors(con):
 # floating-point prediction for float bands).
 @pytest.mark.parametrize("dtype", ["uint8", "uint16", "int32", "float32", "float64"])
 @pytest.mark.parametrize("compression_args", ["", ", 'DEFLATE', 0.85", ", 'LZW', 0.85"])
-def test_rs_asgeotiff_roundtrips_contents(pyarrow25, con, dtype, compression_args):
+def test_rs_asgeotiff_roundtrips_contents(con, dtype, compression_args):
     pytest.importorskip("rasterio")
     from rasterio.io import MemoryFile
 

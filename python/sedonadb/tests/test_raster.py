@@ -108,7 +108,7 @@ def test_iter_rasters_handles_chunks_and_nulls(con):
     assert sum(raster is None for raster in rasters) == 1
 
 
-def test_iter_rasters_handles_sliced_array_offsets(pyarrow25):
+def test_iter_rasters_handles_sliced_array_offsets():
     first = pa.array(Raster.from_numpy(np.full((4, 4), 11, dtype=np.uint16)))
     second = pa.array(Raster.from_numpy(np.full((4, 4), 22, dtype=np.uint16)))
     array = pa.concat_arrays([first, second]).slice(1, 1)
@@ -119,7 +119,7 @@ def test_iter_rasters_handles_sliced_array_offsets(pyarrow25):
 
 @pytest.mark.parametrize("parent_null", [False, True])
 @pytest.mark.parametrize("start", [0, 1, 2])
-def test_iter_rasters_null_bands_with_nonempty_offsets(pyarrow25, parent_null, start):
+def test_iter_rasters_null_bands_with_nonempty_offsets(parent_null, start):
     storage = pa.concat_arrays(
         [
             Raster.from_numpy(np.full((4, 4), value, dtype=np.uint16))._array
@@ -160,7 +160,7 @@ def test_iter_rasters_null_bands_with_nonempty_offsets(pyarrow25, parent_null, s
 
 
 @pytest.mark.parametrize("start, length", [(0, 10), (3, 6), (3, 1), (4, 0)])
-def test_iter_rasters_sliced_validity(pyarrow25, start, length):
+def test_iter_rasters_sliced_validity(start, length):
     raster = Raster.from_numpy(np.ones((4, 4), dtype=np.uint16))
     storage = pa.concat_arrays([raster._array] * 10)
     nulls = [True, False, False, True, False, False, False, True, False, True]
@@ -366,7 +366,7 @@ def test_raster_lazy_nd():
     assert r.height == 256
 
 
-def test_raster_from_numpy_2d(pyarrow25):
+def test_raster_from_numpy_2d():
     # Use array >12 bytes so BinaryView uses out-of-line storage (zero-copy eligible)
     arr = np.arange(4 * 5, dtype="uint8").reshape(4, 5)
     r = Raster.from_numpy(arr)
@@ -382,16 +382,9 @@ def test_raster_from_numpy_2d(pyarrow25):
     assert np.shares_memory(b.to_numpy(), arr)
 
 
-@pytest.mark.parametrize("version", ["21.0.0", "22.0.0", "24.0.0"])
-def test_raster_from_numpy_requires_pyarrow_25(monkeypatch, version):
-    monkeypatch.setattr(pa, "__version__", version)
-    with pytest.raises(ImportError, match=r"requires PyArrow >= 25\.0\.0"):
-        Raster.from_numpy(np.arange(6, dtype=np.uint8).reshape(2, 3))
-
-
 @pytest.mark.parametrize("nbytes", [0, 1, 6, 12, 13, 1024])
 @pytest.mark.parametrize("strided", [False, True])
-def test_raster_from_numpy_arrow_roundtrip(pyarrow25, nbytes, strided):
+def test_raster_from_numpy_arrow_roundtrip(nbytes, strided):
     source = np.arange(nbytes * (2 if strided else 1), dtype=np.uint8)
     pixels = (source[::2] if strided else source).reshape(1, nbytes)
     raster = Raster.from_numpy(pixels)
@@ -407,7 +400,7 @@ def test_raster_from_numpy_arrow_roundtrip(pyarrow25, nbytes, strided):
         assert np.shares_memory(restored, pixels) == (not strided)
 
 
-def test_raster_from_numpy_nd_with_crs(pyarrow25):
+def test_raster_from_numpy_nd_with_crs():
     arr = np.arange(2 * 2 * 3, dtype="float32").reshape(2, 2, 3)
     r = Raster.from_numpy(arr, dim_names=["time", "y", "x"], crs="EPSG:4326")
 
@@ -426,7 +419,7 @@ def test_raster_from_numpy_invalid_shape():
         Raster.from_numpy(np.zeros((2, 2, 3), dtype="uint8"))
 
 
-def test_raster_from_numpy_bbox_matches_rasterio(pyarrow25):
+def test_raster_from_numpy_bbox_matches_rasterio():
     # bbox (pixel/default) must produce rasterio.transform.from_bounds, in GDAL order.
     rasterio = pytest.importorskip("rasterio")
 
@@ -452,7 +445,7 @@ def test_raster_from_numpy_bbox_and_transform_mutually_exclusive():
         )
 
 
-def test_raster_from_numpy_bbox_registration_node(pyarrow25):
+def test_raster_from_numpy_bbox_registration_node():
     # A node-registered grid maps the bbox to cell centers, so its transform
     # differs from the default pixel registration (exact values are pinned by the
     # Rust unit test); this is the Python end-to-end smoke.
@@ -583,17 +576,17 @@ def test_get_binary_view_buffer_sliced():
         ("float64", -12345.5),
     ],
 )
-def test_band_nodata(pyarrow25, dtype, nodata):
+def test_band_nodata(dtype, nodata):
     r = Raster.from_numpy(np.zeros((2, 3), dtype=dtype), nodata=nodata)
     assert r.bands[0].nodata == nodata
 
 
-def test_band_nodata_unset(pyarrow25):
+def test_band_nodata_unset():
     r = Raster.from_numpy(np.zeros((2, 3), dtype="uint8"))
     assert r.bands[0].nodata is None
 
 
-def test_raster_to_numpy_single_band_is_zero_copy(pyarrow25):
+def test_raster_to_numpy_single_band_is_zero_copy():
     data = np.arange(6, dtype="float32").reshape(2, 3)
     r = Raster.from_numpy(data)
     out = r.to_numpy()

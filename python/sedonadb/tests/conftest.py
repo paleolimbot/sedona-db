@@ -38,9 +38,3 @@ def geoarrow_data():
 @pytest.fixture()
 def sedona_testing():
     return HERE.parent.parent.parent / "submodules" / "sedona-testing"
-
-
-@pytest.fixture()
-def pyarrow25():
-    """Require the Arrow export fix needed by Raster.from_numpy()."""
-    return pytest.importorskip("pyarrow", minversion="25.0.0")
